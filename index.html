@@ -628,6 +628,58 @@
   .ls-fach > summary .ls-fach-count{margin-left:auto;font-family:inherit;font-size:12px;font-weight:500;color:var(--text-muted);}
   .ls-fach-body{padding:0 16px 16px;}
 
+
+  /* ---------- Stadt Land Fluss ---------- */
+  .slf-wrap{display:flex;gap:24px 34px;align-items:center;justify-content:center;width:100%;flex-wrap:wrap;}
+  .slf-wheel-box{width:min(56vh,86vw,520px);}
+  .slf-mid{display:flex;flex-direction:column;align-items:center;gap:16px;min-width:0;flex:1 1 320px;max-width:620px;}
+  .slf-letter{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:clamp(90px,22vh,210px);line-height:1;color:var(--text-muted);transition:transform .2s,color .2s;}
+  .slf-hit .slf-letter{color:var(--brand);transform:scale(1.06);}
+  .slf-cats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%;}
+  .slf-cat{background:var(--surface);border:2px solid var(--border);border-radius:12px;padding:12px 10px;text-align:center;font-weight:800;font-size:clamp(15px,2.4vh,22px);line-height:1.2;overflow-wrap:anywhere;}
+  .slf-cat-fix{border-color:var(--brand);}
+  .slf-cat-pkt{background:var(--surface-2);color:var(--text-muted);}
+  .slf-used{font-size:14px;color:var(--text-muted);text-align:center;}
+  .slf-used-list{letter-spacing:.12em;font-weight:700;text-decoration:line-through;}
+  .slf-side{display:flex;flex-direction:column;gap:12px;align-items:center;width:min(320px,100%);}
+  .slf-glass-box{position:relative;display:flex;align-items:center;gap:14px;}
+  .slf-glass{width:auto;height:min(30vh,230px);}
+  .slf-glass-bulb{fill:var(--surface);}
+  .slf-glass-line{fill:none;stroke:var(--text);stroke-width:3;}
+  .slf-glass-frame{fill:#8B6944;}
+  .slf-sand{fill:#E8B72C;}
+  .slf-stream{stroke:#E8B72C;stroke-width:3;transition:opacity .2s;}
+  .slf-clock{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:clamp(30px,6vh,54px);font-variant-numeric:tabular-nums;min-width:3.2ch;}
+  .slf-warn .slf-clock{color:var(--bad);}
+  .slf-status{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:clamp(20px,3.6vh,34px);text-align:center;min-height:1.2em;line-height:1.1;}
+  .slf-over .slf-status{color:var(--bad);}
+  .slf-stop{background:var(--bad);color:#fff;font-size:clamp(22px,3.6vh,32px);font-weight:800;padding:16px 34px;border-radius:999px;width:100%;}
+  .slf-stop:disabled{opacity:.35;cursor:default;}
+  .slf-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  .slf-btns .btn{padding:12px 20px;font-size:16px;}
+
+  /* ---------- Pflanzen-Erinnerung ---------- */
+  .pf-banner{background:var(--bad-soft);border:2px solid var(--bad);border-radius:var(--radius);padding:12px 16px;margin:0 0 16px;}
+  .pf-banner-title{font-weight:800;color:var(--bad);font-size:17px;margin-bottom:8px;}
+  .pf-banner-list{display:flex;flex-direction:column;gap:6px;}
+  .pf-banner-item{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .pf-banner-when{color:var(--bad);font-size:13.5px;font-weight:600;}
+  .pf-done{background:var(--bad);color:#fff;}
+  .pf-btn-due{background:var(--bad-soft);color:var(--bad);animation:pfPulse 1.6s ease-in-out infinite;}
+  @keyframes pfPulse{50%{box-shadow:0 0 0 4px var(--bad-soft);}}
+  @media (prefers-reduced-motion: reduce){ .pf-btn-due{animation:none;} }
+  .pf-hint{font-size:13px;}
+  .pf-list{display:flex;flex-direction:column;gap:8px;margin-bottom:6px;}
+  .pf-item{display:flex;gap:10px;align-items:center;background:var(--surface-2);border:1px solid var(--border);border-left:5px solid #2E9E5B;border-radius:var(--radius-sm);padding:10px 12px;flex-wrap:wrap;}
+  .pf-item-due{border-color:var(--bad);border-left-color:var(--bad);background:var(--bad-soft);}
+  .pf-body{flex:1 1 220px;min-width:0;}
+  .pf-name{font-weight:800;font-size:15.5px;}
+  .pf-meta{font-size:13px;color:var(--text-muted);margin-top:3px;line-height:1.45;}
+  .pf-actions{display:flex;gap:4px;}
+  .pf-label{display:block;font-size:13px;font-weight:700;margin-bottom:4px;}
+  .pf-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .modal.pf-modal{max-width:620px;}
+
   /* ---------- Klassenzimmer-Sammelseite ---------- */
   .kz-intro{color:var(--text-muted);font-size:14px;margin:0 2px 16px;}
   .kz-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;}
@@ -2799,6 +2851,7 @@ function doLogout(){
   state.progressUnsubs = {};
   clearSubjectWatchers();
   stopTeacherTodoWatcher();
+  stopPflanzenWatcher();
   stopQuizWatcher();
   stopUmfrageWatcher();
   erledigt = { ids:{}, loaded:false, uid:null };
@@ -2953,6 +3006,7 @@ function renderChrome(innerHtml){
   html += topbarFerienCountdownHtml();
   if(isTeacher){
     html += '<button class="btn btn-ghost btn-sm topbar-todo" id="todoBtn" type="button" title="To-dos">📝 To-dos <span class="topbar-todo-badge" id="todoBadge">0</span></button>';
+    html += '<button class="btn btn-ghost btn-sm topbar-todo" id="pflanzenBtn" type="button" title="Pflanzen">🪴 <span class="topbar-todo-badge due" hidden>0</span></button>';
   }
   html += '<button class="topbar-quiz" id="quizJoinBtn" type="button" hidden>🎮 Quiz läuft — mitmachen</button>';
   html += '<button class="topbar-quiz topbar-umfrage" id="umfrageJoinBtn" type="button" hidden>⚡ Umfrage läuft — abstimmen</button>';
@@ -2975,7 +3029,7 @@ function renderChrome(innerHtml){
   html += '</div></div>';
   html += '<div class="push-popover" id="pushPopover" hidden></div>';
   if(isTeacher){ html += '<div class="todo-popover" id="todoPopover" hidden></div>'; }
-  html += '<div class="content">'+innerHtml+'</div>';
+  html += '<div class="content">'+(isTeacher ? '<div id="pflanzenBanner"></div>' : '')+innerHtml+'</div>';
   app.innerHTML = html;
 
   document.getElementById('logoBtn').addEventListener('click', goHome);
@@ -2993,6 +3047,12 @@ function renderChrome(innerHtml){
     todoBtn.addEventListener('mouseleave', todoHover.hoverOut);
     ensureTeacherTodoWatcher();
     updateTodoButton();
+  }
+  var pflanzenBtn = document.getElementById('pflanzenBtn');
+  if(pflanzenBtn){
+    pflanzenBtn.addEventListener('click', openPflanzen);
+    ensurePflanzenWatcher();
+    updatePflanzenAnzeige();
   }
 
   var coinBtn = document.getElementById('coinBtn');
@@ -5240,7 +5300,7 @@ function playGong(){
 }
 function playBlip(){ playTone(880, 0.12, 'triangle', 0.18); }
 
-/* ===================== BEAMER-WERKZEUGE (Ruhephase · Wer ist dran · Würfel · Glücksrad) =====================
+/* ===================== BEAMER-WERKZEUGE (Ruhephase · Wer ist dran · Würfel · Glücksrad · Stadt Land Fluss) =====================
    Mehrere Werkzeuge in einem Vollbild-Overlay. "Ruhephase" fasst Countdown,
    Lärmampel und die Liste der Kinder, die gerade sprechen dürfen, in EIN Bild
    zusammen — genau das steht im Unterricht gleichzeitig am Beamer. */
@@ -5256,6 +5316,7 @@ function openBeamerTools(initialTab){
   html += '<button class="kz-tab" data-tab="dran" type="button">🎲 Wer ist dran?</button>';
   html += '<button class="kz-tab" data-tab="wuerfel" type="button">🎲 Würfel</button>';
   html += '<button class="kz-tab" data-tab="rad" type="button">🎡 Glücksrad</button>';
+  html += '<button class="kz-tab" data-tab="slf" type="button">🌍 Stadt Land Fluss</button>';
   html += '<div class="kz-bar-spacer"></div>';
   html += '<button class="kz-close" id="kzClose" type="button" title="Schliessen (Esc)">✕</button>';
   html += '</div>';
@@ -5294,6 +5355,7 @@ function switchBeamerTab(tab){
   if(tab === 'dran'){ mountWerIstDran(stage); return; }
   if(tab === 'wuerfel'){ mountWuerfel(stage); return; }
   if(tab === 'rad'){ mountGlueck(stage); return; }
+  if(tab === 'slf'){ mountStadtLandFluss(stage); return; }
 
   stage.innerHTML = '<div class="rp-grid">'
     + '<div class="rp-col rp-col-timer" id="rpTimer"></div>'
@@ -6109,6 +6171,554 @@ function mountGlueck(stage){
   ladeKlasse();
   // Das Overlay ist evtl. noch nicht fertig ausgelegt — einmal nachzeichnen.
   requestAnimationFrame(function(){ if(!stopped && !spinning) draw(); });
+}
+
+/* ---------- 🌍 Stadt Land Fluss ----------
+   Stadt und Land stehen immer vorne, drei weitere Kategorien sind entweder
+   zufällig (aus SLF_KATEGORIEN) oder selbst festgelegt. Die Buchstaben-
+   Drehscheibe kennt alle Buchstaben ausser X und Y; gezogene verschwinden bis
+   „Alle Buchstaben zurück". Die Sanduhr läuft 1–3 Minuten, „STOPP!" beendet
+   die Runde sofort (wenn jemand fertig ist). */
+
+var SLF_BUCHSTABEN = 'ABCDEFGHIJKLMNOPQRSTUVWZ'.split('');
+var SLF_KATEGORIEN = [
+  'Fluss oder See', 'Tier', 'Pflanze', 'Beruf', 'Vorname',
+  'Berühmte Person', 'Sportart', 'Marke', 'Essen', 'Getränk',
+  'Musiker:in / Band', 'Film oder Serie', 'Videospiel', 'Fahrzeug', 'Kleidungsstück',
+  'Körperteil', 'Farbe', 'Hobby', 'Etwas im Schulzimmer', 'Musikinstrument',
+  'Obst oder Gemüse', 'Süssigkeit', 'App oder Website', 'Superheld:in / Comicfigur', 'Zeichentrickfigur',
+  'Gefühl', 'Eigenschaft (Adjektiv)', 'Verb', 'Gegenstand im Haushalt', 'Werkzeug',
+  'Ausrede fürs Zuspätkommen', 'Etwas für die Ferien', 'Etwas, das stinkt', 'Etwas, das Lärm macht', 'Etwas im Kühlschrank',
+  'Sehenswürdigkeit', 'Sprache', 'Märchen- oder Fantasyfigur', 'Spiel', 'Kompliment',
+  'Fussballclub', 'Wort mit 8+ Buchstaben', 'Englisches Wort', 'Schweizerdeutsches Wort', 'Etwas Rundes',
+  'Berg oder Gebirge', 'Haustiername', 'Pizzabelag', 'Etwas zum Anziehen im Winter', 'Etwas, das man verlieren kann'
+];
+var SLF_ZEITEN = [60, 90, 120, 150, 180];
+var slf = { rot:0, letzter:null };
+
+function slfJson(key, fallback){
+  try{ var v = JSON.parse(lsGet(LIB_PREFIX+key) || 'null'); return v == null ? fallback : v; }catch(e){ return fallback; }
+}
+function slfWeg(){
+  var a = slfJson('slf_weg', []);
+  return Array.isArray(a) ? a.filter(function(b){ return SLF_BUCHSTABEN.indexOf(b) >= 0; }) : [];
+}
+function slfZufallZiehen(alt){
+  var pool = SLF_KATEGORIEN.slice(), out = [];
+  // möglichst nicht dieselben wie eben
+  var ohneAlt = pool.filter(function(k){ return (alt || []).indexOf(k) < 0; });
+  if(ohneAlt.length >= 3) pool = ohneAlt;
+  while(out.length < 3){ out.push(pool.splice(zufallInt(pool.length), 1)[0]); }
+  return out;
+}
+function slfKategorien(){
+  if(lsGet(LIB_PREFIX+'slf_modus') === 'eigene'){
+    var e = slfJson('slf_eigene', []);
+    if(Array.isArray(e) && e.filter(Boolean).length === 3) return e;
+  }
+  var z = slfJson('slf_zufall', null);
+  if(!Array.isArray(z) || z.length !== 3){
+    z = slfZufallZiehen();
+    lsSet(LIB_PREFIX+'slf_zufall', JSON.stringify(z));
+  }
+  return z;
+}
+
+function slfSanduhrSvg(){
+  var top = 'M12,14 H108 C108,58 66,78 62,96 H58 C54,78 12,58 12,14 Z';
+  var bot = 'M58,104 H62 C66,122 108,142 108,186 H12 C12,142 54,122 58,104 Z';
+  return '<svg class="slf-glass" viewBox="0 0 120 200" aria-hidden="true">'
+    + '<defs><clipPath id="slfClipTop"><path d="'+top+'"/></clipPath><clipPath id="slfClipBot"><path d="'+bot+'"/></clipPath></defs>'
+    + '<path class="slf-glass-bulb" d="'+top+'"/><path class="slf-glass-bulb" d="'+bot+'"/>'
+    + '<rect id="slfSandTop" class="slf-sand" clip-path="url(#slfClipTop)" x="0" y="14" width="120" height="82"/>'
+    + '<rect id="slfSandBot" class="slf-sand" clip-path="url(#slfClipBot)" x="0" y="186" width="120" height="0"/>'
+    + '<line id="slfStream" class="slf-stream" x1="60" y1="94" x2="60" y2="186"/>'
+    + '<path class="slf-glass-line" d="'+top+'"/><path class="slf-glass-line" d="'+bot+'"/>'
+    + '<rect class="slf-glass-frame" x="4" y="4" width="112" height="10" rx="4"/>'
+    + '<rect class="slf-glass-frame" x="4" y="186" width="112" height="10" rx="4"/>'
+    + '</svg>';
+}
+
+function mountStadtLandFluss(stage){
+  var TAU = Math.PI * 2;
+  var spinning = false, raf = null, stopped = false, wheel = [];
+  var sek = parseInt(lsGet(LIB_PREFIX+'slf_sek') || '120', 10);
+  if(SLF_ZEITEN.indexOf(sek) < 0) sek = 120;
+  var autoStart = lsGet(LIB_PREFIX+'slf_auto') !== '0';
+  var uhr = { laeuft:false, ende:0, rest:sek*1000, tick:null, fertig:null, lastBeep:-1 };
+
+  var html = '<div class="slf-wrap" id="slfWrap">';
+  html += '<div class="gl-wheel-box slf-wheel-box"><div class="gl-pointer"></div><canvas id="slfCanvas"></canvas>';
+  html += '<button class="gl-hub" id="slfHub" type="button" aria-label="Drehen">Los!</button></div>';
+  html += '<div class="slf-mid">';
+  html += '<div class="slf-letter" id="slfLetter">?</div>';
+  html += '<div class="slf-cats" id="slfCats"></div>';
+  html += '<div class="slf-used" id="slfUsed"></div>';
+  html += '</div>';
+  html += '<div class="slf-side">';
+  html += '<div class="slf-glass-box">'+slfSanduhrSvg()+'<div class="slf-clock" id="slfClock"></div></div>';
+  html += '<div class="slf-status" id="slfStatus">&nbsp;</div>';
+  html += '<button class="btn slf-stop" id="slfStop" type="button">✋ STOPP!</button>';
+  html += '<div class="slf-btns"><button class="btn btn-primary" id="slfSpin" type="button">🎡 Drehen</button>';
+  html += '<button class="btn btn-ghost" id="slfStart" type="button">⏳ Start</button></div>';
+  html += '<span class="wu-seg" id="slfZeiten">';
+  SLF_ZEITEN.forEach(function(s){ html += '<button class="wu-opt" data-sek="'+s+'" type="button">'+fmtClock(s)+'</button>'; });
+  html += '</span>';
+  html += '<label class="wd-check"><input type="checkbox" id="slfAuto"'+(autoStart?' checked':'')+'> Sanduhr startet nach dem Drehen</label>';
+  html += '<span class="wu-seg"><button class="wu-opt" data-modus="zufall" type="button">🎲 Zufällige Kategorien</button>';
+  html += '<button class="wu-opt" data-modus="eigene" type="button">✏️ Eigene</button></span>';
+  html += '<button class="btn btn-ghost btn-sm" id="slfKat" type="button"></button>';
+  html += '<button class="btn btn-ghost btn-sm" id="slfReset" type="button">Alle Buchstaben zurück</button>';
+  html += '</div></div>';
+  stage.innerHTML = html;
+
+  var wrapEl = stage.querySelector('#slfWrap');
+  var canvas = stage.querySelector('#slfCanvas');
+  var letterEl = stage.querySelector('#slfLetter');
+  var catsEl = stage.querySelector('#slfCats');
+  var usedEl = stage.querySelector('#slfUsed');
+  var clockEl = stage.querySelector('#slfClock');
+  var statusEl = stage.querySelector('#slfStatus');
+  var spinBtn = stage.querySelector('#slfSpin');
+  var hubBtn = stage.querySelector('#slfHub');
+  var startBtn = stage.querySelector('#slfStart');
+  var stopBtn = stage.querySelector('#slfStop');
+  var katBtn = stage.querySelector('#slfKat');
+  var resetBtn = stage.querySelector('#slfReset');
+  var sandTop = stage.querySelector('#slfSandTop');
+  var sandBot = stage.querySelector('#slfSandBot');
+  var streamEl = stage.querySelector('#slfStream');
+
+  function modus(){ return lsGet(LIB_PREFIX+'slf_modus') === 'eigene' ? 'eigene' : 'zufall'; }
+
+  function draw(){
+    var size = canvas.parentNode.clientWidth;
+    if(!size) return;
+    var dpr = window.devicePixelRatio || 1;
+    var px = Math.round(size * dpr);
+    if(canvas.width !== px){ canvas.width = px; canvas.height = px; }
+    var ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    var css = getComputedStyle(document.documentElement);
+    var surface = css.getPropertyValue('--surface').trim() || '#FFFFFF';
+    var ring = css.getPropertyValue('--text').trim() || '#1C2033';
+    var c = size / 2, r = c - 6;
+    if(!wheel.length){
+      ctx.beginPath(); ctx.arc(c, c, r, 0, TAU);
+      ctx.fillStyle = css.getPropertyValue('--surface-2').trim() || '#EEF0F8'; ctx.fill();
+    } else {
+      var n = wheel.length, seg = TAU / n;
+      var fontPx = Math.max(12, Math.min(38, r * 0.14, r * seg * 0.7));
+      for(var i=0;i<n;i++){
+        var start = slf.rot - Math.PI/2 + i*seg;
+        var farbe = glueckFarbe(i, n);
+        ctx.beginPath(); ctx.moveTo(c, c); ctx.arc(c, c, r, start, start + seg); ctx.closePath();
+        ctx.fillStyle = farbe[0]; ctx.fill();
+        if(n > 1){ ctx.lineWidth = 2; ctx.strokeStyle = surface; ctx.stroke(); }
+        ctx.save();
+        ctx.translate(c, c); ctx.rotate(start + seg/2);
+        ctx.translate(r - fontPx * 0.9, 0); ctx.rotate(Math.PI/2);
+        ctx.fillStyle = farbe[1];
+        ctx.font = '800 ' + fontPx + "px 'Baloo 2', system-ui, sans-serif";
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(wheel[i], 0, 0);
+        ctx.restore();
+      }
+    }
+    ctx.beginPath(); ctx.arc(c, c, r, 0, TAU);
+    ctx.lineWidth = 5; ctx.strokeStyle = ring; ctx.stroke();
+  }
+
+  function paintUhr(){
+    var rest = uhr.laeuft ? Math.max(0, uhr.ende - Date.now()) : uhr.rest;
+    var frac = sek ? rest / (sek*1000) : 0;
+    clockEl.textContent = fmtClock(Math.ceil(rest/1000));
+    // Sand oben sitzt am Hals (unten im oberen Kolben), unten wächst er vom Boden auf.
+    var hTop = 82 * Math.sqrt(frac), hBot = 82 * Math.sqrt(1 - frac);
+    sandTop.setAttribute('y', String(96 - hTop)); sandTop.setAttribute('height', String(hTop));
+    sandBot.setAttribute('y', String(186 - hBot)); sandBot.setAttribute('height', String(hBot));
+    streamEl.style.opacity = (uhr.laeuft && rest > 0) ? '1' : '0';
+    wrapEl.classList.toggle('slf-warn', uhr.laeuft && rest <= 10000);
+    startBtn.textContent = uhr.laeuft ? '❚❚ Pause' : uhr.fertig ? '⏳ Nochmals' : (uhr.rest < sek*1000 && uhr.rest > 0 ? '▶︎ Weiter' : '⏳ Start');
+    stopBtn.disabled = !uhr.laeuft;
+  }
+  function uhrStop(){ clearInterval(uhr.tick); uhr.tick = null; if(uhr.laeuft){ uhr.rest = Math.max(0, uhr.ende - Date.now()); } uhr.laeuft = false; }
+  function uhrReset(){ uhrStop(); uhr.rest = sek*1000; uhr.lastBeep = -1; uhr.fertig = null; wrapEl.classList.remove('slf-over'); paintUhr(); }
+  function rundeEnde(text){
+    uhrStop();
+    uhr.fertig = text;
+    statusEl.textContent = text;
+    wrapEl.classList.add('slf-over');
+    playGong();
+    paintUhr();
+    paint();
+  }
+  function uhrStart(){
+    if(uhr.laeuft) return;
+    if(uhr.rest <= 0 || uhr.fertig) uhrReset();
+    ensureAudio();
+    uhr.laeuft = true;
+    uhr.ende = Date.now() + uhr.rest;
+    statusEl.textContent = 'Los geht’s — schreibt!';
+    uhr.tick = setInterval(function(){
+      var rest = uhr.ende - Date.now();
+      var s = Math.ceil(rest/1000);
+      if(s <= 5 && s > 0 && s !== uhr.lastBeep){ uhr.lastBeep = s; playBlip(); }
+      if(rest <= 0){ uhr.rest = 0; rundeEnde('⌛ Zeit um!'); return; }
+      paintUhr();
+    }, 200);
+    paintUhr();
+    paint();
+  }
+
+  function paint(){
+    var weg = slfWeg();
+    wheel = SLF_BUCHSTABEN.filter(function(b){ return weg.indexOf(b) < 0 || b === slf.letzter; });
+    var kats = ['Stadt', 'Land'].concat(slfKategorien());
+    catsEl.innerHTML = kats.map(function(k, i){
+      return '<div class="slf-cat'+(i < 2 ? ' slf-cat-fix' : '')+'">'+esc(k)+'</div>';
+    }).join('') + '<div class="slf-cat slf-cat-pkt">Punkte</div>';
+    var uebrig = SLF_BUCHSTABEN.length - weg.length;
+    usedEl.innerHTML = '<b>'+uebrig+'</b> von '+SLF_BUCHSTABEN.length+' Buchstaben übrig'
+      + (weg.length ? ' · schon gespielt: <span class="slf-used-list">'+esc(weg.join(' '))+'</span>' : '');
+    Array.prototype.forEach.call(stage.querySelectorAll('[data-sek]'), function(b){
+      b.classList.toggle('wu-opt-on', parseInt(b.getAttribute('data-sek'),10) === sek);
+      b.disabled = uhr.laeuft;
+    });
+    Array.prototype.forEach.call(stage.querySelectorAll('[data-modus]'), function(b){
+      b.classList.toggle('wu-opt-on', b.getAttribute('data-modus') === modus());
+    });
+    katBtn.textContent = modus() === 'eigene' ? '✏️ Kategorien bearbeiten' : '🔀 Neue Kategorien';
+    var nochWas = SLF_BUCHSTABEN.some(function(b){ return weg.indexOf(b) < 0; });
+    spinBtn.disabled = hubBtn.disabled = spinning || !nochWas;
+    if(!nochWas && !spinning && !uhr.laeuft && !uhr.fertig) statusEl.textContent = 'Alle Buchstaben gespielt 🎉';
+    resetBtn.disabled = spinning || !weg.length;
+    startBtn.disabled = spinning || !slf.letzter;
+    draw();
+  }
+
+  function spin(){
+    if(spinning) return;
+    slf.letzter = null;
+    uhrReset();
+    statusEl.innerHTML = '&nbsp;';
+    paint();
+    if(!wheel.length) return;
+    var list = wheel.slice(), n = list.length, seg = TAU / n;
+    function idxAt(rot){ return Math.floor(glueckMod(-rot, TAU) / seg) % n; }
+    var w = zufallInt(n);
+    var a = (w + 0.15 + Math.random() * 0.7) * seg;
+    var start = slf.rot;
+    var reduce = reduzierteBewegung();
+    var end = start + (reduce ? 0 : (5 + zufallInt(3)) * TAU) + glueckMod(-a - start, TAU);
+    var dur = reduce ? 600 : 4600 + Math.random() * 1000;
+    var t0 = performance.now(), lastIdx = idxAt(start), lastTick = 0;
+    spinning = true;
+    ensureAudio();
+    wrapEl.classList.remove('slf-hit');
+    letterEl.textContent = '…';
+    paint();
+
+    function frame(now){
+      if(stopped) return;
+      var p = Math.min(1, (now - t0) / dur);
+      slf.rot = start + (end - start) * (1 - Math.pow(1 - p, 4));
+      draw();
+      var idx = idxAt(slf.rot);
+      if(idx !== lastIdx && now - lastTick > 45){ playBlip(); lastTick = now; }
+      lastIdx = idx;
+      if(p < 1){ raf = requestAnimationFrame(frame); return; }
+      raf = null;
+      slf.rot = glueckMod(end, TAU);
+      spinning = false;
+      var b = list[w];
+      slf.letzter = b;
+      var weg = slfWeg();
+      if(weg.indexOf(b) < 0){ weg.push(b); weg.sort(); lsSet(LIB_PREFIX+'slf_weg', JSON.stringify(weg)); }
+      letterEl.textContent = b;
+      wrapEl.classList.add('slf-hit');
+      paint();
+      if(autoStart) uhrStart(); else playGong();
+    }
+    raf = requestAnimationFrame(frame);
+  }
+
+  function eigeneBearbeiten(){
+    var akt = slfJson('slf_eigene', []);
+    if(!Array.isArray(akt) || akt.length !== 3) akt = slfKategorien();
+    var h = '<h3>Eigene Kategorien</h3><p>Stadt und Land stehen immer vorne — dazu kommen diese drei:</p>';
+    for(var i=0;i<3;i++){
+      h += '<input type="text" id="slfK'+i+'" maxlength="40" list="slfKatListe" placeholder="Kategorie '+(i+3)+'" value="'+esc(akt[i]||'')+'">';
+    }
+    h += '<datalist id="slfKatListe">'+SLF_KATEGORIEN.map(function(k){ return '<option value="'+esc(k)+'">'; }).join('')+'</datalist>';
+    h += '<div class="modal-actions">'
+      + '<button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button>'
+      + '<button class="btn btn-primary btn-sm" id="modalOk" type="button">Speichern</button></div>';
+    openModal(h);
+    document.getElementById('slfK0').focus();
+    document.getElementById('modalCancel').addEventListener('click', closeModal);
+    document.getElementById('modalOk').addEventListener('click', function(){
+      var werte = [0,1,2].map(function(i){ return document.getElementById('slfK'+i).value.trim(); });
+      var leer = werte.indexOf('');
+      if(leer >= 0){ toast('Bitte alle drei Kategorien ausfüllen.'); document.getElementById('slfK'+leer).focus(); return; }
+      lsSet(LIB_PREFIX+'slf_eigene', JSON.stringify(werte));
+      lsSet(LIB_PREFIX+'slf_modus', 'eigene');
+      closeModal();
+      paint();
+    });
+  }
+
+  spinBtn.addEventListener('click', spin);
+  hubBtn.addEventListener('click', spin);
+  startBtn.addEventListener('click', function(){
+    if(uhr.laeuft){ uhrStop(); statusEl.textContent = 'Pause'; paintUhr(); paint(); }
+    else uhrStart();
+  });
+  stopBtn.addEventListener('click', function(){ if(uhr.laeuft) rundeEnde('✋ STOPP!'); });
+  Array.prototype.forEach.call(stage.querySelectorAll('[data-sek]'), function(b){
+    b.addEventListener('click', function(){
+      if(uhr.laeuft) return;
+      sek = parseInt(b.getAttribute('data-sek'), 10);
+      lsSet(LIB_PREFIX+'slf_sek', String(sek));
+      uhrReset(); paint();
+    });
+  });
+  stage.querySelector('#slfAuto').addEventListener('change', function(e){
+    autoStart = e.target.checked;
+    lsSet(LIB_PREFIX+'slf_auto', autoStart ? '1' : '0');
+  });
+  Array.prototype.forEach.call(stage.querySelectorAll('[data-modus]'), function(b){
+    b.addEventListener('click', function(){
+      var m = b.getAttribute('data-modus');
+      if(m === 'eigene'){
+        var e = slfJson('slf_eigene', []);
+        if(!Array.isArray(e) || e.length !== 3){ eigeneBearbeiten(); return; }
+      }
+      lsSet(LIB_PREFIX+'slf_modus', m);
+      paint();
+    });
+  });
+  katBtn.addEventListener('click', function(){
+    if(modus() === 'eigene'){ eigeneBearbeiten(); return; }
+    lsSet(LIB_PREFIX+'slf_zufall', JSON.stringify(slfZufallZiehen(slfKategorien())));
+    paint();
+  });
+  resetBtn.addEventListener('click', function(){
+    uiConfirm('Alle Buchstaben zurück?', 'Die schon gespielten Buchstaben kommen wieder auf die Drehscheibe.', 'Zurücksetzen', function(){
+      lsSet(LIB_PREFIX+'slf_weg', '[]');
+      slf.letzter = null;
+      letterEl.textContent = '?';
+      wrapEl.classList.remove('slf-hit');
+      uhrReset();
+      statusEl.innerHTML = '&nbsp;';
+      paint();
+    });
+  });
+
+  function onResize(){ if(!spinning) draw(); }
+  window.addEventListener('resize', onResize);
+  document.addEventListener('fullscreenchange', onResize);
+  beamerSpaceKey(spin);
+  beamer.cleanups.push(function(){
+    stopped = true;
+    if(raf) cancelAnimationFrame(raf);
+    raf = null; spinning = false;
+    uhrStop();
+    window.removeEventListener('resize', onResize);
+    document.removeEventListener('fullscreenchange', onResize);
+  });
+
+  if(slf.letzter){ letterEl.textContent = slf.letzter; wrapEl.classList.add('slf-hit'); }
+  uhrReset();
+  paint();
+  requestAnimationFrame(function(){ if(!stopped && !spinning) draw(); });
+}
+
+/* ===================== 🪴 PFLANZEN-ERINNERUNG (nur Lehrperson) =====================
+   Liegt in klassenzimmer/pflanzen (teacher-only, keine neue Regel nötig):
+   {plants:[{id, name, sommer, winter, last:'YYYY-MM-DD'}], updatedAt}.
+   Fällig = zuletzt gegossen + Abstand (Sommer Apr–Sep, Winter Okt–Mär, je
+   nach Monat des letzten Giessens). Solange eine Pflanze fällig ist, steht
+   oben auf JEDER Seite ein rotes Band — es verschwindet erst mit „Gegossen". */
+
+// Abstände in Tagen nach Pflegeangaben (feey, Plantura, pflanzen-verstehen,
+// palmenstadl) — fürs geheizte Schulzimmer im Winter nicht ganz auf null.
+var PFLANZEN_START = [
+  { id:'elefantenfuss', name:'Elefantenfuss',             sommer:14, winter:28, last:'2025-10-26' },
+  { id:'peperomie',     name:'Rundblättrige Peperomie',   sommer:7,  winter:14, last:'2025-09-25' },
+  { id:'palmlilie',     name:'Riesenpalmlilie',           sommer:10, winter:21, last:'2025-09-25' },
+  { id:'gluecksfeder',  name:'Glücksfeder',               sommer:14, winter:21, last:'2025-09-25' },
+  { id:'efeutute',      name:'Efeutute',                  sommer:7,  winter:12, last:'2025-09-25' }
+];
+var pflanzen = { list:[], loaded:false, unsub:null, timer:null, seeding:false };
+
+function pflanzenRef(){ return doc(db, 'klassenzimmer', 'pflanzen'); }
+
+function pflanzeAbstand(p){
+  var m = parseInt((p.last || '').split('-')[1], 10);
+  return (m >= 4 && m <= 9) ? p.sommer : p.winter;
+}
+function pflanzeNaechste(p){
+  var t = (p.last || '').split('-').map(Number);
+  if(t.length !== 3 || !t[0]) return todayStr();
+  return localDateStr(new Date(t[0], t[1]-1, t[2] + pflanzeAbstand(p)));
+}
+function pflanzeTageBis(dateStr){
+  var t = dateStr.split('-').map(Number);
+  var n = new Date(); n.setHours(0,0,0,0);
+  return Math.round((new Date(t[0], t[1]-1, t[2]) - n) / 86400000);
+}
+function pflanzenFaellig(){
+  var heute = todayStr();
+  return pflanzen.list.filter(function(p){ return pflanzeNaechste(p) <= heute; });
+}
+
+function ensurePflanzenWatcher(){
+  if(pflanzen.unsub) return;
+  pflanzen.unsub = onSnapshot(pflanzenRef(), function(snap){
+    if(!snap.exists()){
+      if(pflanzen.seeding) return;
+      pflanzen.seeding = true;
+      setDoc(pflanzenRef(), { plants: PFLANZEN_START, updatedAt: serverTimestamp() })
+        .catch(function(err){ console.error(err); })
+        .finally(function(){ pflanzen.seeding = false; });
+      return;
+    }
+    var d = snap.data();
+    pflanzen.list = Array.isArray(d.plants) ? d.plants : [];
+    pflanzen.loaded = true;
+    updatePflanzenAnzeige();
+  }, function(err){ console.error(err); });
+  // Das Datum wechselt auch ohne neuen Snapshot — regelmässig nachprüfen.
+  pflanzen.timer = setInterval(updatePflanzenAnzeige, 10*60*1000);
+}
+function stopPflanzenWatcher(){
+  if(pflanzen.unsub){ try{ pflanzen.unsub(); }catch(e){} pflanzen.unsub = null; }
+  if(pflanzen.timer){ clearInterval(pflanzen.timer); pflanzen.timer = null; }
+  pflanzen.list = []; pflanzen.loaded = false;
+}
+
+function pflanzenSpeichern(list, okText){
+  return setDoc(pflanzenRef(), { plants: list, updatedAt: serverTimestamp() }, {merge:true})
+    .then(function(){ if(okText) toast(okText); })
+    .catch(function(err){ console.error(err); toast('Konnte nicht gespeichert werden.'); });
+}
+function pflanzeGegossen(id){
+  var name = '';
+  var list = pflanzen.list.map(function(p){
+    if(p.id !== id) return p;
+    name = p.name;
+    return Object.assign({}, p, { last: todayStr() });
+  });
+  pflanzenSpeichern(list, '💧 '+name+' gegossen.');
+}
+
+function pflanzenBannerHtml(){
+  var f = pflanzenFaellig();
+  if(!f.length) return '';
+  var h = '<div class="pf-banner"><div class="pf-banner-title">🪴 Giessen nicht vergessen!</div><div class="pf-banner-list">';
+  f.forEach(function(p){
+    var tage = -pflanzeTageBis(pflanzeNaechste(p));
+    var wann = tage <= 0 ? 'heute fällig' : 'seit '+tage+' Tag'+(tage===1?'':'en')+' überfällig';
+    h += '<div class="pf-banner-item"><span><b>'+esc(p.name)+'</b> <span class="pf-banner-when">'+esc(wann)+'</span></span>';
+    h += '<button class="btn btn-sm pf-done" data-pf-done="'+esc(p.id)+'" type="button">💧 Gegossen</button></div>';
+  });
+  return h + '</div></div>';
+}
+
+function updatePflanzenAnzeige(){
+  var box = document.getElementById('pflanzenBanner');
+  if(box){
+    box.innerHTML = pflanzenBannerHtml();
+    bindPflanzenDone(box);
+  }
+  var btn = document.getElementById('pflanzenBtn');
+  if(btn){
+    var n = pflanzenFaellig().length;
+    btn.classList.toggle('pf-btn-due', n > 0);
+    btn.title = n ? n+' Pflanze'+(n===1?'':'n')+' giessen!' : 'Pflanzen';
+    var badge = btn.querySelector('.topbar-todo-badge');
+    if(badge){ badge.hidden = !n; badge.textContent = String(n); }
+  }
+  if(modalEl.classList.contains('show') && document.getElementById('pfListe')) renderPflanzenListe();
+}
+function bindPflanzenDone(root){
+  Array.prototype.forEach.call(root.querySelectorAll('[data-pf-done]'), function(b){
+    b.addEventListener('click', function(){ b.disabled = true; pflanzeGegossen(b.getAttribute('data-pf-done')); });
+  });
+}
+
+function openPflanzen(){
+  openModal('<h3>🪴 Pflanzen im Schulzimmer</h3>'
+    + '<p class="pf-hint">Abstände: Sommer = April bis September, Winter = Oktober bis März. Solange eine Pflanze fällig ist, bleibt das rote Band oben sichtbar.</p>'
+    + '<div id="pfListe"></div>'
+    + '<div class="modal-actions">'
+    + '<button class="btn btn-ghost btn-sm" id="pfAdd" type="button">+ Pflanze</button>'
+    + '<button class="btn btn-primary btn-sm" id="modalCancel" type="button">Schliessen</button></div>', 'pf-modal');
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  document.getElementById('pfAdd').addEventListener('click', function(){ pflanzeBearbeiten(null); });
+  renderPflanzenListe();
+}
+
+function renderPflanzenListe(){
+  var el = document.getElementById('pfListe');
+  if(!el) return;
+  if(!pflanzen.loaded){ el.innerHTML = '<div class="todo-empty">Wird geladen …</div>'; return; }
+  if(!pflanzen.list.length){ el.innerHTML = '<div class="todo-empty">Noch keine Pflanzen.</div>'; return; }
+  var list = pflanzen.list.slice().sort(function(a,b){ return pflanzeNaechste(a).localeCompare(pflanzeNaechste(b)); });
+  var h = '<div class="pf-list">';
+  list.forEach(function(p){
+    var next = pflanzeNaechste(p), tage = pflanzeTageBis(next);
+    var wann = tage < 0 ? 'seit '+(-tage)+' Tag'+(tage===-1?'':'en')+' überfällig' : tage === 0 ? 'heute' : tage === 1 ? 'morgen' : 'in '+tage+' Tagen';
+    h += '<div class="pf-item'+(tage <= 0 ? ' pf-item-due' : '')+'">';
+    h += '<div class="pf-body"><div class="pf-name">'+esc(p.name)+'</div>';
+    h += '<div class="pf-meta">Zuletzt '+esc(fmtDueDate(p.last))+' · nächstes Mal '+esc(fmtDueDate(next))+' (<b>'+esc(wann)+'</b>)<br>alle '+p.sommer+' Tage im Sommer, '+p.winter+' im Winter</div></div>';
+    h += '<div class="pf-actions"><button class="btn btn-sm '+(tage <= 0 ? 'pf-done' : 'btn-ghost')+'" data-pf-done="'+esc(p.id)+'" type="button">💧 Gegossen</button>';
+    h += '<button class="btn btn-ghost btn-sm" data-pf-edit="'+esc(p.id)+'" type="button" title="Bearbeiten">✏️</button></div></div>';
+  });
+  el.innerHTML = h + '</div>';
+  bindPflanzenDone(el);
+  Array.prototype.forEach.call(el.querySelectorAll('[data-pf-edit]'), function(b){
+    b.addEventListener('click', function(){
+      var id = b.getAttribute('data-pf-edit');
+      pflanzeBearbeiten(pflanzen.list.filter(function(p){ return p.id === id; })[0] || null);
+    });
+  });
+}
+
+function pflanzeBearbeiten(p){
+  var neu = !p;
+  var v = p || { name:'', sommer:7, winter:14, last:todayStr() };
+  openModal('<h3>'+(neu ? 'Neue Pflanze' : esc(v.name))+'</h3>'
+    + '<label class="pf-label">Name</label><input type="text" id="pfName" maxlength="40" value="'+esc(v.name)+'">'
+    + '<label class="pf-label">Zuletzt gegossen am</label><input type="date" id="pfLast" value="'+esc(v.last)+'" max="'+todayStr()+'">'
+    + '<div class="pf-row"><div><label class="pf-label">Alle … Tage (Sommer)</label><input type="number" id="pfSommer" min="1" max="90" value="'+v.sommer+'"></div>'
+    + '<div><label class="pf-label">Alle … Tage (Winter)</label><input type="number" id="pfWinter" min="1" max="90" value="'+v.winter+'"></div></div>'
+    + '<div class="modal-actions">'
+    + (neu ? '' : '<button class="btn btn-danger btn-sm" id="pfDel" type="button" style="margin-right:auto">Löschen</button>')
+    + '<button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button>'
+    + '<button class="btn btn-primary btn-sm" id="modalOk" type="button">Speichern</button></div>');
+  document.getElementById('pfName').focus();
+  document.getElementById('modalCancel').addEventListener('click', openPflanzen);
+  var del = document.getElementById('pfDel');
+  if(del) del.addEventListener('click', function(){
+    uiConfirm(v.name+' löschen?', 'Die Erinnerung für diese Pflanze fällt weg.', 'Löschen', function(){
+      pflanzenSpeichern(pflanzen.list.filter(function(x){ return x.id !== p.id; }), 'Gelöscht.').then(openPflanzen);
+    }, true);
+  });
+  document.getElementById('modalOk').addEventListener('click', function(){
+    var name = document.getElementById('pfName').value.trim();
+    var last = document.getElementById('pfLast').value;
+    var so = parseInt(document.getElementById('pfSommer').value, 10);
+    var wi = parseInt(document.getElementById('pfWinter').value, 10);
+    if(!name){ toast('Bitte einen Namen eingeben.'); return; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(last) || last > todayStr()){ toast('Bitte ein gültiges Datum (nicht in der Zukunft).'); return; }
+    if(!(so >= 1 && so <= 90) || !(wi >= 1 && wi <= 90)){ toast('Abstände: 1 bis 90 Tage.'); return; }
+    var eintrag = { id: neu ? 'p'+Date.now().toString(36) : p.id, name:name, sommer:so, winter:wi, last:last };
+    var list = neu ? pflanzen.list.concat([eintrag]) : pflanzen.list.map(function(x){ return x.id === p.id ? eintrag : x; });
+    pflanzenSpeichern(list, 'Gespeichert.').then(openPflanzen);
+  });
 }
 
 /* ===================== 📡 LIVE-KLASSENRAUM (nur Lehrperson) =====================
@@ -9856,6 +10466,7 @@ function renderKlassenzimmer(){
     { id:'dran',    icon:'🎲', name:'Wer ist dran?',       desc:'Faire Zufallsziehung — wer schon oft dran war, kommt seltener.' },
     { id:'wuerfel', icon:'🎲', name:'Würfel',              desc:'1–6 Würfel am Beamer — mit Augen oder als W10, W12, W20, W100.' },
     { id:'rad',     icon:'🎡', name:'Glücksrad',           desc:'Klasse oder eigene Liste aufs Rad — Gezogene auf Wunsch raus.' },
+    { id:'slf',     icon:'🌍', name:'Stadt Land Fluss',    desc:'Buchstaben-Drehscheibe, Kategorien und Sanduhr (1–3 Min.) mit STOPP-Knopf.' },
     { id:'sitzplan',icon:'🪑', name:'Sitzplan',            desc:'Möbel stellen, Plätze verteilen, Regeln, Zufall und gespeicherte Varianten.' },
     { id:'quiz',    icon:'🎮', name:'Klassen-Quiz',        desc:'Live-Quiz auf den Geräten der Klasse, Rangliste am Beamer.' },
     { id:'fragen',  icon:'❓', name:'Fragebox',            desc:'Anonyme Fragen der Klasse lesen und beantworten.' },
@@ -9886,6 +10497,7 @@ function renderKlassenzimmer(){
       else if(id === 'dran') openBeamerTools('dran');
       else if(id === 'wuerfel') openBeamerTools('wuerfel');
       else if(id === 'rad') openBeamerTools('rad');
+      else if(id === 'slf') openBeamerTools('slf');
       else if(id === 'sitzplan'){ state.route = {name:'sitzplan'}; render(); }
       else if(id === 'quiz'){ state.route = {name:'quiz'}; render(); }
       else if(id === 'fragen') openFragebox();
