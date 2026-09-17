@@ -3148,7 +3148,7 @@ function renderChrome(innerHtml){
   html += '<div class="push-popover" id="pushPopover" hidden></div>';
   if(isTeacher){ html += '<div class="todo-popover" id="todoPopover" hidden></div>'; }
   var fremdBanner = isFremdeKlasse()
-    ? '<div class="klasse-fremd-banner">👀 Du bist in der Klasse <b>'+esc(state.klasse)+'</b> ('+esc(klasseInfo().lp)+'). Änderungen werden hier gespeichert. <button class="btn btn-sm btn-primary" id="klasseHeimBtn" type="button">Zurück zur '+esc(state.profile.klasse)+'</button></div>'
+    ? '<div class="klasse-fremd-banner"><span>👀 Du bist in der Klasse <b>'+esc(state.klasse)+'</b> ('+esc(klasseInfo().lp)+'). Änderungen werden hier gespeichert.</span><button class="btn btn-sm btn-primary" id="klasseHeimBtn" type="button">Zurück zur '+esc(state.profile.klasse)+'</button></div>'
     : '';
   html += '<div class="content">'+fremdBanner+(isTeacher ? '<div id="pflanzenBanner"></div>' : '')+innerHtml+'</div>';
   app.innerHTML = html;
@@ -3529,7 +3529,7 @@ function openKlassenWahl(){
     var aktiv = k.id === state.klasse;
     var eigene = k.id === state.profile.klasse;
     h += '<button class="btn '+(aktiv?'btn-primary':'btn-ghost')+'" type="button" data-klasse="'+esc(k.id)+'">'+
-         '<b>'+esc(k.id)+'</b>&nbsp;· '+esc(k.lp)+(eigene?' (deine Klasse)':'')+(aktiv?' ✓':'')+'</button>';
+         '<span><b>'+esc(k.id)+'</b> · '+esc(k.lp)+(eigene?' (deine Klasse)':'')+(aktiv?' ✓':'')+'</span></button>';
   });
   h += '</div><div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button></div>';
   openModal(h);
@@ -3608,13 +3608,15 @@ async function loadKlassenAbgleich(force){
 
 function refreshSettingsBadge(force){
   if(!state.profile || state.profile.role !== 'teacher') return;
-  loadKlassenAbgleich(force).then(function(d){
-    var badge = document.getElementById('settingsBadge');
-    if(!badge) return;
-    var n = d.vorschlaege.length + d.updates.length;
-    badge.textContent = n > 99 ? '99+' : String(n);
-    badge.hidden = !n;
-  }).catch(function(err){ console.error('Einstellungen-Abgleich', err); });
+  loadKlassenAbgleich(force).then(setSettingsBadge)
+    .catch(function(err){ console.error('Einstellungen-Abgleich', err); });
+}
+function setSettingsBadge(d){
+  var badge = document.getElementById('settingsBadge');
+  if(!badge) return;
+  var n = d.vorschlaege.length + d.updates.length;
+  badge.textContent = n > 99 ? '99+' : String(n);
+  badge.hidden = !n;
 }
 
 function subjectName(id){
@@ -3644,6 +3646,7 @@ function openSettings(){
 
 function paintSettingsAbgleich(force){
   loadKlassenAbgleich(force).then(function(d){
+    setSettingsBadge(d);
     var upEl = document.getElementById('setUpdates');
     var vEl = document.getElementById('setVorschlaege');
     if(!upEl || !vEl) return;
@@ -3667,7 +3670,6 @@ function paintSettingsAbgleich(force){
           btn.disabled = true;
           Promise.resolve(fn(parseInt(btn.getAttribute(sel), 10))).then(function(){
             paintSettingsAbgleich(true);
-            refreshSettingsBadge(false);
           }, function(err){
             console.error(err);
             btn.disabled = false;
