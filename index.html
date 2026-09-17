@@ -3373,8 +3373,15 @@ async function runGoLive(){
     if(res.status === 204){
       toast('🚀 Freigabe gestartet — in ca. 1–2 Minuten ist die Live-Seite aktuell.');
     } else if(res.status === 401 || res.status === 403 || res.status === 404){
+      var ghMsg = '';
+      try{ ghMsg = (await res.json()).message || ''; }catch(e){}
       try{ localStorage.removeItem(GO_LIVE_TOKEN_KEY); }catch(e){}
-      askGoLiveToken('Der gespeicherte Token funktioniert nicht (mehr) — bitte einen neuen einfügen.');
+      var hint = res.status === 403
+        ? 'Der Token hat nicht genug Rechte — unter Permissions muss bei „Actions" „Read and write" stehen (nicht Read-only).'
+        : res.status === 404
+          ? 'Der Token hat keinen Zugriff auf das Repo helfenberger-library (unter Repository access auswählen) oder bei „Actions" fehlt „Read and write".'
+          : 'Der Token ist ungültig oder abgelaufen — bitte neu kopieren (ganzer Wert, beginnt mit github_pat_).';
+      askGoLiveToken(hint + ' (GitHub: ' + res.status + (ghMsg ? ' – ' + ghMsg : '') + ')');
     } else {
       uiInfo('Live schalten fehlgeschlagen', 'GitHub antwortete mit Status ' + res.status + '. Alternativ im Live-Repo unter Actions → „Testseite live schalten" → Run workflow.');
     }
