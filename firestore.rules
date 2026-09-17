@@ -1,0 +1,284 @@
+rules_version = '2';
+
+// Helfenberger's Library — Firestore Security Rules
+//
+// Data model (Storage-free: uploaded exercise pages live directly in Firestore,
+// so the whole project can run on the free "Spark" plan with no credit card):
+//   students/{uid}                        -> {username, displayName, role}   (written only by the admin script, read-only for clients)
+//   resources/{resourceId}                          -> {subject, title, fileName, uploadedAt, uploadedBy}  (lightweight metadata, listed per subject)
+//   resourceContent/{resourceId}                    -> {chunkCount}                                        (fetched only when a resource is opened)
+//   resourceContent/{resourceId}/chunks/{chunkId}    -> {html}   (<=~900KB each; a large upload is split into several of these and
+//                                                                 rejoined on read — see chunkStringByBytes() in index.html)
+//   progress/{uid}/resources/{resourceId}           -> {stats, total, updatedAt}                           (each student's own practice progress)
+//   folders/{folderId}                              -> {subject, parentId, name, order, createdAt, createdBy} (per-subject folder tree)
+//   calendarEntries/{entryId}                       -> {type, subject, title, description, dueDate, createdAt, createdBy} (Hausaufgaben/Abgaben/Prüfungen/Erinnerungen)
+//   pushSubscriptions/{uid}/devices/{subId}          -> each signed-in user's own push-notification device registrations
+//   debts/{uid}                                     -> {entries:[{id, amount, what, createdAt}], updatedAt} (kleine Schulden
+//                                                       bei der Lehrperson; nur die betroffene Person und die Lehrperson lesen)
+//   teacherTodos/{todoId}                           -> {text, description, subject, dueDate, done, doneAt, createdAt, createdBy} (private
+//                                                       To-do-Liste der Lehrperson im Lehrerbereich; nie für Schüler:innen sichtbar)
+//   appMeta/{id}                                    -> one-off seed markers (e.g. "was the Rotstift link
+//                                                       resource already created?"), so the app can create a
+//                                                       default entry exactly once without resurrecting it
+//                                                       after the teacher deletes it
+//   pruefungKorrektur/{pruefungId}                            -> {titel, fach, klasse, aufgaben, erstelltAm} (teacher-only exam
+//                                                                 correction tool, "Rotstift" — separate from the resources/
+//                                                                 progress system, never shown to students)
+//   pruefungKorrektur/{pruefungId}/schueler/{schuelerId}      -> {name, pageCount, ergebnisse, gesamtpunkte, maxPunkte, korrigiertAm}
+//   pruefungKorrekturScans/{schuelerId}/pages/{pageIndex}     -> {b64, mime, bytes} (downscaled JPEG per scanned page,
+//                                                                 base64 in Firestore since there is no Firebase Storage)
+//
+//   klasseninfo/aemtli                              -> {startDate, weekdays, zeiten, aemtli:[{icon,name,offset}],
+//                                                       teams:[[uid,uid],...], skipWeeks:[...]}  Aemtliplan. Liegt bewusst
+//                                                       NICHT unter klassenzimmer/: die Klasse muss ihn lesen koennen.
+//   klassenzimmer/gruppen                           -> {rollen:[...]} Rollen des Gruppengenerators (teacher-only)
+//   progress/{uid}/erledigt/liste                   -> {ids:{entryId:true}, updatedAt}  was die Schueler:in fuer SICH
+//                                                       abgehakt hat; unabhaengig von submitted.{uid} der Lehrperson
+//   progress/{uid}/eigeneEintraege/{id}             -> selbst eingetragene Kalendereintraege (gleiche Felder wie
+//                                                       calendarEntries), nur fuer die Person selbst sichtbar
+//   progress/{uid}/noten/liste                      -> {faecher:{fachId:[{id,name,note,gewicht}]}, updatedAt}
+//                                                       privater Notenrechner, nur die Person selbst
+//   quizSessions/umfrage                            -> laufende Blitzumfrage (nutzt die bestehenden quizSessions-Regeln,
+//                                                       Stimmen liegen unter .../antworten/{uid})
+//   klassenzimmer/sitzplan                          -> aktueller Sitzplan {tables, seats, meta, rules, absent,
+//                                                       genderMode, mirror}; tables[].kind = tisch | pult | block
+//   klassenzimmer/sitzplaene                        -> {plans:[{id, name, savedAt, tables, seats}]} gespeicherte
+//                                                       Sitzordnungen zum Wiederladen
+//   fragen/{fragenId}                               -> {text, subject, name, answer, published, createdAt} (Fragebox:
+//                                                       name ist leer, wenn anonym gefragt wurde - dann steht im
+//                                                       Dokument nichts über die Person, auch keine uid; nur die
+//                                                       Lehrperson liest ungefilterte Fragen, veröffentlichte
+//                                                       Antworten sieht die ganze Klasse)
+//   streaks/{uid}                                   -> {days:{'YYYY-MM-DD': Sekunden}, goalMin} (Lern-Serie)
+//   quizzes/{quizId}                                -> {title, subject, questions:[{q,a,c,sec}], createdAt} (NUR Lehrperson
+//                                                       lesbar - hier stehen die richtigen Antworten drin)
+//   quizSessions/aktiv                              -> laufende Quiz-Runde (feste Dokument-ID, es läuft immer nur eine)
+//   quizSessions/aktiv/antworten/{uid}              -> {qIndex, choice, at, name}   (jede:r schreibt nur die eigene)
+//   quizSessions/aktiv/spieler/{uid}                -> {name, score, correct}       (Punkte setzt nur die Lehrperson)
+//
+// Only the teacher account (helfenberger) carries the custom claim `teacher: true`,
+// set by admin/create-accounts.js. Everyone else is a student.
+
+function isSignedIn() {
+  return request.auth != null;
+}
+
+function isTeacher() {
+  return isSignedIn() && request.auth.token.teacher == true;
+}
+
+function isOwner(uid) {
+  return isSignedIn() && request.auth.uid == uid;
+}
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Roster info. Only the admin script (Admin SDK, bypasses rules) writes this.
+    match /students/{uid} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // The catalogue of uploaded exercise pages, one per subject.
+    match /resources/{resourceId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isTeacher();
+    }
+
+    // The actual content of each exercise page (kept separate from
+    // resources/{resourceId} so browsing a subject's list doesn't have to
+    // download every exercise's full content — only opening one does).
+    // Split into chunk sub-documents so a page can exceed Firestore's ~1MiB
+    // per-document limit (e.g. once exercises start including images).
+    match /resourceContent/{resourceId} {
+      allow read: if isSignedIn();
+      allow create, update: if isTeacher()
+        && request.resource.data.chunkCount is int
+        && request.resource.data.chunkCount > 0
+        && request.resource.data.chunkCount <= 20;
+      // Separate from create/update: on delete, request.resource is null, so a
+      // combined rule that reads request.resource.data would always deny it.
+      allow delete: if isTeacher();
+
+      match /chunks/{chunkId} {
+        allow read: if isSignedIn();
+        allow create, update: if isTeacher()
+          && request.resource.data.html is string
+          && request.resource.data.html.size() < 950000; // ~950KB, under Firestore's 1MiB document cap
+        allow delete: if isTeacher();
+      }
+    }
+
+    // Each student's own progress, one doc per resource. Teacher can read (not write) for an overview.
+    match /progress/{uid}/resources/{resourceId} {
+      allow read: if isOwner(uid) || isTeacher();
+      allow write: if isOwner(uid);
+    }
+
+    // Die selbst abgehakten Kalendereintraege (Hausaufgaben/Abgaben/Unterschriften).
+    // Rein zur eigenen Uebersicht der Schueler:in - die Abgabe-Checkliste der
+    // Lehrperson steht unabhaengig davon auf dem Kalendereintrag selbst
+    // (submitted.{uid}) und wird hier nicht beruehrt. Nur die eigene Person
+    // schreibt. Keine Datenvalidierung angehaengt, darum kann write kombiniert
+    // bleiben (bei einem delete waere request.resource null).
+    match /progress/{uid}/erledigt/{docId} {
+      allow read: if isOwner(uid) || isTeacher();
+      allow write: if isOwner(uid);
+    }
+
+    // Eigene Kalendereintraege der Schueler:in (selbst eingetragene
+    // Hausaufgaben etc.). Nur die Person selbst sieht und schreibt sie - auch
+    // die Lehrperson nicht. Keine Datenvalidierung, darum kann write
+    // kombiniert bleiben (bei einem delete waere request.resource null).
+    match /progress/{uid}/eigeneEintraege/{entryId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // Privater Notenrechner (progress/{uid}/noten/liste). Nur die Person
+    // selbst. Keine Datenvalidierung, write darf kombiniert bleiben.
+    match /progress/{uid}/noten/{docId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // Per-subject folder tree (same access pattern as resources: everyone
+    // signed in browses, only the teacher creates/renames/moves/deletes).
+    match /folders/{folderId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isTeacher();
+    }
+
+    // Kalender (Hausaufgaben, Abgaben, Prüfungen, Erinnerungen) — visible to
+    // the whole class, only the teacher writes.
+    match /calendarEntries/{entryId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isTeacher();
+    }
+
+    // Each signed-in user's own push-notification device registrations.
+    match /pushSubscriptions/{uid}/devices/{subId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // Schulden ("Münze" oben links): kleine Beträge, die Schüler:innen dem
+    // Lehrer schulden. Jede:r liest nur das eigene Dokument, damit niemand die
+    // Schulden der anderen sieht; geschrieben wird ausschliesslich vom Lehrer.
+    match /debts/{uid} {
+      allow read: if isOwner(uid) || isTeacher();
+      allow create, update: if isTeacher()
+        && request.resource.data.entries is list
+        && request.resource.data.entries.size() <= 100;
+      // Separat von create/update: bei einem delete ist request.resource null.
+      allow delete: if isTeacher();
+    }
+
+    // Private To-do-Liste der Lehrperson (Lehrerbereich). Teacher-only end to
+    // end - Schüler:innen sehen diese Collection nie. Keine Datenvalidierung
+    // angehängt, darum kann read/write kombiniert bleiben (bei einem delete
+    // wäre request.resource null).
+    match /teacherTodos/{todoId} {
+      allow read, write: if isTeacher();
+    }
+
+    // One-off seed markers (see data model note above). No data validation
+    // attached, so create/update/delete can safely stay combined.
+    match /appMeta/{id} {
+      allow read: if isSignedIn();
+      allow write: if isTeacher();
+    }
+
+    // Rotstift: exam correction tool. Teacher-only end to end — this holds
+    // exam scores, so unlike resources/folders it is never student-readable.
+    match /pruefungKorrektur/{pruefungId} {
+      allow read, write: if isTeacher();
+      match /schueler/{schuelerId} {
+        allow read, write: if isTeacher();
+      }
+    }
+
+    // Werkzeuge der Lehrperson (Sitzplan). Teacher-only end to end; enthält
+    // Notizen zur Klasse und geht Schüler:innen nichts an. Keine
+    // Datenvalidierung angehängt, darum kann read/write kombiniert bleiben.
+    match /klassenzimmer/{toolId} {
+      allow read, write: if isTeacher();
+    }
+
+    // Werkzeug-Daten, die die KLASSE sehen soll: Aemtliplan und Wochenplan.
+    // Bewusst getrennt von klassenzimmer/{toolId} - das ist teacher-only lesbar,
+    // weil dort Notizen zur Klasse stehen. Hier gilt: alle lesen, nur die
+    // Lehrperson schreibt. Keine Datenvalidierung angehaengt, darum kann write
+    // kombiniert bleiben (bei einem delete waere request.resource null).
+    match /klasseninfo/{toolId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacher();
+    }
+
+    // Fragebox. Jede:r Angemeldete darf eine Frage anlegen. Wer anonym fragt,
+    // schickt name:'' mit - im Dokument steht dann bewusst nichts über die
+    // Person (auch keine uid), es ist also auch im Nachhinein nicht
+    // zuzuordnen. Gelesen wird es nur von der Lehrperson, ausser sie hat es
+    // beantwortet und veröffentlicht (published == true): dann sieht es die
+    // ganze Klasse über die Abfrage where('published','==',true).
+    match /fragen/{fragenId} {
+      allow read: if isTeacher() || resource.data.published == true;
+      allow create: if isSignedIn()
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 600
+        && request.resource.data.published == false
+        && request.resource.data.answer == '';
+      allow update: if isTeacher();
+      // Separat von create/update: bei einem delete ist request.resource null.
+      allow delete: if isTeacher();
+    }
+
+    // Lern-Serie: geübte Minuten pro Tag. Jede:r schreibt nur die eigene,
+    // die Lehrperson darf sie lesen (Überblick, wer regelmässig übt).
+    match /streaks/{uid} {
+      allow read: if isOwner(uid) || isTeacher();
+      allow create, update: if isOwner(uid);
+      // Separat, siehe oben.
+      allow delete: if isTeacher();
+    }
+
+    // Quiz-Vorlagen. NUR für die Lehrperson lesbar - in questions[].c steht
+    // jeweils die richtige Antwort. In die laufende Sitzung wandert pro Frage
+    // nur der Text plus die Auswahl, der richtige Index erst beim Auflösen.
+    match /quizzes/{quizId} {
+      allow read, write: if isTeacher();
+    }
+
+    // Die laufende Quiz-Runde. Alle lesen mit (Frage, Auflösung, Rangliste),
+    // geschrieben wird die Runde selbst nur von der Lehrperson.
+    match /quizSessions/{sessionId} {
+      allow read: if isSignedIn();
+      allow create, update: if isTeacher();
+      // Separat, siehe oben.
+      allow delete: if isTeacher();
+
+      // Die eigene Antwort auf die aktuelle Frage.
+      match /antworten/{uid} {
+        allow read: if isOwner(uid) || isTeacher();
+        allow create, update: if isOwner(uid);
+        allow delete: if isTeacher();
+      }
+
+      // Punktestände. Beim Beitreten legt sich jede:r den eigenen Eintrag mit
+      // 0 Punkten an; danach darf der Punktestand nur noch von der Lehrperson
+      // geändert werden - sonst könnte man sich selbst an die Spitze schreiben.
+      match /spieler/{uid} {
+        allow read: if isSignedIn();
+        allow create: if isTeacher() || (isOwner(uid) && request.resource.data.score == 0);
+        allow update: if isTeacher() || (isOwner(uid) && request.resource.data.score == resource.data.score);
+        allow delete: if isTeacher();
+      }
+    }
+
+    match /pruefungKorrekturScans/{schuelerId} {
+      allow read, write: if isTeacher();
+      match /pages/{pageIndex} {
+        allow read, write: if isTeacher();
+      }
+    }
+  }
+}
