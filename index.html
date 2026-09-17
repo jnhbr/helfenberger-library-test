@@ -4230,6 +4230,8 @@ function renderFolderContents(){
       uiPrompt('Übung umbenennen', null, r.title || r.fileName, 'Speichern', function(title){ renameResource(r, title); });
     });
     document.getElementById('mv-'+r.id).addEventListener('click', function(){ askMoveResource(r); });
+    var replBtn = document.getElementById('repl-'+r.id);
+    if(replBtn) replBtn.addEventListener('click', function(){ pickReplacementFile(r); });
   });
 }
 
@@ -4442,6 +4444,9 @@ function resourceCardHtml(r, index, total, isTeacher){
       html += '<button class="btn btn-sm btn-current'+(r.current?' active':'')+'" id="cur-'+r.id+'">'+(r.current?'Nicht mehr aktuell':'Als aktuell markieren')+'</button>';
     }
     html += '<button class="btn btn-ghost btn-sm" id="rrename-'+r.id+'" type="button">Umbenennen</button>';
+    if(!r.externalUrl){
+      html += '<button class="btn btn-ghost btn-sm" id="repl-'+r.id+'" type="button" title="Neue Version der HTML-Datei hochladen – Titel, Ort und Übungsstände bleiben">Datei ersetzen</button>';
+    }
     html += '<button class="btn btn-ghost btn-sm" id="mv-'+r.id+'" type="button">Verschieben</button>';
     html += '<button class="btn btn-danger btn-sm" id="del-'+r.id+'">Löschen</button>';
   }
@@ -4465,6 +4470,57 @@ function updateResourceBar(resourceId, p){
 function renameResource(r, title){
   setDoc(doc(db,'resources', r.id), {title: title.slice(0,120)}, {merge:true})
     .catch(function(err){ console.error(err); toast('Umbenennen fehlgeschlagen.'); });
+}
+
+// Neue Version einer hochgeladenen HTML-Datei: nur der Inhalt wird getauscht,
+// die Übung behält ID, Titel, Ordner, Reihenfolge und alle Übungsstände.
+function pickReplacementFile(r){
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.html,.htm,text/html';
+  input.addEventListener('change', function(){
+    var file = input.files && input.files[0];
+    if(!file) return;
+    if(!/\.html?$/i.test(file.name) && file.type !== 'text/html'){
+      toast('Bitte eine HTML-Datei wählen (.html).');
+      return;
+    }
+    if(file.size > MAX_RESOURCE_BYTES){
+      toast('Datei ist zu gross (max. '+Math.round(MAX_RESOURCE_BYTES/1024/1024)+' MB).');
+      return;
+    }
+    uiConfirm('Datei ersetzen?',
+      'Der Inhalt von «'+(r.title||r.fileName)+'» wird durch «'+file.name+'» ersetzt. Titel, Ort und Übungsstände bleiben erhalten.',
+      'Ersetzen', function(){ replaceResource(r, file); });
+  });
+  input.click();
+}
+
+async function replaceResource(r, file){
+  try{
+    var htmlText = await readFileAsText(file);
+    if(new Blob([htmlText]).size > MAX_RESOURCE_BYTES){
+      toast('Datei ist zu gross (max. '+Math.round(MAX_RESOURCE_BYTES/1024/1024)+' MB).');
+      return;
+    }
+    var chunks = chunkStringByBytes(htmlText, MAX_CHUNK_BYTES);
+    var contentSnap = await getDoc(doc(db,'resourceContent', r.id));
+    var oldCount = (contentSnap.exists() && contentSnap.data().chunkCount) || 0;
+    var batch = writeBatch(db);
+    batch.set(doc(db,'resourceContent', r.id), { chunkCount: chunks.length });
+    chunks.forEach(function(chunk, i){
+      batch.set(doc(db,'resourceContent', r.id, 'chunks', String(i)), { html: chunk });
+    });
+    for(var i=chunks.length;i<oldCount;i++){
+      batch.delete(doc(db,'resourceContent', r.id, 'chunks', String(i)));
+    }
+    batch.set(doc(db,'resources', r.id), { fileName: file.name, replacedAt: serverTimestamp() }, {merge:true});
+    await batch.commit();
+    toast('«'+(r.title||file.name)+'» wurde ersetzt.');
+  }catch(err){
+    console.error(err);
+    toast('Ersetzen fehlgeschlagen: '+(err && err.message ? err.message : 'unbekannter Fehler'));
+  }
 }
 
 function askDeleteResource(r){
