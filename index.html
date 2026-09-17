@@ -6537,20 +6537,22 @@ function mountStadtLandFluss(stage){
 
 /* ===================== 🪴 PFLANZEN-ERINNERUNG (nur Lehrperson) =====================
    Liegt in klassenzimmer/pflanzen (teacher-only, keine neue Regel nötig):
-   {plants:[{id, name, sommer, winter, last:'YYYY-MM-DD'}], updatedAt}.
-   Fällig = zuletzt gegossen + Abstand (Sommer Apr–Sep, Winter Okt–Mär, je
-   nach Monat des letzten Giessens). Solange eine Pflanze fällig ist, steht
+   {plants:[{id, name, sommer, winter, last:'YYYY-MM-DD', next?:'YYYY-MM-DD'}], seedVersion, updatedAt}.
+   Fällig = `next`, falls fix gesetzt (Starttermine / von Hand), sonst zuletzt
+   gegossen + Abstand (Sommer Apr–Sep, Winter Okt–Mär, je nach Monat des
+   letzten Giessens). „Gegossen" setzt last = heute und löscht `next`. Solange eine Pflanze fällig ist, steht
    oben auf JEDER Seite ein rotes Band — es verschwindet erst mit „Gegossen". */
 
 // Abstände in Tagen nach Pflegeangaben (feey, Plantura, pflanzen-verstehen,
 // palmenstadl) — fürs geheizte Schulzimmer im Winter nicht ganz auf null.
 var PFLANZEN_START = [
-  { id:'elefantenfuss', name:'Elefantenfuss',             sommer:14, winter:28, last:'2025-10-26' },
-  { id:'peperomie',     name:'Rundblättrige Peperomie',   sommer:7,  winter:14, last:'2025-09-25' },
-  { id:'palmlilie',     name:'Riesenpalmlilie',           sommer:10, winter:21, last:'2025-09-25' },
-  { id:'gluecksfeder',  name:'Glücksfeder',               sommer:14, winter:21, last:'2025-09-25' },
-  { id:'efeutute',      name:'Efeutute',                  sommer:7,  winter:12, last:'2025-09-25' }
+  { id:'elefantenfuss', name:'Elefantenfuss',             sommer:14, winter:28, last:'', next:'2026-10-26' },
+  { id:'peperomie',     name:'Rundblättrige Peperomie',   sommer:7,  winter:14, last:'', next:'2026-09-25' },
+  { id:'palmlilie',     name:'Riesenpalmlilie',           sommer:10, winter:21, last:'', next:'2026-09-25' },
+  { id:'gluecksfeder',  name:'Glücksfeder',               sommer:14, winter:21, last:'', next:'2026-09-25' },
+  { id:'efeutute',      name:'Efeutute',                  sommer:7,  winter:12, last:'', next:'2026-09-25' }
 ];
+var PFLANZEN_SEED_VERSION = 2;
 var pflanzen = { list:[], loaded:false, unsub:null, timer:null, seeding:false };
 
 function pflanzenRef(){ return doc(db, 'klassenzimmer', 'pflanzen'); }
@@ -6560,6 +6562,7 @@ function pflanzeAbstand(p){
   return (m >= 4 && m <= 9) ? p.sommer : p.winter;
 }
 function pflanzeNaechste(p){
+  if(/^\d{4}-\d{2}-\d{2}$/.test(p.next || '')) return p.next;
   var t = (p.last || '').split('-').map(Number);
   if(t.length !== 3 || !t[0]) return todayStr();
   return localDateStr(new Date(t[0], t[1]-1, t[2] + pflanzeAbstand(p)));
@@ -6580,12 +6583,23 @@ function ensurePflanzenWatcher(){
     if(!snap.exists()){
       if(pflanzen.seeding) return;
       pflanzen.seeding = true;
-      setDoc(pflanzenRef(), { plants: PFLANZEN_START, updatedAt: serverTimestamp() })
+      setDoc(pflanzenRef(), { plants: PFLANZEN_START, seedVersion: PFLANZEN_SEED_VERSION, updatedAt: serverTimestamp() })
         .catch(function(err){ console.error(err); })
         .finally(function(){ pflanzen.seeding = false; });
       return;
     }
     var d = snap.data();
+    // Erste Fassung hat Jans Termine als „zuletzt gegossen 2025" gespeichert —
+    // gemeint waren die NÄCHSTEN Giesstermine. Einmalig ersetzen, solange
+    // noch nichts daran geändert wurde.
+    if(!d.seedVersion && !pflanzen.seeding && Array.isArray(d.plants) && d.plants.length === 5
+       && d.plants.every(function(p){ return /^2025-(10-26|09-25)$/.test(p.last || ''); })){
+      pflanzen.seeding = true;
+      updateDoc(pflanzenRef(), { plants: PFLANZEN_START, seedVersion: PFLANZEN_SEED_VERSION, updatedAt: serverTimestamp() })
+        .catch(function(err){ console.error(err); })
+        .finally(function(){ pflanzen.seeding = false; });
+      return;
+    }
     pflanzen.list = Array.isArray(d.plants) ? d.plants : [];
     pflanzen.loaded = true;
     updatePflanzenAnzeige();
@@ -6609,7 +6623,9 @@ function pflanzeGegossen(id){
   var list = pflanzen.list.map(function(p){
     if(p.id !== id) return p;
     name = p.name;
-    return Object.assign({}, p, { last: todayStr() });
+    var neu = Object.assign({}, p, { last: todayStr() });
+    delete neu.next;
+    return neu;
   });
   pflanzenSpeichern(list, '💧 '+name+' gegossen.');
 }
@@ -6673,7 +6689,7 @@ function renderPflanzenListe(){
     var wann = tage < 0 ? 'seit '+(-tage)+' Tag'+(tage===-1?'':'en')+' überfällig' : tage === 0 ? 'heute' : tage === 1 ? 'morgen' : 'in '+tage+' Tagen';
     h += '<div class="pf-item'+(tage <= 0 ? ' pf-item-due' : '')+'">';
     h += '<div class="pf-body"><div class="pf-name">'+esc(p.name)+'</div>';
-    h += '<div class="pf-meta">Zuletzt '+esc(fmtDueDate(p.last))+' · nächstes Mal '+esc(fmtDueDate(next))+' (<b>'+esc(wann)+'</b>)<br>alle '+p.sommer+' Tage im Sommer, '+p.winter+' im Winter</div></div>';
+    h += '<div class="pf-meta">'+(p.last ? 'Zuletzt '+esc(fmtDueDate(p.last))+' · ' : '')+'nächstes Mal '+esc(fmtDueDate(next))+' (<b>'+esc(wann)+'</b>)<br>alle '+p.sommer+' Tage im Sommer, '+p.winter+' im Winter</div></div>';
     h += '<div class="pf-actions"><button class="btn btn-sm '+(tage <= 0 ? 'pf-done' : 'btn-ghost')+'" data-pf-done="'+esc(p.id)+'" type="button">💧 Gegossen</button>';
     h += '<button class="btn btn-ghost btn-sm" data-pf-edit="'+esc(p.id)+'" type="button" title="Bearbeiten">✏️</button></div></div>';
   });
@@ -6690,9 +6706,11 @@ function renderPflanzenListe(){
 function pflanzeBearbeiten(p){
   var neu = !p;
   var v = p || { name:'', sommer:7, winter:14, last:todayStr() };
+  var nextAlt = p ? pflanzeNaechste(p) : '';
   openModal('<h3>'+(neu ? 'Neue Pflanze' : esc(v.name))+'</h3>'
     + '<label class="pf-label">Name</label><input type="text" id="pfName" maxlength="40" value="'+esc(v.name)+'">'
-    + '<label class="pf-label">Zuletzt gegossen am</label><input type="date" id="pfLast" value="'+esc(v.last)+'" max="'+todayStr()+'">'
+    + '<label class="pf-label">Zuletzt gegossen am'+(neu ? '' : ' (leer = unbekannt)')+'</label><input type="date" id="pfLast" value="'+esc(v.last || '')+'" max="'+todayStr()+'">'
+    + (neu ? '' : '<label class="pf-label">Nächstes Mal giessen am</label><input type="date" id="pfNext" value="'+esc(nextAlt)+'">')
     + '<div class="pf-row"><div><label class="pf-label">Alle … Tage (Sommer)</label><input type="number" id="pfSommer" min="1" max="90" value="'+v.sommer+'"></div>'
     + '<div><label class="pf-label">Alle … Tage (Winter)</label><input type="number" id="pfWinter" min="1" max="90" value="'+v.winter+'"></div></div>'
     + '<div class="modal-actions">'
@@ -6713,9 +6731,18 @@ function pflanzeBearbeiten(p){
     var so = parseInt(document.getElementById('pfSommer').value, 10);
     var wi = parseInt(document.getElementById('pfWinter').value, 10);
     if(!name){ toast('Bitte einen Namen eingeben.'); return; }
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(last) || last > todayStr()){ toast('Bitte ein gültiges Datum (nicht in der Zukunft).'); return; }
+    var nextEl = document.getElementById('pfNext');
+    var next = nextEl ? nextEl.value : '';
+    if(last && (!/^\d{4}-\d{2}-\d{2}$/.test(last) || last > todayStr())){ toast('„Zuletzt gegossen" darf nicht in der Zukunft liegen.'); return; }
+    if(!last && !next){ toast('Bitte „zuletzt gegossen" oder „nächstes Mal" angeben.'); return; }
     if(!(so >= 1 && so <= 90) || !(wi >= 1 && wi <= 90)){ toast('Abstände: 1 bis 90 Tage.'); return; }
     var eintrag = { id: neu ? 'p'+Date.now().toString(36) : p.id, name:name, sommer:so, winter:wi, last:last };
+    // Nur fix speichern, wenn der Termin von Hand anders ist als der berechnete
+    // (oder sich ohne letztes Giessen gar nicht berechnen lässt).
+    if(next && (!last || next !== nextAlt || (p && p.next))){
+      var ohne = pflanzeNaechste({ last:last, sommer:so, winter:wi });
+      if(!last || next !== ohne) eintrag.next = next;
+    }
     var list = neu ? pflanzen.list.concat([eintrag]) : pflanzen.list.map(function(x){ return x.id === p.id ? eintrag : x; });
     pflanzenSpeichern(list, 'Gespeichert.').then(openPflanzen);
   });
