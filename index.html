@@ -663,6 +663,9 @@
   .pf-banner-title{font-weight:800;color:var(--bad);font-size:17px;margin-bottom:8px;}
   .pf-banner-list{display:flex;flex-direction:column;gap:6px;}
   .pf-banner-item{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .pf-banner-info{background:var(--surface-2);border-color:#E8B72C;}
+  .pf-banner-info .pf-banner-title{color:var(--text);}
+  .pf-banner-sub{font-size:13.5px;color:var(--text-muted);margin:-4px 0 8px;}
   .pf-banner-when{color:var(--bad);font-size:13.5px;font-weight:600;}
   .pf-done{background:var(--bad);color:#fff;}
   .pf-btn-due{background:var(--bad-soft);color:var(--bad);animation:pfPulse 1.6s ease-in-out infinite;}
@@ -6572,9 +6575,96 @@ function pflanzeTageBis(dateStr){
   var n = new Date(); n.setHours(0,0,0,0);
   return Math.round((new Date(t[0], t[1]-1, t[2]) - n) / 86400000);
 }
+
+/* Ferien & Wochenenden: Jan kann nur an Schultagen giessen (in den Ferien
+   höchstens mal vorbeikommen). pflanzePlan() verschiebt darum die Erinnerung:
+   - fällig an einem Nicht-Schultag, aber der nächste Schultag liegt noch in
+     der Toleranz (40 % des Abstands) → Erinnerung am nächsten Schultag;
+   - sonst → schon am letzten Schultag davor („vor den Herbstferien giessen");
+   - geht auch das nicht (dann wäre gerade erst gegossen worden) → die
+     Pflanze braucht einen Besuch in den Ferien, Erinnerung am Fälligkeitstag.
+   pflanzeFerienBesuche() spielt die kommenden Ferien durch und nennt die Tage,
+   an denen trotz Vorab-Giessen jemand vorbeikommen muss. */
+function pfPlus(dateStr, n){
+  var t = dateStr.split('-').map(Number);
+  return localDateStr(new Date(t[0], t[1]-1, t[2] + n));
+}
+function pfTage(a, b){
+  var x = a.split('-').map(Number), y = b.split('-').map(Number);
+  return Math.round((new Date(y[0], y[1]-1, y[2]) - new Date(x[0], x[1]-1, x[2])) / 86400000);
+}
+function pfFerienAm(dateStr){
+  return FERIEN_TG.filter(function(f){ return f.start <= dateStr && f.end >= dateStr; })[0] || null;
+}
+function pfSchultag(dateStr){
+  var t = dateStr.split('-').map(Number);
+  var wd = new Date(t[0], t[1]-1, t[2]).getDay();
+  return wd >= 1 && wd <= 5 && !pfFerienAm(dateStr);
+}
+function pfSchultagNach(dateStr){
+  var d = dateStr;
+  for(var i=0;i<60;i++){ d = pfPlus(d, 1); if(pfSchultag(d)) return d; }
+  return d;
+}
+function pfSchultagVor(dateStr){
+  var d = dateStr;
+  for(var i=0;i<60;i++){ d = pfPlus(d, -1); if(pfSchultag(d)) return d; }
+  return d;
+}
+function pflanzeAbstandAb(p, dateStr){
+  return pflanzeAbstand({ last:dateStr, sommer:p.sommer, winter:p.winter });
+}
+function pflanzeToleranz(abstand){ return Math.max(1, Math.floor(abstand * 0.4)); }
+
+// Nächster Giesstermin ab „gegossen am" (bzw. dem festen Termin), angepasst an
+// Schultage. Liefert {due, remind, grund, besuch}.
+function pflanzePlanAb(p, due, zuletzt){
+  var r = { due:due, remind:due, grund:'', besuch:false };
+  if(pfSchultag(due)) return r;
+  var fer = pfFerienAm(due);
+  var nach = pfSchultagNach(due);
+  if(pfTage(due, nach) <= pflanzeToleranz(pflanzeAbstandAb(p, due))){
+    r.remind = nach;
+    r.grund = 'hält bis '+(fer ? 'nach den '+fer.label : 'nach dem Wochenende')+' durch';
+    return r;
+  }
+  var vor = pfSchultagVor(due);
+  if(!zuletzt || vor > zuletzt){
+    r.remind = vor;
+    r.grund = fer ? 'vor den '+fer.label+' noch giessen' : 'vor dem Wochenende giessen';
+    return r;
+  }
+  r.besuch = true;
+  r.grund = fer ? 'in den '+fer.label+' vorbeikommen' : 'am Wochenende vorbeikommen';
+  return r;
+}
+function pflanzePlan(p){ return pflanzePlanAb(p, pflanzeNaechste(p), p.last || ''); }
+
+// Tage in den nächsten (oder laufenden) Ferien, an denen die Pflanze trotz
+// Giessen am letzten Schultag Wasser braucht.
+function pflanzeFerienBesuche(p){
+  var heute = todayStr();
+  var F = FERIEN_TG.filter(function(f){ return f.end >= heute; })[0];
+  if(!F) return { ferien:null, tage:[] };
+  var out = [];
+  var plan = pflanzePlan(p), datum = plan.remind;
+  if(datum >= F.start && datum <= F.end) out.push(datum);
+  for(var i=0;i<40 && datum <= F.end;i++){
+    var due = pfPlus(datum, pflanzeAbstandAb(p, datum));
+    if(due > F.end) break;
+    var n = pflanzePlanAb(p, due, datum);
+    if(n.besuch && due >= F.start) out.push(due);
+    datum = n.remind;
+  }
+  return { ferien:F, tage:out };
+}
+function pfTageListe(tage){
+  return tage.map(function(d){ return weekdayLabel(d).slice(0,2)+' '+fmtDueDate(d).slice(0,6); }).join(', ');
+}
+
 function pflanzenFaellig(){
   var heute = todayStr();
-  return pflanzen.list.filter(function(p){ return pflanzeNaechste(p) <= heute; });
+  return pflanzen.list.filter(function(p){ return pflanzePlan(p).remind <= heute; });
 }
 
 function ensurePflanzenWatcher(){
@@ -6632,15 +6722,37 @@ function pflanzeGegossen(id){
 
 function pflanzenBannerHtml(){
   var f = pflanzenFaellig();
-  if(!f.length) return '';
-  var h = '<div class="pf-banner"><div class="pf-banner-title">🪴 Giessen nicht vergessen!</div><div class="pf-banner-list">';
-  f.forEach(function(p){
-    var tage = -pflanzeTageBis(pflanzeNaechste(p));
-    var wann = tage <= 0 ? 'heute fällig' : 'seit '+tage+' Tag'+(tage===1?'':'en')+' überfällig';
-    h += '<div class="pf-banner-item"><span><b>'+esc(p.name)+'</b> <span class="pf-banner-when">'+esc(wann)+'</span></span>';
-    h += '<button class="btn btn-sm pf-done" data-pf-done="'+esc(p.id)+'" type="button">💧 Gegossen</button></div>';
+  var h = '';
+  if(f.length){
+    h += '<div class="pf-banner"><div class="pf-banner-title">🪴 Giessen nicht vergessen!</div><div class="pf-banner-list">';
+    f.forEach(function(p){
+      var plan = pflanzePlan(p);
+      var tage = -pflanzeTageBis(plan.due);
+      var wann;
+      if(tage < 0) wann = plan.grund + ' (eigentlich erst am '+fmtDueDate(plan.due)+' fällig)';
+      else if(tage === 0) wann = 'heute fällig';
+      else wann = 'seit '+tage+' Tag'+(tage===1?'':'en')+' fällig';
+      if(tage >= 0 && plan.grund && plan.remind !== plan.due) wann += ' — ' + plan.grund;
+      h += '<div class="pf-banner-item"><span><b>'+esc(p.name)+'</b> <span class="pf-banner-when">'+esc(wann)+'</span></span>';
+      h += '<button class="btn btn-sm pf-done" data-pf-done="'+esc(p.id)+'" type="button">💧 Gegossen</button></div>';
+    });
+    h += '</div></div>';
+  }
+  // Ferienhinweis ab 10 Tage vor Ferienbeginn: wer die Ferien nicht durchhält.
+  var heute = todayStr(), hinweise = [], ferien = null;
+  pflanzen.list.forEach(function(p){
+    var b = pflanzeFerienBesuche(p);
+    if(!b.ferien || !b.tage.length || pfTage(heute, b.ferien.start) > 10) return;
+    ferien = b.ferien;
+    var rest = b.tage.filter(function(d){ return d > heute; });
+    if(rest.length) hinweise.push('<b>'+esc(p.name)+'</b>: '+esc(pfTageListe(rest)));
   });
-  return h + '</div></div>';
+  if(hinweise.length){
+    h += '<div class="pf-banner pf-banner-info"><div class="pf-banner-title">🧳 '+esc(ferien.label)+': Diese Pflanzen halten nicht durch</div>'
+      + '<div class="pf-banner-sub">Vorher kräftig giessen und an diesen Tagen vorbeikommen (oder mit nach Hause nehmen):</div>'
+      + '<div class="pf-banner-list">'+hinweise.map(function(x){ return '<div>'+x+'</div>'; }).join('')+'</div></div>';
+  }
+  return h;
 }
 
 function updatePflanzenAnzeige(){
@@ -6667,7 +6779,7 @@ function bindPflanzenDone(root){
 
 function openPflanzen(){
   openModal('<h3>🪴 Pflanzen im Schulzimmer</h3>'
-    + '<p class="pf-hint">Abstände: Sommer = April bis September, Winter = Oktober bis März. Solange eine Pflanze fällig ist, bleibt das rote Band oben sichtbar.</p>'
+    + '<p class="pf-hint">Abstände: Sommer = April bis September, Winter = Oktober bis März. Gegossen wird nur an Schultagen: Fällt ein Termin aufs Wochenende oder in die Ferien, kommt die Erinnerung am Schultag danach (wenn die Pflanze so lange durchhält, ca. 40 % des Abstands) — sonst schon am Schultag davor. Solange eine Pflanze fällig ist, bleibt das rote Band oben sichtbar.</p>'
     + '<div id="pfListe"></div>'
     + '<div class="modal-actions">'
     + '<button class="btn btn-ghost btn-sm" id="pfAdd" type="button">+ Pflanze</button>'
@@ -6682,14 +6794,20 @@ function renderPflanzenListe(){
   if(!el) return;
   if(!pflanzen.loaded){ el.innerHTML = '<div class="todo-empty">Wird geladen …</div>'; return; }
   if(!pflanzen.list.length){ el.innerHTML = '<div class="todo-empty">Noch keine Pflanzen.</div>'; return; }
-  var list = pflanzen.list.slice().sort(function(a,b){ return pflanzeNaechste(a).localeCompare(pflanzeNaechste(b)); });
+  var list = pflanzen.list.slice().sort(function(a,b){ return pflanzePlan(a).remind.localeCompare(pflanzePlan(b).remind); });
   var h = '<div class="pf-list">';
   list.forEach(function(p){
-    var next = pflanzeNaechste(p), tage = pflanzeTageBis(next);
+    var plan = pflanzePlan(p), next = plan.remind, tage = pflanzeTageBis(next);
     var wann = tage < 0 ? 'seit '+(-tage)+' Tag'+(tage===-1?'':'en')+' überfällig' : tage === 0 ? 'heute' : tage === 1 ? 'morgen' : 'in '+tage+' Tagen';
+    var extra = '';
+    if(plan.remind !== plan.due) extra += '<br>↳ '+esc(plan.grund)+' (eigentlich '+esc(fmtDueDate(plan.due))+')';
+    else if(plan.besuch) extra += '<br>↳ '+esc(plan.grund);
+    var fb = pflanzeFerienBesuche(p);
+    if(fb.tage.length) extra += '<br>🧳 <b>'+esc(fb.ferien.label)+'</b>: vorbeikommen am '+esc(pfTageListe(fb.tage));
+    else if(fb.ferien && pfTage(todayStr(), fb.ferien.start) <= 30) extra += '<br>🧳 hält die '+esc(fb.ferien.label)+' durch';
     h += '<div class="pf-item'+(tage <= 0 ? ' pf-item-due' : '')+'">';
     h += '<div class="pf-body"><div class="pf-name">'+esc(p.name)+'</div>';
-    h += '<div class="pf-meta">'+(p.last ? 'Zuletzt '+esc(fmtDueDate(p.last))+' · ' : '')+'nächstes Mal '+esc(fmtDueDate(next))+' (<b>'+esc(wann)+'</b>)<br>alle '+p.sommer+' Tage im Sommer, '+p.winter+' im Winter</div></div>';
+    h += '<div class="pf-meta">'+(p.last ? 'Zuletzt '+esc(fmtDueDate(p.last))+' · ' : '')+'nächstes Mal '+esc(fmtDueDate(next))+' (<b>'+esc(wann)+'</b>)'+extra+'<br>alle '+p.sommer+' Tage im Sommer, '+p.winter+' im Winter</div></div>';
     h += '<div class="pf-actions"><button class="btn btn-sm '+(tage <= 0 ? 'pf-done' : 'btn-ghost')+'" data-pf-done="'+esc(p.id)+'" type="button">💧 Gegossen</button>';
     h += '<button class="btn btn-ghost btn-sm" data-pf-edit="'+esc(p.id)+'" type="button" title="Bearbeiten">✏️</button></div></div>';
   });
