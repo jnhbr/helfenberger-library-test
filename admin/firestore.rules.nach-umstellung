@@ -179,17 +179,11 @@ service cloud.firestore {
     }
 
     // Roster info. Only the admin script (Admin SDK, bypasses rules) writes this.
-    // UEBERGANG: bis zur Umstellung liest die Live-Seite noch die ganze Liste.
-    // Nach der Umstellung: nur die eigene Klasse (Abfrage where('klasse','==',...)).
+    // Schüler:innen lesen nur die eigene Klasse (Abfrage where('klasse','==',...)).
     match /students/{uid} {
-      allow read: if isSignedIn();
+      allow read: if isTeacher() || isOwner(uid)
+        || (isSignedIn() && resource.data.klasse == request.auth.token.klasse);
       allow write: if false;
-    }
-
-    // The catalogue of uploaded exercise pages, one per subject.
-    match /resources/{resourceId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isTeacher();
     }
 
     // The actual content of each exercise page (kept separate from
@@ -247,50 +241,9 @@ service cloud.firestore {
       allow read, write: if isOwner(uid);
     }
 
-    // Per-subject folder tree (same access pattern as resources: everyone
-    // signed in browses, only the teacher creates/renames/moves/deletes).
-    match /folders/{folderId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isTeacher();
-    }
-
-    // Kalender (Hausaufgaben, Abgaben, Prüfungen, Erinnerungen) — visible to
-    // the whole class, only the teacher writes.
-    match /calendarEntries/{entryId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isTeacher();
-    }
-
     // Each signed-in user's own push-notification device registrations.
     match /pushSubscriptions/{uid}/devices/{subId} {
       allow read, write: if isOwner(uid);
-    }
-
-    // Schulden ("Münze" oben links): kleine Beträge, die Schüler:innen dem
-    // Lehrer schulden. Jede:r liest nur das eigene Dokument, damit niemand die
-    // Schulden der anderen sieht; geschrieben wird ausschliesslich vom Lehrer.
-    match /debts/{uid} {
-      allow read: if isOwner(uid) || isTeacher();
-      allow create, update: if isTeacher()
-        && request.resource.data.entries is list
-        && request.resource.data.entries.size() <= 100;
-      // Separat von create/update: bei einem delete ist request.resource null.
-      allow delete: if isTeacher();
-    }
-
-    // Private To-do-Liste der Lehrperson (Lehrerbereich). Teacher-only end to
-    // end - Schüler:innen sehen diese Collection nie. Keine Datenvalidierung
-    // angehängt, darum kann read/write kombiniert bleiben (bei einem delete
-    // wäre request.resource null).
-    match /teacherTodos/{todoId} {
-      allow read, write: if isTeacher();
-    }
-
-    // One-off seed markers (see data model note above). No data validation
-    // attached, so create/update/delete can safely stay combined.
-    match /appMeta/{id} {
-      allow read: if isSignedIn();
-      allow write: if isTeacher();
     }
 
     // Rotstift: exam correction tool. Teacher-only end to end — this holds
@@ -302,42 +255,6 @@ service cloud.firestore {
       }
     }
 
-    // Werkzeuge der Lehrperson (Sitzplan). Teacher-only end to end; enthält
-    // Notizen zur Klasse und geht Schüler:innen nichts an. Keine
-    // Datenvalidierung angehängt, darum kann read/write kombiniert bleiben.
-    match /klassenzimmer/{toolId} {
-      allow read, write: if isTeacher();
-    }
-
-    // Werkzeug-Daten, die die KLASSE sehen soll: Aemtliplan und Wochenplan.
-    // Bewusst getrennt von klassenzimmer/{toolId} - das ist teacher-only lesbar,
-    // weil dort Notizen zur Klasse stehen. Hier gilt: alle lesen, nur die
-    // Lehrperson schreibt. Keine Datenvalidierung angehaengt, darum kann write
-    // kombiniert bleiben (bei einem delete waere request.resource null).
-    match /klasseninfo/{toolId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacher();
-    }
-
-    // Fragebox. Jede:r Angemeldete darf eine Frage anlegen. Wer anonym fragt,
-    // schickt name:'' mit - im Dokument steht dann bewusst nichts über die
-    // Person (auch keine uid), es ist also auch im Nachhinein nicht
-    // zuzuordnen. Gelesen wird es nur von der Lehrperson, ausser sie hat es
-    // beantwortet und veröffentlicht (published == true): dann sieht es die
-    // ganze Klasse über die Abfrage where('published','==',true).
-    match /fragen/{fragenId} {
-      allow read: if isTeacher() || resource.data.published == true;
-      allow create: if isSignedIn()
-        && request.resource.data.text is string
-        && request.resource.data.text.size() > 0
-        && request.resource.data.text.size() <= 600
-        && request.resource.data.published == false
-        && request.resource.data.answer == '';
-      allow update: if isTeacher();
-      // Separat von create/update: bei einem delete ist request.resource null.
-      allow delete: if isTeacher();
-    }
-
     // Lern-Serie: geübte Minuten pro Tag. Jede:r schreibt nur die eigene,
     // die Lehrperson darf sie lesen (Überblick, wer regelmässig übt).
     match /streaks/{uid} {
@@ -347,44 +264,49 @@ service cloud.firestore {
       allow delete: if isTeacher();
     }
 
-    // Quiz-Vorlagen. NUR für die Lehrperson lesbar - in questions[].c steht
-    // jeweils die richtige Antwort. In die laufende Sitzung wandert pro Frage
-    // nur der Text plus die Auswahl, der richtige Index erst beim Auflösen.
-    match /quizzes/{quizId} {
-      allow read, write: if isTeacher();
-    }
-
-    // Die laufende Quiz-Runde. Alle lesen mit (Frage, Auflösung, Rangliste),
-    // geschrieben wird die Runde selbst nur von der Lehrperson.
-    match /quizSessions/{sessionId} {
-      allow read: if isSignedIn();
-      allow create, update: if isTeacher();
-      // Separat, siehe oben.
-      allow delete: if isTeacher();
-
-      // Die eigene Antwort auf die aktuelle Frage.
-      match /antworten/{uid} {
-        allow read: if isOwner(uid) || isTeacher();
-        allow create, update: if isOwner(uid);
-        allow delete: if isTeacher();
-      }
-
-      // Punktestände. Beim Beitreten legt sich jede:r den eigenen Eintrag mit
-      // 0 Punkten an; danach darf der Punktestand nur noch von der Lehrperson
-      // geändert werden - sonst könnte man sich selbst an die Spitze schreiben.
-      match /spieler/{uid} {
-        allow read: if isSignedIn();
-        allow create: if isTeacher() || (isOwner(uid) && request.resource.data.score == 0);
-        allow update: if isTeacher() || (isOwner(uid) && request.resource.data.score == resource.data.score);
-        allow delete: if isTeacher();
-      }
-    }
-
     match /pruefungKorrekturScans/{schuelerId} {
       allow read, write: if isTeacher();
       match /pages/{pageIndex} {
         allow read, write: if isTeacher();
       }
+    }
+
+    // ===================== ALT =====================
+    // Klassenlose Collections von vor der Umstellung (Herbst 2026). Die Daten
+    // liegen als Sicherung noch da, sind aber für die App gesperrt; nur das
+    // Admin-SDK kommt noch dran.
+    match /resources/{docId=**} {
+      allow read, write: if false;
+    }
+    match /folders/{docId=**} {
+      allow read, write: if false;
+    }
+    match /calendarEntries/{docId=**} {
+      allow read, write: if false;
+    }
+    match /debts/{docId=**} {
+      allow read, write: if false;
+    }
+    match /teacherTodos/{docId=**} {
+      allow read, write: if false;
+    }
+    match /appMeta/{docId=**} {
+      allow read, write: if false;
+    }
+    match /klassenzimmer/{docId=**} {
+      allow read, write: if false;
+    }
+    match /klasseninfo/{docId=**} {
+      allow read, write: if false;
+    }
+    match /fragen/{docId=**} {
+      allow read, write: if false;
+    }
+    match /quizzes/{docId=**} {
+      allow read, write: if false;
+    }
+    match /quizSessions/{docId=**} {
+      allow read, write: if false;
     }
   }
 }
