@@ -3750,7 +3750,7 @@ function goLiveToken(){
 // Solange die Klassen-Umstellung aussteht, würde "Jetzt live" den neuen Code
 // vor den neuen Passwörtern/Regeln veröffentlichen. Nach der Umstellung auf
 // false setzen (admin/klassen-accounts.js umstellen).
-const KLASSEN_UMSTELLUNG_AUSSTEHEND = true;
+const KLASSEN_UMSTELLUNG_AUSSTEHEND = false;
 function confirmGoLive(){
   if(KLASSEN_UMSTELLUNG_AUSSTEHEND){
     uiInfo('Noch nicht live schalten', 'Die Klassen-Umstellung (neue Logins, G3a/E1c) ist noch nicht abgeschlossen. Sie wird zusammen mit den neuen Passwörtern und Regeln live geschaltet.');
