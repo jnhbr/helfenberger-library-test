@@ -3569,11 +3569,12 @@ function sortByOrder(list, fallbackField){
    alles andere (PDF/Word/Excel, fremde Seiten) über `externalUrl` im neuen Tab.
    Kopieren wäre sinnlos: die Seiten laden Skripte/GeoGebra relativ vom LMVZ-Server. */
 var LMVZ_SUBJECT = 'mathe';
+var LMVZ_CATALOG_VERSION = 2;   // bei jeder Änderung an assets/lmvz-mathe.json erhöhen (Browser-Cache)
 var LMVZ_PYTHAGORAS_FOLDER = 'lmvz_m2_2a';
 var lmvzCatalogPromise = null;
 function lmvzLoadCatalog(){
   if(!lmvzCatalogPromise){
-    lmvzCatalogPromise = fetch('assets/lmvz-mathe.json').then(function(r){
+    lmvzCatalogPromise = fetch('assets/lmvz-mathe.json?v='+LMVZ_CATALOG_VERSION).then(function(r){
       if(!r.ok) throw new Error('HTTP '+r.status);
       return r.json();
     }).catch(function(err){ lmvzCatalogPromise = null; throw err; });
@@ -3601,7 +3602,7 @@ function lmvzBuild(cat, isTeacher){
     fold(lmId, null, lm.name, -1000 + li);
     lm.kap.forEach(function(k, ki){
       var kId = lmId+'_k'+k.nr;
-      fold(kId, lmId, k.nr+' '+(k.name || 'Kapitel '+k.nr), ki);
+      fold(kId, lmId, k.nr+'. Kapitel'+(k.name ? ': '+k.name : ''), ki);
       k.subs.forEach(function(s, si){
         var sId = lmId+'_'+s.id, onId = sId+'_on';
         fold(sId, kId, s.name, si);
