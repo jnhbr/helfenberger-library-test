@@ -6155,7 +6155,7 @@ document.addEventListener('visibilitychange', function(){
    zu überschreiben. */
 
 var timeTrack = { resourceId:null, startedAt:null, flushTimer:null };
-var TIME_FLUSH_MS = 60000;      // bei langen Sitzungen zwischendurch sichern, nicht erst beim Verlassen
+var TIME_FLUSH_MS = 180000;     // bei langen Sitzungen alle 3 Min. zwischendurch sichern (Rest beim Verlassen/Wegwechseln)
 var TIME_MIN_FLUSH_SEC = 3;     // Mini-Blips (versehentlich geöffnet, sofort wieder zu) nicht mitzählen
 
 function startTimeTracking(rid){
@@ -9402,10 +9402,11 @@ function bumpStreak(seconds){
   if(!state.user || !state.profile || state.profile.role === 'teacher') return;
   if(!(seconds > 0)) return;
   var today = todayStr();
-  var patch = {};
-  patch['days.' + today] = increment(seconds);
-  setDoc(doc(db,'streaks', state.user.uid), { days: {} }, {merge:true})
-    .then(function(){ return updateDoc(doc(db,'streaks', state.user.uid), patch); })
+  // Ein einziger Schreibvorgang: merge:true fasst nur days[heute] an und legt
+  // das Dokument bei Bedarf an (spart Firestore-Schreibkontingent im Spark-Plan).
+  var days = {};
+  days[today] = increment(seconds);
+  setDoc(doc(db,'streaks', state.user.uid), { days: days }, {merge:true})
     .then(function(){
       if(!streakState.days) streakState.days = {};
       streakState.days[today] = (streakState.days[today] || 0) + seconds;
