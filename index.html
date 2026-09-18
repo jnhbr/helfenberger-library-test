@@ -1159,6 +1159,8 @@
   .pr-lock[hidden]{display:none;}
   .pr-lock-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:8px 14px;background:var(--brand);color:var(--brand-contrast);font-size:14px;}
   .pr-lock-bar .pr-lock-hint{margin-left:auto;opacity:.85;font-size:13px;}
+  .pr-uhr{font-variant-numeric:tabular-nums;font-weight:700;background:rgba(255,255,255,.18);border-radius:999px;padding:2px 10px;}
+  .pr-uhr.knapp{background:#E63950;animation:prAlarm 1s ease-in-out infinite;}
   .pr-lock iframe{flex:1;width:100%;border:0;background:#fff;}
   .pr-lock-msg{margin:auto;max-width:520px;padding:32px 24px;text-align:center;}
   .pr-lock-msg h2{margin:8px 0 12px;}
@@ -10917,7 +10919,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-09-18-pruefungsmodus-lp', datum:'2026-09-18', fuer:'lehrer', text:'Neu im Klassenzimmer: 📝 Prüfungen. Übung wählen — die Library liest die Bereiche selbst aus der Übung (Themen der Prüfungsvorbereitungen, Themenkarten der Mathe-Übungen, bei Pöstlergeografie Bereiche/Gebiet/Antwortart) und zieht daraus die Fragen. Freigeben und live zuschauen: Wer die Prüfung verlässt (Tab, Fenster, Esc, neu laden), ist gesperrt, bis du entsperrst. Automatisch korrigiert, von Hand umwertbar. Mit «📣 Resultate freigeben» kommt die Note mit der gewählten Gewichtung in den Notenrechner der Klasse — verbergen oder löschen nimmt sie wieder heraus.'},
+  {id:'2026-09-18-pruefungsmodus-lp', datum:'2026-09-18', fuer:'lehrer', text:'Neu im Klassenzimmer: 📝 Prüfungen. Übung wählen — die Library liest die Bereiche selbst aus der Übung (Themen der Prüfungsvorbereitungen, Themenkarten der Mathe-Übungen, bei Pöstlergeografie Bereiche/Gebiet/Antwortart) und zieht daraus die Fragen. Freigeben und live zuschauen: Wer die Prüfung verlässt (Tab, Fenster, Esc, neu laden), ist gesperrt, bis du entsperrst. Optional mit Zeitlimit: Die Zeit läuft pro Person ab dem Start, danach wird automatisch abgegeben. Automatisch korrigiert, von Hand umwertbar. Mit «📣 Resultate freigeben» kommt die Note mit der gewählten Gewichtung in den Notenrechner der Klasse — verbergen oder löschen nimmt sie wieder heraus.'},
   {id:'2026-09-18-pruefungsmodus', datum:'2026-09-18', fuer:'alle', text:'Online-Prüfungen: Wenn oben «📝 Prüfung verfügbar» steht, kannst du die Prüfung starten. Achtung: Verlässt du sie (anderer Tab, anderes Fenster, Esc, neu laden), wirst du gesperrt und musst warten, bis die Lehrperson dich entsperrt. Sobald die Lehrperson die Resultate freigibt, steht deine Note automatisch im 🎶 Notenrechner.'},
   {id:'2026-09-18-mathe-tastatur-weiter', datum:'2026-09-18', fuer:'alle', text:'Mathe-Übungen: Den Taschenrechner 🧮 kannst du jetzt auch mit der Tastatur bedienen (Ziffern, + − * /, Enter). Und wenn du eine Übung wieder öffnest, landest du direkt bei der Aufgabe, bei der du aufgehört hast — auch auf einem anderen Gerät.'},
   {id:'2026-09-18-schulleitung', datum:'2026-09-18', fuer:'lehrer', text:'Neues Login «Schulleitung»: sieht alle Klassen, wahlweise als Lehrperson oder als Schüler:in (Knopf im gelben Band), kann aber nichts verändern.'},
@@ -12462,6 +12464,11 @@ function pruefById(id){ return pruef.list.find(function(p){ return p.id === id; 
 // feuernder Listen-Snapshot noch den alten Stand («läuft, aktiv») und würde
 // ein zweites Mal sperren.
 function pruefLokal(pid, patch){ pruef.mine[pid] = Object.assign({}, pruef.mine[pid] || {}, patch); }
+// Zeitlimit (optional, p.zeitMin): läuft pro Person ab ihrem Start (startMs),
+// auch während einer Sperre weiter. Danach wird mit dem aktuellen Stand abgegeben.
+function pruefFrist(p, t){ return p && +p.zeitMin > 0 && t && t.startMs ? t.startMs + p.zeitMin * 60000 : null; }
+function pruefZeitUm(p, t){ var f = pruefFrist(p, t); return f != null && Date.now() >= f; }
+function pruefZeitText(ms){ var s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 function pruefIstLehrer(){ return !!(state.profile && state.profile.role === 'teacher'); }
 
 function pruefNote(p, punkte, max){
@@ -12576,7 +12583,8 @@ function updatePruefungBanner(){
 function pruefStartDialog(p){
   openModal(
     '<h3>📝 '+esc(p.titel)+'</h3>'+
-    '<p><b>'+esc(String((p.cfg && p.cfg.anzahl) || ''))+' Fragen.</b> Deine Antworten werden laufend gespeichert, du kannst vor- und zurückblättern.</p>'+
+    '<p><b>'+esc(String(pruefAnzahl(p)))+' Fragen'+(+p.zeitMin > 0 ? ', '+esc(String(p.zeitMin))+' Minuten Zeit' : '')+'.</b> Deine Antworten werden laufend gespeichert, du kannst vor- und zurückblättern.'+
+      (+p.zeitMin > 0 ? ' Ist die Zeit um, wird automatisch abgegeben — auch wenn du gerade gesperrt bist, läuft die Zeit weiter.' : '')+'</p>'+
     '<div class="pr-regeln">'+
       '<div>🖥️ Die Prüfung läuft im <b>Vollbild</b>.</div>'+
       '<div>🔒 Wenn du die Prüfung <b>verlässt</b> — anderer Tab, anderes Fenster oder Programm, <b>Esc</b>, neu laden — wirst du <b>gesperrt</b>. Weiter geht es erst, wenn die Lehrperson dich entsperrt.</div>'+
@@ -12629,22 +12637,26 @@ async function pruefStarten(p, weiter, vorschau){
   pruefFullscreenAn(ov);
   var uid = state.user.uid;
   var sess = pruef.sess = {pid:p.id, vorschau:!!vorschau, ending:false, frame:null, missed:0, fsWasOn:false,
-    antworten:null, beantwortet:0, saveTimer:null, poll:null, beat:null, abgebenGesendet:false};
+    antworten:null, beantwortet:0, saveTimer:null, poll:null, beat:null, abgebenGesendet:false,
+    frist:vorschau && +p.zeitMin > 0 ? Date.now() + p.zeitMin * 60000 : null, uhr:null};
+  sess.uhr = setInterval(pruefUhrTick, 1000);
   pruef.lockSig = 'sess';
   var vorher = pruef.mine[p.id], docOk = false;
   try{
     if(!vorschau){
-      pruefLokal(p.id, {status:'laeuft', aktiv:true});
+      var startMs = weiter && pruef.mine[p.id] && pruef.mine[p.id].startMs ? pruef.mine[p.id].startMs : Date.now();
+      pruefLokal(p.id, {status:'laeuft', aktiv:true, startMs:startMs});
       if(weiter){
         await updateDoc(teilRef(p.id, uid), {aktiv:true, lebt:serverTimestamp()});
       } else {
         await setDoc(teilRef(p.id, uid), {
           uid:uid, name:state.profile.displayName || '', status:'laeuft', aktiv:true,
-          gestartetAm:serverTimestamp(), lebt:serverTimestamp(),
+          gestartetAm:serverTimestamp(), startMs:startMs, lebt:serverTimestamp(),
           antworten:{}, beantwortet:0, max:pruefAnzahl(p), verstoesse:[]
         });
       }
       docOk = true;
+      sess.frist = pruefFrist(p, {startMs:startMs});
       // Wächter nach einer kurzen Schonfrist (Vollbild braucht einen Moment) — schon während die Seite lädt.
       setTimeout(function(){ if(pruef.sess === sess) pruefWaechterAn(); }, 1500);
     }
@@ -12682,10 +12694,18 @@ async function pruefStarten(p, weiter, vorschau){
 }
 function pruefLockBar(p, vorschau){
   return '<div class="pr-lock-bar"><b>📝 '+esc(p.titel)+'</b><span>'+esc(state.profile.displayName || '')+'</span>'+
+    (+p.zeitMin > 0 ? '<span class="pr-uhr" id="pruefUhr">⏱ '+esc(String(p.zeitMin))+':00</span>' : '')+
     (vorschau ? '<span class="pr-lock-hint">Vorschau — nichts wird gespeichert</span><button class="btn btn-sm btn-ghost" id="pruefVorschauZu" type="button">Schliessen</button>'
               : '<span class="pr-lock-hint">🔒 Nicht verlassen, sonst wirst du gesperrt</span>')+'</div>';
 }
+function pruefUhrTick(){
+  var s = pruef.sess; if(!s || !s.frist) return;
+  var rest = s.frist - Date.now(), el = document.getElementById('pruefUhr');
+  if(el){ el.textContent = '⏱ ' + pruefZeitText(rest); el.classList.toggle('knapp', rest < 60000); }
+  if(rest <= 0 && !s.zeitUm){ s.zeitUm = true; toast('⏱ Die Zeit ist um — deine Prüfung wird abgegeben.'); pruefErzwingeAbgabe(); }
+}
 function pruefLockBarVerdrahten(){
+  pruefUhrTick();
   var zu = document.getElementById('pruefVorschauZu');
   if(zu) zu.addEventListener('click', function(){ pruefSessionStopp(); pruefFullscreenAus(); pruefLockHide(); });
 }
@@ -12734,6 +12754,7 @@ function pruefSessionStopp(){
   pruefWaechterAus();
   var s = pruef.sess;
   if(s && s.frame){ try{ s.frame.srcdoc = ''; }catch(e){} }
+  if(s) clearInterval(s.uhr);
   pruef.sess = null;
 }
 
@@ -12759,7 +12780,8 @@ window.addEventListener('message', function(e){
   if(!s || !s.frame || e.source !== s.frame.contentWindow || !d || d.type !== 'geoPruefung') return;
   var p = pruefById(s.pid);
   if(d.action === 'bereit'){
-    if(p && p.status === 'beendet') pruefErzwingeAbgabe();
+    s.bereit = true;
+    if(p && p.status === 'beendet' || s.zeitUm) pruefErzwingeAbgabe();
     return;
   }
   if(d.action === 'stand'){ pruefStand(s, d.antworten, d.beantwortet); return; }
@@ -12804,7 +12826,8 @@ function pruefAbgabe(s, d){
 function pruefErzwingeAbgabe(){
   var s = pruef.sess;
   if(s && s.bank && !s.abgebenGesendet){ s.abgebenGesendet = true; pruefBankAbgeben(true); return; }
-  if(!s || !s.frame || s.abgebenGesendet) return;
+  // Erst senden, wenn die Seite «bereit» gemeldet hat — sonst ginge die Nachricht verloren.
+  if(!s || !s.frame || !s.bereit || s.abgebenGesendet) return;
   s.abgebenGesendet = true;
   try{ s.frame.contentWindow.postMessage({type:'geoPruefung', action:'abgeben'}, '*'); }catch(e){}
 }
@@ -12859,13 +12882,14 @@ function pruefZeigeGesperrt(p, grund){
     '<p><b>Melde dich bei der Lehrperson.</b> Sobald sie dich entsperrt, kannst du weiterschreiben. Deine bisherigen Antworten sind gespeichert.</p></div>';
 }
 function pruefZeigeEntsperrt(p){
-  var sig = 'frei:' + p.id + ':' + p.status;
+  var zeitUm = pruefZeitUm(p, pruef.mine[p.id]);
+  var sig = 'frei:' + p.id + ':' + p.status + ':' + zeitUm;
   if(pruef.lockSig === sig) return;
   pruef.lockSig = sig;
   closeModal();
   var ov = pruefOverlay();
-  var beendet = p.status === 'beendet';
-  ov.innerHTML = '<div class="pr-lock-msg"><div class="pr-lock-icon">🔓</div><h2>'+(beendet ? 'Die Prüfung ist beendet' : 'Du bist entsperrt')+'</h2>'+
+  var beendet = p.status === 'beendet' || zeitUm;
+  ov.innerHTML = '<div class="pr-lock-msg"><div class="pr-lock-icon">🔓</div><h2>'+(zeitUm ? 'Die Zeit ist um' : beendet ? 'Die Prüfung ist beendet' : 'Du bist entsperrt')+'</h2>'+
     '<p>'+(beendet ? 'Deine gespeicherten Antworten werden jetzt abgegeben.' : 'Deine Antworten sind noch da. Nicht mehr verlassen, sonst wirst du wieder gesperrt!')+'</p>'+
     '<button class="btn btn-primary" id="pruefWeiterBtn" type="button">'+(beendet ? '✉️ Abgeben' : '📝 Weiterschreiben')+'</button></div>';
   document.getElementById('pruefWeiterBtn').addEventListener('click', function(){ pruef.lockSig = ''; pruefStarten(p, true); });
@@ -13144,7 +13168,7 @@ function pruefBankStart(p, sess, ov, saved){
   document.getElementById('prBank').addEventListener('input', pruefBankEingabe);
   document.getElementById('prBank').addEventListener('change', pruefBankEingabe);
   pruefBankZeichnen();
-  if(p.status === 'beendet') pruefErzwingeAbgabe();
+  if(p.status === 'beendet' || sess.zeitUm) pruefErzwingeAbgabe();
 }
 function pruefBankHat(v){
   if(v == null || v === '') return false;
@@ -13297,6 +13321,7 @@ function pruefStatusBadge(p){
 function pruefBeschreibung(p, lang){
   var c = p.cfg || {}, teile = [p.resourceTitel || ''];
   teile.push(pruefAnzahl(p) + ' Fragen' + (pruefArt(p) === 'bank' && p.maxPunkte ? ' (' + p.maxPunkte + ' Punkte)' : ''));
+  if(+p.zeitMin > 0) teile.push('⏱ ' + p.zeitMin + ' Min.');
   if(lang){
     if(c.katNamen && c.katNamen.length) teile.push(c.katNamen.join(', '));
     Object.keys(c.optNamen || {}).forEach(function(k){ teile.push(c.optNamen[k]); });
@@ -13354,6 +13379,8 @@ async function pruefEditor(p){
     return '<option value="'+esc(f.id)+'"'+(f.id === fachStd ? ' selected' : '')+'>'+esc(f.name)+'</option>'; }).join('') + '</select></div>';
   h += '<div><label class="modal-label">Gewichtung</label><input type="number" id="prGewicht" class="modal-input" min="0.5" max="10" step="0.5" value="'+esc(String(p && p.gewicht ? p.gewicht : 1))+'"></div></div>';
   h += '<p class="pr-hinweis">Bei «📣 Resultate freigeben» wird die Note mit dieser Gewichtung automatisch im 🎶 Notenrechner der Schüler:innen eingetragen. Wird die Prüfung gelöscht oder werden die Resultate wieder verborgen, verschwindet sie dort wieder.</p>';
+  h += '<div class="pr-grid2"><div><label class="modal-label">Zeitlimit in Minuten (leer = keins)</label><input type="number" id="prZeit" class="modal-input" min="1" max="300" step="1" value="'+esc(p && p.zeitMin ? String(p.zeitMin) : '')+'"></div><div></div></div>';
+  h += '<p class="pr-hinweis">Die Zeit läuft pro Person ab dem Start (auch während einer Sperre). Ist sie um, wird automatisch mit dem aktuellen Stand abgegeben.</p>';
   h += '<div class="pr-grid2"><div><label class="modal-label">Punkte für eine 6 (leer = alle)</label><input type="number" id="prP6" class="modal-input" min="1" step="0.5" value="'+esc(p && p.punkteFuer6 ? String(p.punkteFuer6) : '')+'"></div>';
   h += '<div><label class="modal-label">Noten runden auf</label><select id="prRund" class="modal-input">' + [['0.1','Zehntel'],['0.25','Viertel'],['0.5','Halbe']].map(function(o){
     return '<option value="'+o[0]+'"'+(String((p && p.rundung) || 0.1) === o[0] ? ' selected' : '')+'>'+o[1]+'</option>'; }).join('') + '</select></div></div>';
@@ -13425,7 +13452,8 @@ async function pruefEditor(p){
     var gewicht = parseFloat(String(document.getElementById('prGewicht').value).replace(',', '.'));
     if(!(gewicht > 0 && gewicht <= 10)){ toast('Gewichtung muss zwischen 0.5 und 10 liegen.'); document.getElementById('prGewicht').focus(); return; }
     var data = {titel:titel, punkteFuer6:+document.getElementById('prP6').value || null, rundung:+document.getElementById('prRund').value || 0.1,
-      fach:document.getElementById('prFach').value, gewicht:gewicht};
+      fach:document.getElementById('prFach').value, gewicht:gewicht,
+      zeitMin:Math.min(300, Math.max(0, Math.round(+document.getElementById('prZeit').value || 0))) || null};
     var loesung = null;
     if(!fragenFix){
       if(!info || info.art === 'keine' || !resource) return;
@@ -13562,7 +13590,7 @@ function pruefMonitorZeichnen(){
     var t = r.t, st = r.st;
     var fort = !t ? '' : t.status === 'abgegeben'
       ? (r.erg ? r.erg.punkte+' / '+r.erg.max+' Pkt · Note <b>'+pruefNoteText(pruefNote(p, r.erg.punkte, r.erg.max))+'</b>' : 'wird korrigiert …')
-      : (t.beantwortet || 0)+' / '+anzahl+' beantwortet';
+      : (t.beantwortet || 0)+' / '+anzahl+' beantwortet' + (pruefFrist(p, t) ? ' · ⏱ ' + (pruefZeitUm(p, t) ? 'Zeit um' : Math.ceil((pruefFrist(p, t) - Date.now()) / 60000) + ' Min. übrig') : '');
     var vs = t && t.verstoesse && t.verstoesse.length ? ' · <span class="pr-vs" title="'+esc(t.verstoesse.map(function(v){ return new Date(v.at).toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'})+' '+v.grund; }).join('\n'))+'">⚠️ '+t.verstoesse.length+'× verlassen</span>' : '';
     h += '<div class="pr-zeile '+st.cls+'"><div class="pr-name">'+esc(r.name)+'</div><div class="pr-st">'+esc(st.txt)+'</div><div class="pr-fort">'+fort+vs+'</div><div class="pr-akt">';
     if(t && t.status === 'gesperrt') h += '<button class="btn btn-primary btn-sm" data-e="'+esc(r.uid)+'" type="button">🔓 Entsperren</button>';
