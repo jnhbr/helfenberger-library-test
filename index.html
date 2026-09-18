@@ -1345,7 +1345,8 @@ const MAX_RESOURCE_BYTES = 8 * 1024 * 1024; // overall cap per uploaded resource
 const MAX_PDF_BYTES = 4 * 1024 * 1024; // PDFs tiefer: jeder Aufruf kostet Download-Volumen; Grösseres komprimieren oder als 🔗 Link
 // Speicher-Kontingent pro Lehrperson (alle eigenen Uploads inkl. noch
 // aufbewahrter Vorversionen). Gezählt über resourceContent.{ownerUid, bytes};
-// Inhalte von vor dieser Regel (ohne ownerUid) zählen nicht mit. Nur im
+// Inhalte von vor dieser Regel (ohne ownerUid) werden beim Öffnen von
+// ⚙️ Einstellungen einmalig nachgezählt (backfillQuotaOwner). Nur im
 // Browser geprüft — Lehrpersonen sind vertrauenswürdig, es geht ums Aufräumen.
 const TEACHER_QUOTA_BYTES = 1024 * 1024 * 1024;
 function contentBytes(content){ return typeof content === 'string' ? new Blob([content]).size : content.length; }
@@ -1362,11 +1363,52 @@ async function assertQuota(addBytes){
     throw new Error('Dein Speicher ist voll ('+fmtMB(used)+' von '+fmtMB(TEACHER_QUOTA_BYTES)+', siehe ⚙️ Einstellungen). Bitte alte Übungen/PDFs löschen oder als «🔗 Link» ablegen.');
   }
 }
+// Alte Inhalte (vor dem Kontingent hochgeladen) haben weder ownerUid noch
+// bytes und zählten darum als 0. Einmalig pro Lehrperson/Gerät: alle Übungen
+// der eigenen Klasse durchgehen, die sie hochgeladen hat (oder ohne
+// uploadedBy), und deren aktuelle + vorherige Fassung nachtragen.
+var QUOTA_BACKFILL_KEY = 'libQuotaBackfill1_';
+async function backfillQuotaOwner(){
+  var uid = state.user.uid, klasse = heimKlasse();
+  if(!klasse) return false;
+  try{ if(localStorage.getItem(QUOTA_BACKFILL_KEY+uid)) return false; }catch(e){}
+  var snap = await getDocs(kcolFor(klasse, 'resources'));
+  var ids = [];
+  snap.forEach(function(d){
+    var r = d.data();
+    if(r.linkUrl || r.externalUrl || (r.uploadedBy && r.uploadedBy !== uid)) return;
+    [resourceContentId(Object.assign({id:d.id}, r)), r.prevContentId].forEach(function(id){
+      if(id && ids.indexOf(id) < 0) ids.push(id);
+    });
+  });
+  var changed = false;
+  for(var k=0; k<ids.length; k++){
+    var ref = doc(db,'resourceContent', ids[k]);
+    var cs = await getDoc(ref);
+    if(!cs.exists() || cs.data().ownerUid) continue;
+    var n = cs.data().chunkCount || 0, bytes = 0;
+    for(var i=0;i<n;i++){
+      var c = await getContentDoc(doc(db,'resourceContent', ids[k], 'chunks', String(i)));
+      if(!c.exists()) continue;
+      var cd = c.data();
+      bytes += cd.bin ? cd.bin.toUint8Array().length : contentBytes(cd.html || '');
+    }
+    await updateDoc(ref, { ownerUid: uid, bytes: bytes });
+    changed = true;
+  }
+  try{ localStorage.setItem(QUOTA_BACKFILL_KEY+uid, '1'); }catch(e){}
+  return changed;
+}
 // Anzeige in ⚙️ Einstellungen → «💾 Mein Speicher».
 function showQuotaUsage(){
   var el = document.getElementById('setQuota');
   if(!el) return;
-  teacherUsedBytes().then(function(used){
+  paintQuotaUsage(el).then(function(){
+    return backfillQuotaOwner().then(function(changed){ if(changed && document.getElementById('setQuota')) return paintQuotaUsage(el); });
+  }).catch(function(err){ console.error(err); });
+}
+function paintQuotaUsage(el){
+  return teacherUsedBytes().then(function(used){
     var pct = Math.min(100, Math.round(used / TEACHER_QUOTA_BYTES * 100));
     var col = pct >= 90 ? '#c0392b' : pct >= 70 ? '#e67e22' : 'var(--brand)';
     el.innerHTML = '<div style="font-size:13px;"><b>'+esc(fmtMB(used))+'</b> von '+esc(fmtMB(TEACHER_QUOTA_BYTES))+' belegt ('+pct+' %)</div>'+
