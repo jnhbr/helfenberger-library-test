@@ -937,6 +937,10 @@
   .qp-right .qp-big{color:var(--good);}
   .qp-wrong .qp-big{color:var(--bad);}
   .qp-score{font-size:22px;font-weight:700;}
+  .qp-gain{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:clamp(30px,7vw,56px);color:var(--good);animation:qpGainPop .45s ease-out;}
+  .qp-gain-0{color:var(--text-muted);font-size:clamp(20px,4vw,30px);}
+  @keyframes qpGainPop{0%{transform:scale(.6);opacity:0;}70%{transform:scale(1.12);opacity:1;}100%{transform:scale(1);}}
+  @media (prefers-reduced-motion: reduce){ .qp-gain{animation:none;} }
   .qp-me{outline:2px solid var(--brand);}
 
   /* ---------- Kopfzeile: neue Knöpfe ---------- */
@@ -8948,16 +8952,23 @@ function openQuizImport(){
 
 function startQuizSession(quiz){
   quizLive.busy = {}; quizLive.sig = null; quizClock.key = '';
-  setDoc(quizSessionRef(), {
-    quizId: quiz.id, title: quiz.title, state:'lobby', qIndex:-1,
-    totalQ: (quiz.questions||[]).length, question:null, sec:0, startedAt:0,
-    correctIndex:-1, stats:[], updatedAt: serverTimestamp()
-  }).then(function(){
-    // Punktestände und Antworten der letzten Runde wegräumen.
+  /* Reihenfolge ist wichtig: ZUERST die Spieler und Antworten der letzten Runde
+     wegräumen, ERST DANN die Lobby öffnen. Früher war es umgekehrt - wer schnell
+     auf «mitmachen» tippte, fand noch den alten Eintrag vom letzten Quiz, schrieb
+     darum keinen neuen, und Sekunden später löschte das Aufräumen genau diesen
+     Eintrag. Auf dem Schülergerät stand «Du bist dabei!», am Beamer fehlte die
+     Person (z.B. nur 9 von 15). */
+  setDoc(quizSessionRef(), { state:'idle', question:null, updatedAt: serverTimestamp() }, {merge:true}).then(function(){
     return Promise.all([
       getDocs(quizPlayersCol()).then(function(s){ var b = writeBatch(db); s.forEach(function(d){ b.delete(d.ref); }); return b.commit(); }),
       getDocs(quizAnswersCol()).then(function(s){ var b = writeBatch(db); s.forEach(function(d){ b.delete(d.ref); }); return b.commit(); })
     ]);
+  }).then(function(){
+    return setDoc(quizSessionRef(), {
+      quizId: quiz.id, title: quiz.title, state:'lobby', qIndex:-1,
+      totalQ: (quiz.questions||[]).length, question:null, sec:0, startedAt:0,
+      correctIndex:-1, stats:[], updatedAt: serverTimestamp()
+    });
   }).then(function(){ openQuizHost(quiz); })
     .catch(function(err){ console.error(err); toast('Quiz konnte nicht gestartet werden.'); });
 }
@@ -9295,13 +9306,14 @@ function quizReveal(quiz){
         uid: d.id,
         name: (player && player.name) || a.name || '?',
         score: ((player && player.score) || 0) + gained,
-        correct: ((player && player.correct) || 0) + (gained > 0 ? 1 : 0)
+        correct: ((player && player.correct) || 0) + (gained > 0 ? 1 : 0),
+        gained: gained
       });
     });
 
     var batch = writeBatch(db);
     updates.forEach(function(u){
-      batch.set(doc(quizPlayersCol(), u.uid), { name:u.name, score:u.score, correct:u.correct }, {merge:true});
+      batch.set(doc(quizPlayersCol(), u.uid), { name:u.name, score:u.score, correct:u.correct, lastGain:u.gained, lastQ:qIndex }, {merge:true});
     });
     return batch.commit().then(function(){
       return setDoc(quizSessionRef(), { stats: stats, updatedAt: serverTimestamp() }, {merge:true});
@@ -9326,7 +9338,7 @@ function quizPlaySig(s){
   var uid = (state.user||{}).uid;
   var me = quizLive.players.filter(function(p){ return p.uid === uid; })[0];
   return [s.state, s.qIndex, s.correctIndex, quizPlay.choice,
-          me ? (me.score||0) : -1, quizLive.players.length, (s.stats||[]).join(','),
+          me ? (me.score||0) : -1, me ? (me.lastQ+':'+me.lastGain) : '', quizLive.players.length, (s.stats||[]).join(','),
           quizRevealRank(s)].join('|');
 }
 
@@ -9384,7 +9396,10 @@ function quizPlayFullRender(s){
         + '<button class="btn btn-ghost btn-sm" id="qpLeave" type="button">Verlassen</button></div>';
 
   if(s.state === 'lobby'){
-    html += '<div class="qp-mid"><div class="qp-big">Du bist dabei!</div><p>Gleich geht es los …</p></div>';
+    var inLobby = quizLive.players.some(function(p){ return p.uid === state.user.uid; });
+    html += inLobby
+      ? '<div class="qp-mid"><div class="qp-big">Du bist dabei!</div><p>Gleich geht es los …</p></div>'
+      : '<div class="qp-mid"><div class="qp-wait">⏳</div><div class="qp-big">Einen Moment …</div><p>Du wirst gerade angemeldet.</p></div>';
   } else if(s.state === 'frage'){
     var left = quizSecondsLeft(s);
     html += '<div class="qp-timer'+(left<=5?' qp-timer-hot':'')+'">'+left+'</div>';
@@ -9401,7 +9416,14 @@ function quizPlayFullRender(s){
     html += '<div class="qp-mid '+(right?'qp-right':'qp-wrong')+'">';
     html += '<div class="qp-big">'+(quizPlay.choice === null ? '⏳ Keine Antwort' : (right ? '✅ Richtig!' : '❌ Leider falsch'))+'</div>';
     html += '<p>Richtig war: <b>'+esc((s.question && s.question.answers && s.question.answers[s.correctIndex]) || '')+'</b></p>';
-    if(me) html += '<div class="qp-score">'+(me.score||0)+' Punkte</div>';
+    if(me){
+      // Punkte dieser Frage: bei falsch/keiner Antwort sofort +0; bei richtig
+      // erst, wenn das Lehrergerät die Punkte verrechnet hat (lastQ = diese Frage).
+      if(me.lastQ === s.qIndex) html += '<div class="qp-gain'+((me.lastGain||0)>0?'':' qp-gain-0')+'">+'+(me.lastGain||0)+' Punkte</div>';
+      else if(!right) html += '<div class="qp-gain qp-gain-0">+0 Punkte</div>';
+      else html += '<div class="qp-gain qp-gain-0">Punkte werden gezählt …</div>';
+      html += '<div class="qp-score">Total: '+(me.score||0)+' Punkte</div>';
+    }
     html += '</div>';
   } else if(s.state === 'ende'){
     // Solange die Verkuendung laeuft, verraet das eigene Geraet nichts - erst
@@ -9472,6 +9494,38 @@ function ensureQuizPlayDelegation(){
   });
 }
 
+/* Selbstheilendes Beitreten: solange man im Quiz ist und der eigene Eintrag in
+   spieler/ fehlt (Schreiben fehlgeschlagen, WLAN-Aussetzer, ...), wird es alle
+   paar Sekunden erneut versucht - statt wie früher still in der Konsole zu
+   scheitern, während das Gerät trotzdem «Du bist dabei!» anzeigte. */
+var quizJoin = { pending:false, lastTry:0, retry:null };
+function quizEnsureJoined(viaGet){
+  clearTimeout(quizJoin.retry);
+  if(!state.user || state.route.name !== 'quizplay' || !quizIsRunning(quizLive.session)) return;
+  if(quizLive.unsubPlayers && quizLive.players.some(function(p){ return p.uid === state.user.uid; }) && !viaGet) return;
+  if(quizJoin.pending || Date.now() - quizJoin.lastTry < 2500){
+    quizJoin.retry = setTimeout(function(){ quizEnsureJoined(true); }, 3000);
+    return;
+  }
+  quizJoin.pending = true;
+  quizJoin.lastTry = Date.now();
+  var playerRef = doc(quizPlayersCol(), state.user.uid);
+  var name = (state.profile && state.profile.displayName) || '?';
+  // Den Eintrag nur anlegen, wenn er fehlt: beim erneuten Beitreten während
+  // derselben Runde würde ein Neuschreiben den Punktestand auf 0 setzen (und
+  // die Regel, die genau das verhindert, den Schreibvorgang ablehnen).
+  getDoc(playerRef).then(function(snap){
+    if(snap.exists()) return null;
+    return setDoc(playerRef, { name: name, score: 0, correct: 0 });
+  }).then(function(){
+    quizJoin.pending = false;
+  }, function(err){
+    console.error('Quiz beitreten', err);
+    quizJoin.pending = false;
+    quizJoin.retry = setTimeout(function(){ quizEnsureJoined(true); }, 3000);
+  });
+}
+
 function joinQuiz(){
   if(!quizIsRunning(quizLive.session)) return;
   // Eigener Spieler-Eintrag mit 0 Punkten; die Punkte setzt danach nur noch
@@ -9479,15 +9533,15 @@ function joinQuiz(){
   // derselben Runde darf der Eintrag NICHT neu geschrieben werden - das würde
   // den bereits erspielten Punktestand auf 0 zurücksetzen (und die Regel, die
   // genau das verhindert, den Schreibvorgang ablehnen).
-  var playerRef = doc(quizPlayersCol(), state.user.uid);
-  getDoc(playerRef).then(function(snap){
-    if(snap.exists()) return null;
-    return setDoc(playerRef, { name: state.profile.displayName, score: 0, correct: 0 });
-  }).catch(function(err){ console.error(err); });
+  quizJoin.lastTry = 0;
+  quizEnsureJoined(true);
   if(!quizLive.unsubPlayers){
     quizLive.unsubPlayers = onSnapshot(quizPlayersCol(), function(snap){
       quizLive.players = [];
       snap.forEach(function(d){ quizLive.players.push(Object.assign({uid:d.id}, d.data())); });
+      // Nur eine Antwort vom Server (nicht aus dem Gerätespeicher) zählt als
+      // Beweis, dass der eigene Eintrag fehlt - dann gleich nochmals eintragen.
+      if(!snap.metadata.fromCache) quizEnsureJoined(false);
       if(state.route.name === 'quizplay') renderQuizPlay();
     }, function(err){ console.error(err); });
   }
@@ -9808,6 +9862,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-18-quiz-punkte-plus', datum:'2026-09-18', fuer:'alle', text:'Klassen-Quiz: Nach jeder Frage siehst du gross, wie viele Punkte du dazubekommen hast. Und «mitmachen» klappt jetzt zuverlässig.'},
   {id:'2026-09-18-quiz-stopp', datum:'2026-09-18', fuer:'lehrer', text:'Klassen-Quiz: Neuer Knopf «⏸ Zeit stoppen» am Beamer — der Countdown friert ein, niemand wird gesperrt, aufgelöst wird per Knopf.'},
   {id:'2026-09-17-neuigkeiten', datum:'2026-09-17', fuer:'alle', text:'Neuer Reiter 🆕: Hier siehst du, was sich an der Library geändert hat. Leuchtet das Symbol rot, gibt es etwas Neues.'},
   {id:'2026-09-17-erinnerungen', datum:'2026-09-17', fuer:'alle', text:'Erinnerungen kommen zuverlässiger an, auch wenn der Versand sich verspätet.'},
