@@ -1341,6 +1341,34 @@ const LOGIN_ALIASES = {
 const MAX_CHUNK_BYTES = 900 * 1024; // safety margin under Firestore's 1 MiB per-document limit
 const MAX_RESOURCE_BYTES = 8 * 1024 * 1024; // overall cap per uploaded resource (spread across chunks if needed)
 const MAX_PDF_BYTES = 4 * 1024 * 1024; // PDFs tiefer: jeder Aufruf kostet Download-Volumen; Grösseres komprimieren oder als 🔗 Link
+// Speicher-Kontingent pro Lehrperson (alle eigenen Uploads inkl. noch
+// aufbewahrter Vorversionen). Gezählt über resourceContent.{ownerUid, bytes};
+// Inhalte von vor dieser Regel (ohne ownerUid) zählen nicht mit. Nur im
+// Browser geprüft — Lehrpersonen sind vertrauenswürdig, es geht ums Aufräumen.
+const TEACHER_QUOTA_BYTES = 1024 * 1024 * 1024;
+function contentBytes(content){ return typeof content === 'string' ? new Blob([content]).size : content.length; }
+function fmtMB(b){ return b >= 1024*1024*1024 ? (b/1024/1024/1024).toFixed(2).replace('.', ',')+' GB' : Math.round(b/1024/1024)+' MB'; }
+async function teacherUsedBytes(){
+  var snap = await getDocs(query(collection(db,'resourceContent'), where('ownerUid','==',state.user.uid)));
+  var sum = 0;
+  snap.forEach(function(d){ sum += d.data().bytes || 0; });
+  return sum;
+}
+async function assertQuota(addBytes){
+  var used = await teacherUsedBytes();
+  if(used + addBytes > TEACHER_QUOTA_BYTES){
+    throw new Error('Dein Speicher ist voll ('+fmtMB(used)+' von '+fmtMB(TEACHER_QUOTA_BYTES)+'). Bitte alte Übungen/PDFs löschen oder als «🔗 Link» ablegen.');
+  }
+}
+function showQuotaUsage(){
+  var el = document.getElementById('dzQuota');
+  if(!el) return;
+  teacherUsedBytes().then(function(used){
+    var pct = Math.min(100, Math.round(used / TEACHER_QUOTA_BYTES * 100));
+    el.innerHTML = '💾 Dein Speicher: <b>'+esc(fmtMB(used))+'</b> von '+esc(fmtMB(TEACHER_QUOTA_BYTES))+' ('+pct+' %)';
+    if(pct >= 90) el.style.color = 'var(--danger, #c0392b)';
+  }).catch(function(err){ console.error(err); });
+}
 function maxBytesFor(pdf){ return pdf ? MAX_PDF_BYTES : MAX_RESOURCE_BYTES; }
 function tooBigMsg(pdf){ return pdf
   ? 'PDF ist zu gross (max. '+Math.round(MAX_PDF_BYTES/1024/1024)+' MB). Bitte komprimieren (z.B. Vorschau → Exportieren → Quartz-Filter «Reduce File Size») oder als «🔗 Link hinzufügen» ablegen.'
@@ -4934,6 +4962,7 @@ function renderSubject(subjectId, folderId){
     html += '<div>HTML- oder PDF-Datei hierher ziehen oder <label for="fileInput" style="color:var(--brand);text-decoration:underline;cursor:pointer;">Datei auswählen</label></div>';
     html += '<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" id="dzLinkBtn" type="button">🔗 Link hinzufügen</button></div>';
     html += '<div id="dzTarget" style="font-size:12.5px;margin-top:8px;"></div>';
+    html += '<div id="dzQuota" style="font-size:12.5px;margin-top:6px;opacity:.85;"></div>';
     html += '<input type="file" id="fileInput" accept=".html,.htm,.pdf,text/html,application/pdf">';
     html += '<div class="upload-progress" id="uploadProgress"></div>';
     html += '</div>';
@@ -4943,6 +4972,7 @@ function renderSubject(subjectId, folderId){
   html += '<div id="resourceList" class="resource-list"><div class="empty-state">Wird geladen …</div></div>';
 
   renderChrome(html);
+  if(isTeacher) showQuotaUsage();
   document.getElementById('backBtn').addEventListener('click', goHome);
   var diktatAnalyseBtn = document.getElementById('diktatAnalyseBtn');
   if(diktatAnalyseBtn){
@@ -5423,12 +5453,14 @@ function repointEntries(batch, sync, newContentId, prevContentId, fileName){
 async function publishResourceContent(r, htmlText, fileName){
   // htmlText: String (HTML-Übung) oder Uint8Array (PDF)
   var chunks = contentChunkDocs(htmlText);
+  var bytes = contentBytes(htmlText);
+  await assertQuota(bytes);
   var sync = await syncedResourceEntries(r);
   // Nie einen Inhalt überschreiben (er kann geteilt sein), sondern neu ablegen
   // und die Übung(en) umhängen.
   var newContentId = r.id + '_' + Date.now().toString(36);
   var batch = writeBatch(db);
-  batch.set(doc(db,'resourceContent', newContentId), { chunkCount: chunks.length });
+  batch.set(doc(db,'resourceContent', newContentId), { chunkCount: chunks.length, bytes: bytes, ownerUid: state.user.uid });
   chunks.forEach(function(chunk, i){
     batch.set(doc(db,'resourceContent', newContentId, 'chunks', String(i)), chunk);
   });
@@ -6146,7 +6178,10 @@ async function doUpload(subjectId, folderId, file, title){
   progEl.classList.add('show');
   try{
     var pdf = isPdfFile(file);
-    var chunks = contentChunkDocs(pdf ? await readFileAsBytes(file) : await readFileAsText(file));
+    var content = pdf ? await readFileAsBytes(file) : await readFileAsText(file);
+    var chunks = contentChunkDocs(content);
+    var bytes = contentBytes(content);
+    await assertQuota(bytes);
     var resId = subjectId+'_'+Date.now();
     var batch = writeBatch(db);
     var meta = {
@@ -6161,12 +6196,13 @@ async function doUpload(subjectId, folderId, file, title){
     };
     if(pdf) meta.pdf = true;
     batch.set(kdoc('resources', resId), meta);
-    batch.set(doc(db,'resourceContent', resId), { chunkCount: chunks.length });
+    batch.set(doc(db,'resourceContent', resId), { chunkCount: chunks.length, bytes: bytes, ownerUid: state.user.uid });
     chunks.forEach(function(chunk, i){
       batch.set(doc(db,'resourceContent', resId, 'chunks', String(i)), chunk);
     });
     await batch.commit();
     toast('«'+title+'» wurde veröffentlicht.');
+    showQuotaUsage();
   }catch(err){
     console.error(err);
     toast('Hochladen fehlgeschlagen: '+(err && err.message ? err.message : 'unbekannter Fehler'));
@@ -11114,6 +11150,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-18-speicher-kontingent', datum:'2026-09-18', fuer:'lehrer', text:'💾 Jede Lehrperson hat neu 1 GB Speicher für eigene Übungen und PDFs (Anzeige im Hochlade-Feld). Ist er voll: Altes löschen oder grosse Dateien als «🔗 Link» ablegen.'},
   {id:'2026-09-18-pdf-4mb-cache', datum:'2026-09-18', fuer:'lehrer', text:'📄 PDFs neu max. 4 MB (grössere komprimieren oder als «🔗 Link» ablegen). Übungen und PDFs werden pro Gerät nur noch einmal heruntergeladen und danach aus dem Speicher geöffnet – spart Firebase-Kontingent und lädt schneller.'},
   {id:'2026-09-18-mehrere-links-aktuell', datum:'2026-09-18', fuer:'alle', text:'📘 Bei Hausaufgaben können jetzt mehrere Übungen oder PDFs verlinkt sein – und pro Fach können mehrere Themen gleichzeitig rot als «Aktuell» markiert sein.'},
   {id:'2026-09-18-pdf-link', datum:'2026-09-18', fuer:'lehrer', text:'📄 PDFs: Einfach ins gleiche Feld wie die Übungsseiten ziehen (max. 4 MB, gespeichert ohne Aufschlag). Neu auch «🔗 Link hinzufügen» – z.B. für ein PDF aus iCloud/OneDrive: es wird nur der Link gespeichert, öffnet in neuem Tab. Beides lässt sich wie Übungen bei Hausaufgaben verlinken.'},
