@@ -10966,6 +10966,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-18-gaeste-pruefung', datum:'2026-09-18', fuer:'lehrer', text:'Fach-Gäste (z.B. Elena und Letizia) erscheinen bei Prüfungen nur noch in Mathe-Prüfungen — in der Live-Übersicht und bei ihnen selbst.'},
   {id:'2026-09-18-pruefung-formate', datum:'2026-09-18', fuer:'lehrer', text:'📝 Prüfungen: Beim Erstellen wählst du jetzt die Aufgabenformate — ✍️ Frei formulieren, 🔤 Selbst hinschreiben (ohne Auswahl), ☑️ Auswählen, 🔗 Zuordnen & Ordnen. Standard 30/40/20/10 %, frei änderbar. Hat die Übung zu wenig Kurzantwort-Fragen, werden Auswahlfragen mit kurzer Antwort und Zuordnungs-Paare automatisch zu Fragen ohne Auswahl umgewandelt (kleine Tippfehler zählen als richtig).'},
   {id:'2026-09-18-fluestern-alle', datum:'2026-09-18', fuer:'lehrer', text:'🗣 Flüstern: Mit «Alle hinzufügen» darf die ganze Klasse auf einmal flüstern.'},
   {id:'2026-09-18-pruefung-massstab-bloom', datum:'2026-09-18', fuer:'lehrer', text:'📝 Prüfungen: Notenmassstab pro Prüfung wählbar — DBK linear (Standard), DBK mit reduzierter 6, Bestehensgrenze (Note 4 bei x %), Fehlerabzug (mit «Fehler für eine 6») oder eigene Punktetabelle. Beim Erstellen Niveau G/E wählen: Die Fragen werden nach Bloom verteilt (G 50/35/15, E 30/40/30 % Erinnern/Verstehen/Anwenden, anpassbar) und nach Bereichen und Aufgabentypen gemischt. Jede Aufgabe bekommt einen Punktevorschlag (halbe Punkte möglich), unter «🧮 Aufgaben & Punkte» änderbar. Karteikarten der Übung werden zu offenen Fragen, vorkorrigiert über Stichwörter der Musterlösung. In den Details gibst du volle, keine oder Teilpunkte.'},
@@ -12523,6 +12524,8 @@ function pruefArt(p){ return p.art || 'nativ'; }
 function pruefAnzahl(p){ return pruefArt(p) === 'bank' ? (p.fragen || []).length : ((p.cfg && p.cfg.anzahl) || 0); }
 function pruefMs(ts){ return ts && ts.toMillis ? ts.toMillis() : (typeof ts === 'number' ? ts : 0); }
 function pruefById(id){ return pruef.list.find(function(p){ return p.id === id; }) || null; }
+// Fach der Prüfung (Fach der Übung, sonst Fach im Notenrechner) — für Fach-Gäste.
+function pruefFach(p){ return (p && (p.subject || p.fach)) || ''; }
 // Eigene Teilnahme sofort lokal nachführen: die Prüfungsliste und die eigene
 // Teilnahme sind zwei getrennte Listener — ohne das sähe ein dazwischen
 // feuernder Listen-Snapshot noch den alten Stand («läuft, aktiv») und würde
@@ -12723,6 +12726,9 @@ function startPruefungWatcher(){
     var list = [];
     snap.forEach(function(d){ list.push(Object.assign({id:d.id}, d.data())); });
     list.sort(function(a,b){ return pruefMs(b.createdAt) - pruefMs(a.createdAt); });
+    // Fach-Gäste (z.B. nur Mathe) sehen nur Prüfungen ihres Fachs.
+    var nurFach = state.profile.role !== 'teacher' && state.profile.nurFach;
+    if(nurFach) list = list.filter(function(p){ return pruefFach(p) === nurFach; });
     pruef.list = list;
     syncPruefTeilWatchers();
     updatePruefungBanner();
@@ -14173,7 +14179,7 @@ async function pruefEditor(p){
         data.art = info.art;
         data.diktat = !!info.diktat;
         if(info.diktat && info.fragen[0]) data.woerterInfo = info.fragen[0].woerter || null;
-        data.resourceId = resource.id; data.resourceTitel = resource.title || resource.fileName || ''; data.contentId = resourceContentId(resource);
+        data.resourceId = resource.id; data.subject = resource.subject || ''; data.resourceTitel = resource.title || resource.fileName || ''; data.contentId = resourceContentId(resource);
         data.cfg = {kats:kats, katNamen:katEls.map(function(i){ return i.parentNode.textContent.replace(/\s*\(\d+\)\s*$/, '').trim(); }),
           optionen:optionen, optNamen:optNamen, anzahl:anzahl, mischen:mischenEl.checked};
         var nivEl = document.getElementById('prNiveau');
@@ -14312,7 +14318,7 @@ function pruefMonitorZeichnen(){
     pruef.loesLaedt = true;
     pruefLoesungLaden(p.id).then(function(){ pruef.loesLaedt = false; pruefMonitorZeichnen(); }, function(err){ pruef.loesLaedt = false; console.error(err); });
   }
-  var teil = pruef.teil[p.id], roster = pruefRosterCache.list, anzahl = pruefAnzahl(p);
+  var teil = pruef.teil[p.id], roster = pruefRosterCache.list && rosterFuerFach(pruefRosterCache.list, pruefFach(p)), anzahl = pruefAnzahl(p);
   var h = '<h2 class="page-welcome" style="margin-bottom:6px;">📝 '+esc(p.titel)+' '+pruefStatusBadge(p)+'</h2>';
   h += '<p class="kz-intro">'+esc(pruefBeschreibung(p, true))+'</p>';
   h += '<div class="back-row" style="flex-wrap:wrap;">';
