@@ -1126,6 +1126,13 @@
   .ae-gross-jobs{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
   .ae-gross-jobs .ae-job{font-size:clamp(17px,2.6vw,30px);padding:8px 20px;}
   .ae-gross-stuhl{margin-top:20px;font-family:'Baloo 2',system-ui,sans-serif;font-size:clamp(28px,5.5vw,68px);font-weight:800;line-height:1.1;color:var(--bad);}
+  .ae-stuhl{display:inline-flex;align-items:center;gap:10px;margin:8px 0 6px 2px;cursor:pointer;user-select:none;font-size:14px;font-weight:600;}
+  .ae-stuhl input{position:absolute;opacity:0;width:1px;height:1px;}
+  .ae-stuhl-sw{position:relative;width:44px;height:24px;border-radius:999px;background:var(--border);transition:background .15s;flex:none;}
+  .ae-stuhl-sw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s;}
+  .ae-stuhl input:checked + .ae-stuhl-sw{background:var(--good);}
+  .ae-stuhl input:checked + .ae-stuhl-sw::after{transform:translateX(20px);}
+  .ae-stuhl input:focus-visible + .ae-stuhl-sw{outline:2px solid var(--primary, #3B82F6);outline-offset:2px;}
   .ae-gross-hint{margin-top:18px;color:var(--text-muted);font-size:14px;}
   @keyframes aeGrossPuls{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(230,57,80,.6);}50%{transform:scale(1.04);box-shadow:0 0 0 26px rgba(230,57,80,0);}}
   @media (prefers-reduced-motion: reduce){ .ae-gross-box{animation:none;} }
@@ -10657,6 +10664,7 @@ var AEMTLI_DEFAULTS = {
   startDate: '2026-08-11',          // erster Diensttag nach den Sommerferien
   weekdays: [2, 5],                 // Dienstag + Freitag (0 = Sonntag)
   zeiten: { 2:'08:15', 5:'11:00' }, // feste Uhrzeit je Diensttag
+  stuhl: { 2:true, 5:false },       // true = «AUFSTUHLEN», sonst «NICHT aufstuhlen»
   aemtli: [
     { icon:'🧹', name:'Boden wischen',    offset:0 },
     { icon:'🧽', name:'Wandtafel putzen', offset:4 }
@@ -10692,6 +10700,10 @@ function aemtliZeitenText(cfg){
     var z = (cfg.zeiten||{})[wd] || (cfg.zeiten||{})[String(wd)] || '';
     return name + (z ? ' ' + z + ' Uhr' : '');
   }).join(' · ');
+}
+function aemtliStuhl(cfg, wd){
+  var st = (cfg && cfg.stuhl) || {};
+  return !!(st.hasOwnProperty(wd) ? st[wd] : st[String(wd)]);
 }
 function aemtliInFerien(dateStr){
   return FERIEN_TG.some(function(f){ return f.start <= dateStr && f.end >= dateStr; });
@@ -10812,6 +10824,7 @@ function aemtliLoad(force){
     cfg.weekdays = cfg.weekdays.map(Number).filter(function(n){ return n >= 0 && n <= 6; });
     if(!cfg.weekdays.length) cfg.weekdays = AEMTLI_DEFAULTS.weekdays.slice();
     if(!cfg.zeiten || typeof cfg.zeiten !== 'object') cfg.zeiten = Object.assign({}, AEMTLI_DEFAULTS.zeiten);
+    if(!cfg.stuhl || typeof cfg.stuhl !== 'object') cfg.stuhl = Object.assign({}, AEMTLI_DEFAULTS.stuhl);
     cfg.skipWeeks = Array.isArray(cfg.skipWeeks) ? cfg.skipWeeks : [];
     aemtliState.cfg = cfg;
     aemtliState.roster = roster;
@@ -10868,7 +10881,7 @@ function aemtliSave(){
   // den Aufrufer mitreissen — das Zeichnen haengt nicht vom Speichern ab.
   try{
     return setDoc(klasseninfoRef('aemtli'), {
-      startDate: c.startDate, weekdays: c.weekdays, zeiten: c.zeiten, aemtli: c.aemtli,
+      startDate: c.startDate, weekdays: c.weekdays, zeiten: c.zeiten, stuhl: c.stuhl || {}, aemtli: c.aemtli,
       teams: aemtliTeamsSpeicherform(c.teams), skipWeeks: c.skipWeeks, updatedAt: serverTimestamp()
     }).catch(function(err){ console.error('Ämtliplan nicht gespeichert', err); toast('Ämtliplan nicht gespeichert.'); });
   }catch(err){
@@ -10921,7 +10934,8 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-09-18-pruefung-diktat', datum:'2026-09-18', fuer:'lehrer', text:'📝 Prüfungen: Bei «Neue Prüfung» stehen nur noch Übungen zur Auswahl, aus denen sich wirklich eine Prüfung machen lässt (ohne Lehrerbereich und Berufswahl). Neu gehen auch ✍️ Diktate: Du diktierst vorne, die Klasse tippt im gesperrten Vollbild mit (Rechtschreibprüfung/Autokorrektur aus, Einfügen gesperrt). Korrigiert wird Wort für Wort gegen den Text der Diktat-Übung — Gross/Klein zählt, Satzzeichen nicht. Note = 6 − Fehler × Abzug pro Fehler; in den Details kannst du jeden Fehler von Hand streichen.'},
+  {id:'2026-09-18-aemtli-stuhl', datum:'2026-09-18', fuer:'lehrer', text:'🧹 Ämtliplan: Unter jedem Diensttag gibt es jetzt einen Schieber, ob vor dem Ämtli «🪑 AUFSTUHLEN» oder «🚫 NICHT aufstuhlen» angezeigt wird.'},
+  {id:'2026-09-18-pruefung-diktat', datum:'2026-09-18', fuer:'lehrer', text:'📝 Prüfungen: Bei «Neue Prüfung» stehen nur noch Übungen zur Auswahl, aus denen sich wirklich eine Prüfung machen lässt (ohne Lehrerbereich und Berufswahl). Neu gehen auch ✍️ Diktate: Du diktierst vorne, die Klasse tippt im gesperrten Vollbild mit (Rechtschreibprüfung/Autokorrektur aus, Einfügen gesperrt). Korrigiert wird Wort für Wort gegen den Text der Diktat-Übung — Gross/Klein und Satzzeichen zählen. Note = 6 − Fehler × Abzug pro Fehler; in den Details kannst du jeden Fehler von Hand streichen.'},
   {id:'2026-09-18-pruefungsmodus-lp', datum:'2026-09-18', fuer:'lehrer', text:'Neu im Klassenzimmer: 📝 Prüfungen. Übung wählen — die Library liest die Bereiche selbst aus der Übung (Themen der Prüfungsvorbereitungen, Themenkarten der Mathe-Übungen, bei Pöstlergeografie Bereiche/Gebiet/Antwortart) und zieht daraus die Fragen. Freigeben und live zuschauen: Wer die Prüfung verlässt (Tab, Fenster, Esc, neu laden), ist gesperrt, bis du entsperrst. Optional mit Zeitlimit: Die Zeit läuft pro Person ab dem Start, danach wird automatisch abgegeben. Automatisch korrigiert, von Hand umwertbar. Mit «📣 Resultate freigeben» kommt die Note mit der gewählten Gewichtung in den Notenrechner der Klasse — verbergen oder löschen nimmt sie wieder heraus.'},
   {id:'2026-09-18-pruefungsmodus', datum:'2026-09-18', fuer:'alle', text:'Online-Prüfungen: Wenn oben «📝 Prüfung verfügbar» steht, kannst du die Prüfung starten. Achtung: Verlässt du sie (anderer Tab, anderes Fenster, Esc, neu laden), wirst du gesperrt und musst warten, bis die Lehrperson dich entsperrt. Sobald die Lehrperson die Resultate freigibt, steht deine Note automatisch im 🎶 Notenrechner.'},
   {id:'2026-09-18-mathe-tastatur-weiter', datum:'2026-09-18', fuer:'alle', text:'Mathe-Übungen: Den Taschenrechner 🧮 kannst du jetzt auch mit der Tastatur bedienen (Ziffern, + − * /, Enter). Und wenn du eine Übung wieder öffnest, landest du direkt bei der Aufgabe, bei der du aufgehört hast — auch auf einem anderen Gerät.'},
@@ -11189,9 +11203,8 @@ function aemtliGrossCheck(){
   var jobs = info.jobs.map(function(j){
     return '<span class="ae-job">'+(j.a.icon||'🧹')+' '+esc(j.a.name)+': <b>'+esc(aemtliShortNames(j.team).join(' + ') || '—')+'</b></span>';
   }).join('');
-  // Stühle: am Dienstag aufstuhlen, am Freitag ausdrücklich nicht.
-  var wd = aemtliParse(info.datum).getDay();
-  var stuhl = wd === 2 ? '🪑 AUFSTUHLEN' : wd === 5 ? '🚫 NICHT aufstuhlen' : '';
+  // Stühle: pro Diensttag im Ämtliplan eingestellt (Schieber unter dem Tag).
+  var stuhl = aemtliStuhl(aemtliState.cfg, aemtliParse(info.datum).getDay()) ? '🪑 AUFSTUHLEN' : '🚫 NICHT aufstuhlen';
   el = document.createElement('div');
   el.id = 'aeGross';
   el.className = 'ae-gross';
@@ -11492,6 +11505,9 @@ function paintAemtliJobs(host){
     h += '<label class="modal-label" style="margin:0;align-self:center;">'+esc(name)+'</label>';
     h += '<input class="modal-input" type="time" data-zeit="'+wd+'" value="'+esc(z)+'">';
     h += '</div>';
+    var auf = aemtliStuhl(cfg, wd);
+    h += '<label class="ae-stuhl"><input type="checkbox" data-stuhl="'+wd+'"'+(auf ? ' checked' : '')+'><span class="ae-stuhl-sw"></span>'
+       + '<span class="ae-stuhl-txt">'+(auf ? '🪑 AUFSTUHLEN' : '🚫 NICHT aufstuhlen')+'</span></label>';
   });
   host.innerHTML = h;
 
@@ -11522,6 +11538,15 @@ function paintAemtliJobs(host){
       cfg.zeiten = cfg.zeiten || {};
       cfg.zeiten[inp.getAttribute('data-zeit')] = inp.value;
       aemtliSaveSoon();
+    });
+  });
+  Array.prototype.forEach.call(host.querySelectorAll('[data-stuhl]'), function(inp){
+    inp.addEventListener('change', function(){
+      cfg.stuhl = cfg.stuhl || {};
+      cfg.stuhl[inp.getAttribute('data-stuhl')] = inp.checked;
+      var t = inp.parentNode.querySelector('.ae-stuhl-txt');
+      if(t) t.textContent = inp.checked ? '🪑 AUFSTUHLEN' : '🚫 NICHT aufstuhlen';
+      aemtliSave();
     });
   });
   Array.prototype.forEach.call(host.querySelectorAll('[data-wd]'), function(b){
@@ -13015,7 +13040,7 @@ function pruefExtractImpl(){
     var werte = function(v){ return typeof v === 'string' ? [v] : Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).map(function(x){ return v[x]; }) : []); };
     if(Array.isArray(A)) A.forEach(function(el){ grp(werte(el).reduce(function(a, x){ return a.concat(werte(x)); }, [])); });
     else if(A && typeof A === 'object') Object.keys(A).forEach(function(k){ grp([k].concat(werte(A[k]))); });
-    var woerter = text.join(' ').split(/\s+/).filter(function(w){ return w.replace(/[^0-9A-Za-zÀ-ÿ]/g, ''); }).length;
+    var woerter = text.join(' ').split(/\s+/).filter(function(w){ return /[\p{L}\p{N}]/u.test(w); }).length;
     out.diktat = true;
     kat('diktat', '✍️ Diktat');
     add('diktat', {typ:'diktat', frage:'Diktat', text:text, alt:alt, woerter:woerter});
@@ -13160,7 +13185,7 @@ function pruefBankZiehen(info, kats, anzahl, seed){
     if(f.typ === 'mc'){ q.optionen = f.optionen; L.loesung = f.loesung; L.anzeige = f.optionen[f.loesung] || ''; }
     else if(f.typ === 'tf'){ L.loesung = f.loesung; L.anzeige = f.loesung ? 'Wahr' : 'Falsch'; }
     else if(f.typ === 'text'){ L.loesung = f.loesung; L.anzeige = f.loesung[0] || ''; }
-    else if(f.typ === 'diktat'){ L.text = f.text; L.alt = f.alt || []; L.punkte = f.woerter || 1; L.anzeige = ''; }
+    else if(f.typ === 'diktat'){ L.text = f.text; L.alt = f.alt || []; L.punkte = pruefDiktatTokens(f.text.join(' ')).length || 1; L.anzeige = ''; }
     else if(f.typ === 'zahl'){ q.einheit = f.einheit || ''; L.loesung = f.loesung; L.anzeige = String(f.loesung.wert).replace('.', ',') + (f.einheit ? ' ' + f.einheit : ''); }
     else if(f.typ === 'zuordnen'){
       var perm = pruefMischen(f.rechts.map(function(r, j){ return j; }), rnd);
@@ -13235,9 +13260,19 @@ function pruefBankBewerten(p, loes, antworten, korrektur){
    (korrektur[id] = true); fehlende oder überzählige Wörter am Stück sind eine
    Zeile und zählen pro Wort. */
 function pruefDiktatTokens(t){
-  return String(t || '').split(/\s+/).map(function(w){
-    return {roh:w, k:w.replace(/^[.,;:!?„“”"«»‹›'‘’()\[\]\-–—…]+|[.,;:!?„“”"«»‹›'‘’()\[\]\-–—…]+$/g, '').replace(/ß/g, 'ss')};
-  }).filter(function(x){ return x.k; });
+  // Wörter und Satzzeichen getrennt: jedes Satzzeichen ist ein eigenes Token
+  // (fehlendes Komma = 1 Fehler, das Wort davor bleibt richtig).
+  var out = [];
+  String(t || '').replace(/[„“”«»‹›"]/g, '"').replace(/[‘’‚`´]/g, "'").replace(/\.\.\./g, '…').replace(/—/g, '–')
+    .split(/\s+/).forEach(function(w){
+      var m = w.match(/^([^\p{L}\p{N}]*)([\s\S]*?)([^\p{L}\p{N}]*)$/u);
+      if(!m) return;
+      var zeichen = function(g){ Array.from(g).forEach(function(c){ if(c === '-') c = '–'; out.push({roh:c, k:c, z:true}); }); };
+      zeichen(m[1]);
+      if(m[2]) out.push({roh:m[2], k:m[2].replace(/ß/g, 'ss')});
+      zeichen(m[3]);
+    });
+  return out;
 }
 function pruefDiktatDetails(q, L, v, korrektur){
   var orig = (L.text || []).join(' '), ein = String(v || '');
@@ -13255,11 +13290,17 @@ function pruefDiktatDetails(q, L, v, korrektur){
   for(var i=0;i<=n;i++) T.push(new Uint16Array(m+1));
   for(i=n-1;i>=0;i--) for(var j=m-1;j>=0;j--) T[i][j] = A[i].k === B[j].k ? T[i+1][j+1] + 1 : Math.max(T[i+1][j], T[i][j+1]);
   var fehler = [], del = [], ins = [];
+  // Innerhalb einer Lücke nur Wort mit Wort und Zeichen mit Zeichen paaren.
+  function paaren(dl, il, pos){
+    var k = Math.min(dl.length, il.length);
+    for(var x=0;x<k;x++) fehler.push({id:q.id + '~' + dl[x], pos:dl[x], n:1, a:B[il[x]].roh, r:A[dl[x]].roh, art:'falsch'});
+    if(dl.length > k) fehler.push({id:q.id + '~' + dl[k], pos:dl[k], n:dl.length - k, a:'–', r:dl.slice(k).map(function(x){ return A[x].roh; }).join(' '), art:'fehlt'});
+    if(il.length > k) fehler.push({id:q.id + '~+' + il[k], pos:pos, n:il.length - k, a:il.slice(k).map(function(x){ return B[x].roh; }).join(' '), r:'(nichts)', art:'zuviel'});
+  }
   function lueckeAbschliessen(){
-    var k = Math.min(del.length, ins.length);
-    for(var x=0;x<k;x++) fehler.push({id:q.id + '~' + del[x], n:1, a:B[ins[x]].roh, r:A[del[x]].roh, art:'falsch'});
-    if(del.length > k) fehler.push({id:q.id + '~' + del[k], n:del.length - k, a:'–', r:del.slice(k).map(function(x){ return A[x].roh; }).join(' '), art:'fehlt'});
-    if(ins.length > k) fehler.push({id:q.id + '~+' + ins[k], n:ins.length - k, a:ins.slice(k).map(function(x){ return B[x].roh; }).join(' '), r:'(nichts)', art:'zuviel'});
+    var wortD = function(x){ return !A[x].z; }, wortI = function(x){ return !B[x].z; };
+    paaren(del.filter(wortD), ins.filter(wortI), i);
+    paaren(del.filter(function(x){ return !wortD(x); }), ins.filter(function(x){ return !wortI(x); }), i);
     del = []; ins = [];
   }
   i = 0; j = 0;
@@ -13269,18 +13310,20 @@ function pruefDiktatDetails(q, L, v, korrektur){
     else del.push(i++);
   }
   lueckeAbschliessen();
+  fehler.sort(function(x, y){ return x.pos - y.pos; });
   var zaehlt = 0;
   var rows = fehler.map(function(f){
     var ok = !!korrektur[f.id];
     if(!ok) zaehlt += f.n;
-    var was = f.art === 'fehlt' ? (f.n > 1 ? f.n + ' Wörter fehlen' : 'Wort fehlt') : f.art === 'zuviel' ? (f.n > 1 ? f.n + ' Wörter zu viel' : 'Wort zu viel') : 'falsch geschrieben';
+    var was = f.art === 'fehlt' ? (f.n > 1 ? 'fehlt (' + f.n + ' Wörter/Zeichen)' : 'fehlt') : f.art === 'zuviel' ? (f.n > 1 ? 'zu viel (' + f.n + ' Wörter/Zeichen)' : 'zu viel') : 'falsch';
     return {id:f.id, nr:true, f:'«' + (f.art === 'zuviel' ? f.a : f.r) + '» — ' + was, kat:f.n > 1 ? f.n + ' Fehler' : '', a:f.a, r:f.r, ok:ok, pkt:0, max:0};
   });
   var max = n || 1, pkt = Math.max(0, max - zaehlt);
-  var info = {id:q.id, info:true, f:'Diktat: ' + zaehlt + ' Fehler · ' + m + ' von ' + n + ' Wörtern geschrieben', a:'', ok:zaehlt === 0, pkt:pkt, max:max};
+  var nw = A.filter(function(x){ return !x.z; }).length, mw = B.filter(function(x){ return !x.z; }).length;
+  var info = {id:q.id, info:true, f:'Diktat: ' + zaehlt + ' Fehler · ' + mw + ' von ' + nw + ' Wörtern geschrieben', a:'', ok:zaehlt === 0, pkt:pkt, max:max};
   return [info].concat(rows);
 }
-function pruefDiktatWoerter(t){ return pruefDiktatTokens(t).length; }
+function pruefDiktatWoerter(t){ return pruefDiktatTokens(t).filter(function(x){ return !x.z; }).length; }
 
 /* ---------- Schüler:in: Bank-Prüfung schreiben ---------- */
 
@@ -13346,7 +13389,7 @@ function pruefBankZeichnen(){
 }
 function pruefDiktatZeichnen(b, q, v){
   var h = '<div class="pr-q-kopf"><span class="pr-badge">✍️ Diktat</span><span id="prDiktatZahl">'+pruefDiktatWoerter(v)+' Wörter</span></div>';
-  h += '<p class="pr-q-frage">Hör gut zu und schreib das Diktat hier mit. Achte auf Gross- und Kleinschreibung.</p>';
+  h += '<p class="pr-q-frage">Hör gut zu und schreib das Diktat hier mit. Achte auf Gross- und Kleinschreibung und auf die Satzzeichen.</p>';
   h += '<textarea class="modal-input pr-diktat-in" id="prDiktatIn" lang="de" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" data-gramm="false" data-enable-grammarly="false" placeholder="Hier schreiben …">'+esc(v || '')+'</textarea>';
   h += '<div class="pr-q-nav" style="justify-content:flex-end"><button class="btn btn-primary btn-sm" data-abgeben="1" type="button">✉️ Diktat abgeben</button></div>';
   h += '<div id="prBankConfirm"></div>';
@@ -13469,7 +13512,7 @@ function pruefStatusBadge(p){
 // Kurzbeschreibung: Übung · Anzahl · Bereiche · (Einstellungen der Übung)
 function pruefBeschreibung(p, lang){
   var c = p.cfg || {}, teile = [p.resourceTitel || ''];
-  if(p.diktat) teile.push('✍️ Diktat · ' + (p.maxPunkte || '?') + ' Wörter · −' + String(+p.fehlerAbzug > 0 ? +p.fehlerAbzug : 0.25).replace('.', ',') + ' pro Fehler');
+  if(p.diktat) teile.push('✍️ Diktat · ' + (p.woerterInfo || '?') + ' Wörter · −' + String(+p.fehlerAbzug > 0 ? +p.fehlerAbzug : 0.25).replace('.', ',') + ' pro Fehler');
   else teile.push(pruefAnzahl(p) + ' Fragen' + (pruefArt(p) === 'bank' && p.maxPunkte ? ' (' + p.maxPunkte + ' Punkte)' : ''));
   if(+p.zeitMin > 0) teile.push('⏱ ' + p.zeitMin + ' Min.');
   if(lang){
@@ -13565,7 +13608,7 @@ async function pruefEditor(p){
       var fd = info.fragen[0] || {};
       box.innerHTML = '<div class="pr-kats" hidden><label><input type="checkbox" value="diktat" data-n="1" checked> ✍️ Diktat</label></div>'+
         '<input type="hidden" id="prAnzahl" value="1"><input type="checkbox" id="prMischen" hidden>'+
-        '<p class="pr-hinweis">✍️ <b>Diktat</b> mit '+(fd.woerter || '?')+' Wörtern. Du diktierst vorne, die Schüler:innen tippen im gesperrten Vollbild mit (Rechtschreibprüfung und Autokorrektur aus, Einfügen gesperrt). Korrigiert wird Wort für Wort gegen den Text der Übung: Gross/Klein zählt, Satzzeichen nicht, ß = ss. Jeder Fehler lässt sich in den Details von Hand streichen.</p>';
+        '<p class="pr-hinweis">✍️ <b>Diktat</b> mit '+(fd.woerter || '?')+' Wörtern. Du diktierst vorne, die Schüler:innen tippen im gesperrten Vollbild mit (Rechtschreibprüfung und Autokorrektur aus, Einfügen gesperrt). Korrigiert wird Wort für Wort gegen den Text der Übung: Gross/Klein und Satzzeichen zählen (jedes Zeichen einzeln), ß = ss. Jeder Fehler lässt sich in den Details von Hand streichen.</p>';
       okBtn.disabled = false;
       return;
     }
@@ -13648,6 +13691,7 @@ async function pruefEditor(p){
       var anzahl = Math.min(100, Math.max(1, +document.getElementById('prAnzahl').value || 20));
       data.art = info.art;
       data.diktat = !!info.diktat;
+      if(info.diktat && info.fragen[0]) data.woerterInfo = info.fragen[0].woerter || null;
       data.resourceId = resource.id; data.resourceTitel = resource.title || resource.fileName || ''; data.contentId = resourceContentId(resource);
       data.cfg = {kats:kats, katNamen:katEls.map(function(i){ return i.parentNode.textContent.replace(/\s*\(\d+\)\s*$/, '').trim(); }),
         optionen:optionen, optNamen:optNamen, anzahl:anzahl, mischen:document.getElementById('prMischen').checked};
