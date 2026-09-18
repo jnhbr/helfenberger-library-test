@@ -1125,6 +1125,7 @@
   .ae-gross h2{font-family:'Baloo 2',system-ui,sans-serif;font-size:clamp(30px,6vw,76px);line-height:1.1;margin:10px 0 18px;color:var(--bad);}
   .ae-gross-jobs{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
   .ae-gross-jobs .ae-job{font-size:clamp(17px,2.6vw,30px);padding:8px 20px;}
+  .ae-gross-stuhl{margin-top:20px;font-family:'Baloo 2',system-ui,sans-serif;font-size:clamp(28px,5.5vw,68px);font-weight:800;line-height:1.1;color:var(--bad);}
   .ae-gross-hint{margin-top:18px;color:var(--text-muted);font-size:14px;}
   @keyframes aeGrossPuls{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(230,57,80,.6);}50%{transform:scale(1.04);box-shadow:0 0 0 26px rgba(230,57,80,0);}}
   @media (prefers-reduced-motion: reduce){ .ae-gross-box{animation:none;} }
@@ -10545,6 +10546,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-18-aemtli-stuhl', datum:'2026-09-18', fuer:'lehrer', text:'Ämtli-Erinnerung: am Dienstag steht zusätzlich gross «AUFSTUHLEN», am Freitag «NICHT aufstuhlen».'},
   {id:'2026-09-18-aemtli-gross', datum:'2026-09-18', fuer:'lehrer', text:'Ämtli-Erinnerung: 5 Minuten vor jeder Ämtli-Zeit poppt der Hinweis gross und pulsierend über allem auf (auch im Vollbild). Antippen = weg, zur Ämtli-Zeit verschwindet er sowieso.'},
   {id:'2026-09-18-uebung-bearbeiten', datum:'2026-09-18', fuer:'lehrer', text:'Übungen direkt bearbeiten: «✏️ Bearbeiten» bei jeder Übung — Texte & Lösungen als Formularfelder (nach Aufgabe gruppiert, mit Suche) oder im Code-Modus. Mit Vorschau, Syntaxprüfung und «↩️ Vorherige Version». Kopien in anderen Klassen werden automatisch mitaktualisiert, auch bei «Datei ersetzen».'},
   {id:'2026-09-18-fach-gaeste', datum:'2026-09-18', fuer:'lehrer', text:'Fach-Gäste (z.B. Elena und Letizia in Mathe): erscheinen in Abgabe-Checklisten, Vergessen-Zähler und Live-Klasse nur bei Mathe, in Spielen per «👭 Gäste»-Schalter, im Sitzplan nur von Hand — auch als zweite Person auf einem besetzten Platz.'},
@@ -10806,12 +10808,16 @@ function aemtliGrossCheck(){
   var jobs = info.jobs.map(function(j){
     return '<span class="ae-job">'+(j.a.icon||'🧹')+' '+esc(j.a.name)+': <b>'+esc(aemtliShortNames(j.team).join(' + ') || '—')+'</b></span>';
   }).join('');
+  // Stühle: am Dienstag aufstuhlen, am Freitag ausdrücklich nicht.
+  var wd = aemtliParse(info.datum).getDay();
+  var stuhl = wd === 2 ? '🪑 AUFSTUHLEN' : wd === 5 ? '🚫 NICHT aufstuhlen' : '';
   el = document.createElement('div');
   el.id = 'aeGross';
   el.className = 'ae-gross';
   el.innerHTML = '<div class="ae-gross-box"><div class="ae-gross-icon">🧹</div>'
     + '<h2>Ämtli um '+esc(info.zeit)+' Uhr!</h2>'
     + '<div class="ae-gross-jobs">'+jobs+'</div>'
+    + (stuhl ? '<div class="ae-gross-stuhl">'+esc(stuhl)+'</div>' : '')
     + '<div class="ae-gross-hint">Antippen zum Schliessen</div></div>';
   el.addEventListener('click', function(){
     lsSet(LIB_PREFIX + 'aemtli_gross', key);
