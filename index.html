@@ -1407,11 +1407,35 @@ function showQuotaUsage(){
     return backfillQuotaOwner().then(function(changed){ if(changed && document.getElementById('setQuota')) return paintQuotaUsage(el); });
   }).catch(function(err){ console.error(err); });
 }
+// Aufteilung PDFs / Übungen: resourceContent kennt den Typ nicht, darum über
+// die Übungen der eigenen Klasse (pdf-Flag) die Inhalts-IDs zuordnen.
+async function teacherUsedSplit(){
+  var own = await getDocs(query(collection(db,'resourceContent'), where('ownerUid','==',state.user.uid)));
+  var pdfIds = {};
+  if(heimKlasse()){
+    (await getDocs(kcolFor(heimKlasse(), 'resources'))).forEach(function(d){
+      var r = d.data();
+      if(!r.pdf) return;
+      pdfIds[resourceContentId(Object.assign({id:d.id}, r))] = true;
+      if(r.prevContentId) pdfIds[r.prevContentId] = true;
+    });
+  }
+  var res = {used:0, pdf:0, pdfN:0, html:0, htmlN:0};
+  own.forEach(function(d){
+    var b = d.data().bytes || 0;
+    res.used += b;
+    if(pdfIds[d.id]){ res.pdf += b; res.pdfN++; } else { res.html += b; res.htmlN++; }
+  });
+  return res;
+}
+function fmtMBfein(b){ return (b/1024/1024).toFixed(1).replace('.', ',')+' MB'; }
 function paintQuotaUsage(el){
-  return teacherUsedBytes().then(function(used){
+  return teacherUsedSplit().then(function(sp){
+    var used = sp.used;
     var pct = Math.min(100, Math.round(used / TEACHER_QUOTA_BYTES * 100));
     var col = pct >= 90 ? '#c0392b' : pct >= 70 ? '#e67e22' : 'var(--brand)';
     el.innerHTML = '<div style="font-size:13px;"><b>'+esc(fmtMB(used))+'</b> von '+esc(fmtMB(TEACHER_QUOTA_BYTES))+' belegt ('+pct+' %)</div>'+
+      '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">📄 PDFs: <b>'+esc(fmtMBfein(sp.pdf))+'</b> ('+sp.pdfN+') · 🧩 Übungen: <b>'+esc(fmtMBfein(sp.html))+'</b> ('+sp.htmlN+')</div>'+
       '<div style="height:8px;border-radius:4px;background:rgba(127,127,127,.2);margin:6px 0;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+col+';"></div></div>'+
       '<small style="color:var(--text-muted);">Zählt alle eigenen hochgeladenen Übungen und PDFs (inkl. Vorversionen). Ist er voll: Altes löschen oder grosse Dateien als «🔗 Link» ablegen.</small>';
   }).catch(function(err){ console.error(err); el.textContent = 'Konnte nicht geladen werden.'; });
