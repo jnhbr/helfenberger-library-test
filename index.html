@@ -3601,7 +3601,7 @@ function lmvzBuild(cat, isTeacher){
     fold(lmId, null, lm.name, -1000 + li);
     lm.kap.forEach(function(k, ki){
       var kId = lmId+'_k'+k.nr;
-      fold(kId, lmId, 'Kapitel '+k.nr, ki);
+      fold(kId, lmId, k.nr+' '+(k.name || 'Kapitel '+k.nr), ki);
       k.subs.forEach(function(s, si){
         var sId = lmId+'_'+s.id, onId = sId+'_on';
         fold(sId, kId, s.name, si);
