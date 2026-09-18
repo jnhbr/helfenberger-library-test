@@ -4104,7 +4104,7 @@ async function uebungZuMir(r, quelle, heim){
   settingsCache.at = 0;
 }
 
-// Fremde Klasse: pro Übung ein Knopf, der zeigt, ob sie bei mir fehlt/anders ist.
+// Fremde Klasse: Knopf nur bei Übungen, die bei mir fehlen oder anders sind.
 function paintHeimButtons(list){
   var home = heimKlasse();
   if(!home || !isFremdeKlasse()) return;
@@ -4117,14 +4117,11 @@ function paintHeimButtons(list){
       if(old) old.remove();
       var heim = d.own[r.id] || null;
       var art = heimAbgleich(r, heim);
+      if(!art) return; // bei mir gleich → kein Knopf
       var b = document.createElement('button');
       b.type = 'button';
       b.setAttribute('data-heim', '1');
-      if(!art){
-        b.className = 'btn btn-ghost btn-sm';
-        b.disabled = true;
-        b.textContent = '✓ In '+home+' aktuell';
-      } else {
+      {
         b.className = 'btn btn-primary btn-sm';
         b.textContent = art === 'neu' ? '📥 Duplizieren' : '🔄 Aktualisieren';
         b.title = art === 'neu' ? 'Kopie in deiner Klasse '+home+' anlegen' : 'Deine Fassung in '+home+' durch diese ersetzen';
