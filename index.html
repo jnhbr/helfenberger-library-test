@@ -12652,6 +12652,10 @@ async function pruefStarten(p, weiter, vorschau){
     if(pruefArt(p) === 'bank'){ pruefBankStart(p, sess, ov, saved); return; }
     var html = await loadResourceHtml(p.contentId);
     if(pruef.sess !== sess) return;
+    // Ältere Pöstlergeografie zeigte nach einem Karten-Klick den Namen des
+    // angetippten Landes — damit liesse sich die Lösung erklicken. Auch wenn
+    // noch diese Fassung hochgeladen ist: Namen hier herausnehmen.
+    html = html.split("'Deine Wahl: <b>' + esc(exAnswerLabel(q, EX.ans[q.key])) + '</b>'").join("'✔️ <b>Auf der Karte markiert</b> – du kannst deine Wahl noch ändern.'");
     var cfg = Object.assign({}, p.cfg || {}, (p.cfg && p.cfg.optionen) || {}, {titel:p.titel, seed:p.seed, personSeed:pruefPersonSeed(uid), antworten:saved});
     var inject = '<script>window.__GEO_PRUEFUNG=' + JSON.stringify(cfg).replace(/</g, '\\u003c') + ';<\/script>';
     var headRe = /<head(\s[^>]*)?>/i;
