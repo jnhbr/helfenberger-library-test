@@ -1298,7 +1298,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  getFirestore, doc, getDoc, getDocs, collection, query, where, onSnapshot, serverTimestamp, increment,
+  getFirestore, doc, getDoc, getDocFromCache, getDocs, collection, query, where, onSnapshot, serverTimestamp, increment,
   setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, Bytes
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
@@ -1340,6 +1340,11 @@ const LOGIN_ALIASES = {
 };
 const MAX_CHUNK_BYTES = 900 * 1024; // safety margin under Firestore's 1 MiB per-document limit
 const MAX_RESOURCE_BYTES = 8 * 1024 * 1024; // overall cap per uploaded resource (spread across chunks if needed)
+const MAX_PDF_BYTES = 4 * 1024 * 1024; // PDFs tiefer: jeder Aufruf kostet Download-Volumen; Grösseres komprimieren oder als 🔗 Link
+function maxBytesFor(pdf){ return pdf ? MAX_PDF_BYTES : MAX_RESOURCE_BYTES; }
+function tooBigMsg(pdf){ return pdf
+  ? 'PDF ist zu gross (max. '+Math.round(MAX_PDF_BYTES/1024/1024)+' MB). Bitte komprimieren (z.B. Vorschau → Exportieren → Quartz-Filter «Reduce File Size») oder als «🔗 Link hinzufügen» ablegen.'
+  : 'Datei ist zu gross (max. '+Math.round(MAX_RESOURCE_BYTES/1024/1024)+' MB).'; }
 
 // Splits a string into pieces that each stay under maxBytes when UTF-8 encoded,
 // without ever cutting a multi-byte character (or a surrogate pair) in half —
@@ -5356,8 +5361,8 @@ function pickReplacementFile(r){
       toast(r.pdf ? 'Bitte eine PDF-Datei wählen (.pdf).' : 'Bitte eine HTML-Datei wählen (.html).');
       return;
     }
-    if(file.size > MAX_RESOURCE_BYTES){
-      toast('Datei ist zu gross (max. '+Math.round(MAX_RESOURCE_BYTES/1024/1024)+' MB).');
+    if(file.size > maxBytesFor(r.pdf)){
+      toast(tooBigMsg(r.pdf));
       return;
     }
     uiConfirm('Datei ersetzen?',
@@ -5469,29 +5474,36 @@ function contentChunkDocs(content){
     if(new Blob([content]).size > MAX_RESOURCE_BYTES) throw new Error('Datei ist zu gross (max. '+Math.round(MAX_RESOURCE_BYTES/1024/1024)+' MB).');
     return chunkStringByBytes(content, MAX_CHUNK_BYTES).map(function(c){ return {html:c}; });
   }
-  if(content.length > MAX_RESOURCE_BYTES) throw new Error('Datei ist zu gross (max. '+Math.round(MAX_RESOURCE_BYTES/1024/1024)+' MB).');
+  if(content.length > MAX_PDF_BYTES) throw new Error(tooBigMsg(true));
   var out = [];
   for(var i=0;i<content.length;i+=MAX_CHUNK_BYTES){
     out.push({bin: Bytes.fromUint8Array(content.slice(i, i+MAX_CHUNK_BYTES))});
   }
   return out.length ? out : [{bin: Bytes.fromUint8Array(new Uint8Array(0))}];
 }
+// Inhalte unter resourceContent werden nie verändert (neue Fassung = neue ID,
+// siehe publishResourceContent). Darum zuerst im Offline-Cache nachschauen und
+// nur bei Fehlen den Server fragen — so wird ein PDF/eine Übung pro Gerät nur
+// einmal heruntergeladen statt bei jedem Öffnen (spart Firebase-Download).
+function getContentDoc(ref){
+  return getDocFromCache(ref).then(function(s){ return s.exists() ? s : getDoc(ref); }, function(){ return getDoc(ref); });
+}
 async function loadResourcePdfBlob(contentId){
-  var snap = await getDoc(doc(db,'resourceContent', contentId));
+  var snap = await getContentDoc(doc(db,'resourceContent', contentId));
   if(!snap.exists()) throw new Error('Inhalt nicht gefunden.');
   var n = snap.data().chunkCount || 0, idx = [];
   for(var i=0;i<n;i++) idx.push(i);
-  var chunkSnaps = await Promise.all(idx.map(function(i){ return getDoc(doc(db,'resourceContent', contentId, 'chunks', String(i))); }));
+  var chunkSnaps = await Promise.all(idx.map(function(i){ return getContentDoc(doc(db,'resourceContent', contentId, 'chunks', String(i))); }));
   var parts = chunkSnaps.map(function(c){ var b = c.exists() && c.data().bin; return b ? b.toUint8Array() : new Uint8Array(0); });
   return new Blob(parts, {type:'application/pdf'});
 }
 
 async function loadResourceHtml(contentId){
-  var snap = await getDoc(doc(db,'resourceContent', contentId));
+  var snap = await getContentDoc(doc(db,'resourceContent', contentId));
   if(!snap.exists()) throw new Error('Inhalt nicht gefunden.');
   var n = snap.data().chunkCount || 0, idx = [];
   for(var i=0;i<n;i++) idx.push(i);
-  var chunkSnaps = await Promise.all(idx.map(function(i){ return getDoc(doc(db,'resourceContent', contentId, 'chunks', String(i))); }));
+  var chunkSnaps = await Promise.all(idx.map(function(i){ return getContentDoc(doc(db,'resourceContent', contentId, 'chunks', String(i))); }));
   return chunkSnaps.map(function(c){ return (c.exists() && c.data().html) || ''; }).join('');
 }
 
@@ -6116,8 +6128,8 @@ function handleUpload(subjectId, folderId, file){
     toast('Bitte eine HTML- oder PDF-Datei hochladen (.html / .pdf).');
     return;
   }
-  if(file.size > MAX_RESOURCE_BYTES){
-    toast('Datei ist zu gross (max. '+Math.round(MAX_RESOURCE_BYTES/1024/1024)+' MB).');
+  if(file.size > maxBytesFor(isPdfFile(file))){
+    toast(tooBigMsg(isPdfFile(file)));
     return;
   }
   var suggested = file.name.replace(/\.(html?|pdf)$/i,'').replace(/[_-]+/g,' ');
@@ -6598,13 +6610,13 @@ function renderResource(r){
   watchProgress(r.id, function(p){ updateViewerProgress(p); });
 
   var contentId = resourceContentId(r);
-  var contentPromise = getDoc(doc(db,'resourceContent', contentId)).then(function(snap){
+  var contentPromise = getContentDoc(doc(db,'resourceContent', contentId)).then(function(snap){
     if(!snap.exists()){ throw new Error('no content'); }
     var chunkCount = snap.data().chunkCount || 0;
     var chunkIndexes = [];
     for(var i=0;i<chunkCount;i++){ chunkIndexes.push(i); }
     return Promise.all(chunkIndexes.map(function(i){
-      return getDoc(doc(db,'resourceContent', contentId, 'chunks', String(i)));
+      return getContentDoc(doc(db,'resourceContent', contentId, 'chunks', String(i)));
     }));
   });
 
@@ -11102,8 +11114,9 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-18-pdf-4mb-cache', datum:'2026-09-18', fuer:'lehrer', text:'📄 PDFs neu max. 4 MB (grössere komprimieren oder als «🔗 Link» ablegen). Übungen und PDFs werden pro Gerät nur noch einmal heruntergeladen und danach aus dem Speicher geöffnet – spart Firebase-Kontingent und lädt schneller.'},
   {id:'2026-09-18-mehrere-links-aktuell', datum:'2026-09-18', fuer:'alle', text:'📘 Bei Hausaufgaben können jetzt mehrere Übungen oder PDFs verlinkt sein – und pro Fach können mehrere Themen gleichzeitig rot als «Aktuell» markiert sein.'},
-  {id:'2026-09-18-pdf-link', datum:'2026-09-18', fuer:'lehrer', text:'📄 PDFs: Einfach ins gleiche Feld wie die Übungsseiten ziehen (max. 8 MB, gespeichert ohne Aufschlag). Neu auch «🔗 Link hinzufügen» – z.B. für ein PDF aus iCloud/OneDrive: es wird nur der Link gespeichert, öffnet in neuem Tab. Beides lässt sich wie Übungen bei Hausaufgaben verlinken.'},
+  {id:'2026-09-18-pdf-link', datum:'2026-09-18', fuer:'lehrer', text:'📄 PDFs: Einfach ins gleiche Feld wie die Übungsseiten ziehen (max. 4 MB, gespeichert ohne Aufschlag). Neu auch «🔗 Link hinzufügen» – z.B. für ein PDF aus iCloud/OneDrive: es wird nur der Link gespeichert, öffnet in neuem Tab. Beides lässt sich wie Übungen bei Hausaufgaben verlinken.'},
   {id:'2026-09-18-gaeste-pruefung', datum:'2026-09-18', fuer:'lehrer', text:'Fach-Gäste (z.B. Elena und Letizia) erscheinen bei Prüfungen nur noch in Mathe-Prüfungen — in der Live-Übersicht und bei ihnen selbst.'},
   {id:'2026-09-18-pruefung-formate', datum:'2026-09-18', fuer:'lehrer', text:'📝 Prüfungen: Beim Erstellen wählst du jetzt die Aufgabenformate — ✍️ Frei formulieren, 🔤 Selbst hinschreiben (ohne Auswahl), ☑️ Auswählen, 🔗 Zuordnen & Ordnen. Standard 30/40/20/10 %, frei änderbar. Hat die Übung zu wenig Kurzantwort-Fragen, werden Auswahlfragen mit kurzer Antwort und Zuordnungs-Paare automatisch zu Fragen ohne Auswahl umgewandelt (kleine Tippfehler zählen als richtig).'},
   {id:'2026-09-18-fluestern-alle', datum:'2026-09-18', fuer:'lehrer', text:'🗣 Flüstern: Mit «Alle hinzufügen» darf die ganze Klasse auf einmal flüstern.'},
@@ -13438,11 +13451,11 @@ async function pruefScan(contentId){
   try{ var c = localStorage.getItem(pruefScanKey(contentId)); if(c === '1' || c === '0') return c === '1'; }catch(e){}
   var ok = false;
   try{
-    var snap = await getDoc(doc(db,'resourceContent', contentId));
+    var snap = await getContentDoc(doc(db,'resourceContent', contentId));
     if(snap.exists()){
       var n = snap.data().chunkCount || 0, rest = '';
       for(var i=0;i<n && !ok;i++){
-        var cs = await getDoc(doc(db,'resourceContent', contentId, 'chunks', String(i)));
+        var cs = await getContentDoc(doc(db,'resourceContent', contentId, 'chunks', String(i)));
         var h = (cs.exists() && cs.data().html) || '';
         ok = PRUEF_SCAN_RE.test(rest + h);
         rest = h.slice(-60);
