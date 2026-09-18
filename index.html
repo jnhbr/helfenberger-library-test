@@ -99,6 +99,24 @@
       background-attachment:scroll;
     }
   }
+  /* Testseite: Hintergrund rot statt blau getönt, damit man sie sofort von
+     der Live-Seite unterscheidet. Klasse wird im <head> gesetzt (Pfad enthält -test/). */
+  html.test-site{--test-bg:color-mix(in srgb, var(--bg) 82%, #E53935);background:var(--test-bg);}
+  html.test-site body{
+    background-color:var(--test-bg);
+    background-image:
+      radial-gradient(ellipse at 12% 0%, rgba(229,57,53,.16), transparent 45%),
+      radial-gradient(ellipse at 100% 100%, rgba(229,57,53,.12), transparent 50%),
+      linear-gradient(color-mix(in srgb, var(--test-bg) 88%, transparent), color-mix(in srgb, var(--test-bg) 88%, transparent)),
+      url('assets/background.jpg');
+  }
+  @media (max-width:600px){
+    html.test-site body{
+      background-image:
+        radial-gradient(ellipse at 12% 0%, rgba(229,57,53,.16), transparent 45%),
+        radial-gradient(ellipse at 100% 100%, rgba(229,57,53,.12), transparent 50%);
+    }
+  }
   .desk-prop{position:fixed;bottom:0;font-size:64px;line-height:1;opacity:.5;pointer-events:none;z-index:0;filter:saturate(.9);}
   .desk-prop-left{left:14px;}
   .desk-prop-right{right:70px;}
@@ -1100,6 +1118,7 @@
   .vg-item-spacer{flex:1;}
   .vg-hint{color:var(--text-muted);font-size:13px;line-height:1.55;margin:0 2px 14px;}
 </style>
+<script>if(/-test\//.test(location.pathname))document.documentElement.classList.add('test-site');</script>
 </head>
 <body>
 <div class="desk-prop desk-prop-left" aria-hidden="true">📚</div>
