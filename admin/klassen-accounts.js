@@ -56,6 +56,8 @@ const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(__dirnam
 admin.initializeApp({ credential: admin.credential.cert(require(keyPath)) });
 const auth = admin.auth();
 const db = admin.firestore();
+// REST statt gRPC: gRPC blieb auf Jans Mac beim ersten Firestore-Zugriff hängen.
+db.settings({ preferRest: true });
 
 function slug(s) {
   return String(s).trim().toLowerCase()
