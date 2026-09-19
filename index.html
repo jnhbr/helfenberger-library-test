@@ -353,6 +353,12 @@
   .cal-open-res-btn{margin-top:6px;padding-left:0;}
   .cal-res-links{display:flex;flex-direction:column;align-items:flex-start;}
   .cal-res-links .cal-open-res-btn{margin-top:2px;}
+  .cal-res-menu{margin-top:6px;}
+  .cal-res-menu>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--text);padding:5px 12px;border:1px solid var(--border);border-radius:999px;user-select:none;}
+  .cal-res-menu>summary::-webkit-details-marker{display:none;}
+  .cal-res-menu>summary::after{content:'▾';font-size:11px;transition:transform .15s;}
+  .cal-res-menu[open]>summary::after{transform:rotate(180deg);}
+  .cal-res-menu .cal-res-links{margin-top:4px;padding-left:8px;border-left:2px solid var(--border);}
   .cal-res-pick{max-height:190px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:6px 10px;margin-bottom:12px;}
   .cal-res-pick label{display:flex;align-items:center;gap:8px;font-size:14px;padding:3px 0;}
   .cal-res-pick .cal-res-empty{font-size:13px;color:var(--text-muted);padding:3px 0;}
@@ -2022,9 +2028,13 @@ function calendarEntryLineHtml(e, isTeacher, roster){
   if(e.description){ html += '<div class="cal-entry-desc">'+esc(e.description)+'</div>'; }
   var links = calendarEntryResources(e);
   if(links.length){
-    html += '<div class="cal-res-links">' + links.map(function(l){
+    var linksHtml = '<div class="cal-res-links">' + links.map(function(l){
       return '<button class="btn btn-ghost btn-sm cal-open-res-btn" type="button" data-resource-id="'+esc(l.id)+'">▶ '+(l.title ? esc(l.title) : 'Zur Übung')+'</button>';
     }).join('') + '</div>';
+    // Ab zwei Links zusammengeklappt, sonst wird der Eintrag unübersichtlich.
+    html += links.length >= 2
+      ? '<details class="cal-res-menu"><summary>📎 Material ('+links.length+')</summary>'+linksHtml+'</details>'
+      : linksHtml;
   }
   if(isTeacher && hasSubmissionChecklist(e.type) && roster){
     html += '<button class="btn btn-ghost btn-sm cal-sub-btn" type="button" data-id="'+esc(e.id)+'">☑ '+esc(submittedCountLabel(e, roster))+'</button>';
@@ -11412,6 +11422,8 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-19-material-menu', datum:'2026-09-19', fuer:'alle', text:'📎 Hat eine Hausaufgabe mehrere Übungen oder PDFs, sind sie jetzt ordentlich unter «Material» zusammengefasst – draufklicken zum Aufklappen.'},
+  {id:'2026-09-19-morgenpause', datum:'2026-09-19', fuer:'alle', text:'🗓️ Stundenplan korrigiert: Die Morgenpause ist nach der 3. Lektion (09:55–10:10). Die 3. Lektion dauert darum 09:10–09:55.'},
   {id:'2026-09-19-fachnamen', datum:'2026-09-19', fuer:'alle', text:'🏷️ Fächer umbenannt: «Informatik» heisst jetzt «Medien und Informatik», «Freies Schreiben» heisst «Zeichnen» und «Psychologie» heisst «ERG». Deine Übungen sind noch am gleichen Ort.'},
   {id:'2026-09-19-stundenplan-pause', datum:'2026-09-19', fuer:'alle', text:'🗓️ Stundenplan korrigiert: Am Nachmittag ist die Pause von 15:05 bis 15:20 – die letzten zwei Lektionen beginnen darum 5 Minuten später, Schluss ist um 16:55.'},
   {id:'2026-09-19-stundenplan', datum:'2026-09-19', fuer:'alle', text:'🗓️ Neu: dein Stundenplan (Symbol oben). Deine Lehrperson trägt den Klassenplan ein, du kannst danach deine eigenen Freilektionen eintragen. Auf der Startseite siehst du, was jetzt und als Nächstes kommt.'},
@@ -15363,14 +15375,18 @@ var STP_TAGE = ['Mo','Di','Mi','Do','Fr'];
 var STP_TAGE_LANG = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'];
 var STP_TAG_FARBEN = ['#4361EE','#E63950','#2E9E5B','#E8752C','#8B5CF6'];
 var STP_ZEITEN_STANDARD = [
-  {von:'07:30', bis:'08:15'}, {von:'08:20', bis:'09:05'}, {von:'09:20', bis:'10:05'},
+  {von:'07:30', bis:'08:15'}, {von:'08:20', bis:'09:05'}, {von:'09:10', bis:'09:55'},
   {von:'10:10', bis:'10:55'}, {von:'11:00', bis:'11:45'},
   {von:'13:30', bis:'14:15'}, {von:'14:20', bis:'15:05'}, {von:'15:20', bis:'16:05'}, {von:'16:10', bis:'16:55'}
 ];
-// Bis 19.09.2026 galt am Nachmittag 10 statt 15 Min. Pause — damit gespeicherte Pläne mit den alten Standardzeiten nachziehen.
-var STP_ZEITEN_ALT = '07:30-08:15,08:20-09:05,09:20-10:05,10:10-10:55,11:00-11:45,13:30-14:15,14:20-15:05,15:15-16:00,16:05-16:50';
+// Frühere Standardzeiten (bis 19.09.2026: Nachmittag 10 statt 15 Min. Pause, Morgenpause nach der 2. statt 3. Lektion)
+// — damit gespeicherte Pläne mit unveränderten alten Standardzeiten nachziehen.
+var STP_ZEITEN_ALT = [
+  '07:30-08:15,08:20-09:05,09:20-10:05,10:10-10:55,11:00-11:45,13:30-14:15,14:20-15:05,15:15-16:00,16:05-16:50',
+  '07:30-08:15,08:20-09:05,09:20-10:05,10:10-10:55,11:00-11:45,13:30-14:15,14:20-15:05,15:20-16:05,16:10-16:55'
+];
 function stpZeitenAktuell(z){
-  if(z && z.map(function(x){ return x.von+'-'+x.bis; }).join(',') === STP_ZEITEN_ALT) return STP_ZEITEN_STANDARD;
+  if(z && STP_ZEITEN_ALT.indexOf(z.map(function(x){ return x.von+'-'+x.bis; }).join(',')) >= 0) return STP_ZEITEN_STANDARD;
   return z || null;
 }
 var STP_FREI_FARBEN = ['#0EA5E9','#F43F5E','#14B8A6','#F59E0B','#6366F1','#84CC16','#EC4899','#64748B'];
