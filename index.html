@@ -11422,6 +11422,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-19-stundenplan-klasse', datum:'2026-09-19', fuer:'lehrer', text:'👥 Persönlicher Stundenplan: Pro Lektion lässt sich jetzt die Klasse auswählen (E1a–G3b); sie erscheint in der Lektion und im «Jetzt/Danach» auf der Startseite.'},
   {id:'2026-09-19-material-menu', datum:'2026-09-19', fuer:'alle', text:'📎 Hat eine Hausaufgabe mehrere Übungen oder PDFs, sind sie jetzt ordentlich unter «Material» zusammengefasst – draufklicken zum Aufklappen.'},
   {id:'2026-09-19-morgenpause', datum:'2026-09-19', fuer:'alle', text:'🗓️ Stundenplan korrigiert: Die Morgenpause ist nach der 3. Lektion (09:55–10:10). Die 3. Lektion dauert darum 09:10–09:55.'},
   {id:'2026-09-19-fachnamen', datum:'2026-09-19', fuer:'alle', text:'🏷️ Fächer umbenannt: «Informatik» heisst jetzt «Medien und Informatik», «Freies Schreiben» heisst «Zeichnen» und «Psychologie» heisst «ERG». Deine Übungen sind noch am gleichen Ort.'},
@@ -15389,6 +15390,8 @@ function stpZeitenAktuell(z){
   if(z && STP_ZEITEN_ALT.indexOf(z.map(function(x){ return x.von+'-'+x.bis; }).join(',')) >= 0) return STP_ZEITEN_STANDARD;
   return z || null;
 }
+// Klassen fürs Feld «Klasse» im persönlichen Plan der Lehrperson (kl).
+var STP_KLASSEN = ['E1a','E1b','E1c','G1a','G1b','E2a','E2b','E2c','G2a','G2b','E3a','E3b','G3a','G3b'];
 var STP_FREI_FARBEN = ['#0EA5E9','#F43F5E','#14B8A6','#F59E0B','#6366F1','#84CC16','#EC4899','#64748B'];
 var stp = { klasse:null, eigen:null, geladen:false, klasseName:null, ansicht:null, bearbeiten:false, tag:null };
 
@@ -15411,7 +15414,7 @@ function stpKey(tag, i){ return tag + '-' + i; }
 function stpLeer(c){ return !c || (!c.frei && !c.f && !c.t); }
 function stpGleich(a, b){
   a = a || {}; b = b || {};
-  return !!a.frei === !!b.frei && (a.f||'') === (b.f||'') && (a.t||'') === (b.t||'') && (a.zi||'') === (b.zi||'') && (a.lp||'') === (b.lp||'');
+  return !!a.frei === !!b.frei && (a.f||'') === (b.f||'') && (a.t||'') === (b.t||'') && (a.zi||'') === (b.zi||'') && (a.lp||'') === (b.lp||'') && (a.kl||'') === (b.kl||'');
 }
 
 // Welcher Plan wird angezeigt? 'mein' (LP: eigener Plan; SuS: Klassenplan + eigene Änderungen) oder 'klasse'.
@@ -15499,7 +15502,7 @@ function stpZeichnen(){
     if(info){
       inner += (info.img ? '<img class="stp-img'+(info.full?'':' ct')+'" src="'+info.img+'" alt="" loading="lazy">' : '<span class="stp-dot"></span>');
       inner += '<span class="stp-txt"><span class="stp-name">'+esc(info.name)+'</span>';
-      var sub = [c.zi ? '📍 '+c.zi : '', c.lp || ''].filter(Boolean).join(' · ');
+      var sub = [c.kl ? '👥 '+c.kl : '', c.zi ? '📍 '+c.zi : '', c.lp || ''].filter(Boolean).join(' · ');
       if(sub) inner += '<span class="stp-sub">'+esc(sub)+'</span>';
       inner += '</span>';
     } else if(c && c.frei){
@@ -15614,8 +15617,15 @@ function stpZelleBearbeiten(key){
   h += '<div id="stpFelder"'+(c.frei?' hidden':'')+'>';
   h += '<label class="modal-label">Fach</label><select id="stpFach">'+stpFachOptionen(fSel)+'</select>';
   h += '<input type="text" id="stpText" maxlength="30" placeholder="Name, z. B. Chor oder Band" value="'+q(c.t)+'"'+(fSel==='__andere'?'':' hidden')+' style="margin-top:8px;">';
+  // Im persönlichen Plan der Lehrperson: Klasse statt Lehrperson (die ist sie ja selbst).
+  var mitKlasse = lehrer && ansicht !== 'klasse';
   h += '<div class="stp-felder2"><div><label class="modal-label">Zimmer</label><input type="text" id="stpZi" maxlength="20" placeholder="z. B. 12" value="'+q(c.zi)+'"></div>'+
-       '<div><label class="modal-label">Lehrperson</label><input type="text" id="stpLp" maxlength="40" placeholder="z. B. Helfenberger" value="'+q(c.lp)+'"></div></div>';
+       (mitKlasse
+         ? '<div><label class="modal-label">Klasse</label><select id="stpKl"><option value="">—</option>'+
+             STP_KLASSEN.concat(c.kl && STP_KLASSEN.indexOf(c.kl) < 0 ? [c.kl] : []).map(function(k){ return '<option value="'+q(k)+'"'+(c.kl===k?' selected':'')+'>'+esc(k)+'</option>'; }).join('')+
+           '</select></div>'
+         : '<div><label class="modal-label">Lehrperson</label><input type="text" id="stpLp" maxlength="40" placeholder="z. B. Helfenberger" value="'+q(c.lp)+'"></div>')+
+       '</div>';
   h += '</div>';
   h += '<div class="modal-actions">';
   if(schuelerEigen) h += '<button class="btn btn-ghost btn-sm" id="stpReset" type="button" title="Eigene Änderung verwerfen">↺ Wie Klassenplan</button>';
@@ -15638,9 +15648,11 @@ function stpZelleBearbeiten(key){
       neu = {};
       if(f && f !== '__andere') neu.f = f;
       if(f === '__andere') neu.t = t;
-      var zi = document.getElementById('stpZi').value.trim(), lp = document.getElementById('stpLp').value.trim();
+      var lpEl = document.getElementById('stpLp'), klEl = document.getElementById('stpKl');
+      var zi = document.getElementById('stpZi').value.trim(), lp = lpEl ? lpEl.value.trim() : (c.lp || '');
       if(zi) neu.zi = zi;
       if(lp) neu.lp = lp;
+      if(klEl && klEl.value) neu.kl = klEl.value;
     }
     closeModal();
     if(ansicht === 'klasse'){
@@ -15733,7 +15745,7 @@ function renderStpJetzt(){
   var n = stpNaechste();
   if(!n.aktuell && !n.danach){ el.innerHTML = ''; return; }
   function chip(l, label, extra){
-    var sub = [l.c.zi ? '📍 '+l.c.zi : '', extra || ''].filter(Boolean).join(' · ');
+    var sub = [l.c.kl ? '👥 '+l.c.kl : '', l.c.zi ? '📍 '+l.c.zi : '', extra || ''].filter(Boolean).join(' · ');
     return '<div class="stp-jchip" style="--c:'+l.info.color+'">'+
       (l.info.img ? '<img class="'+(l.info.full?'':'ct')+'" src="'+l.info.img+'" alt="">' : '<span class="stp-dot"></span>')+
       '<div><small>'+label+'</small><b>'+esc(l.info.name)+'</b>'+(sub ? '<span>'+esc(sub)+'</span>' : '')+'</div></div>';
