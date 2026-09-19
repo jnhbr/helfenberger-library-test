@@ -84,6 +84,7 @@ rules_version = '2';
 //   uebungsIndex/{resourceId}                       -> {klassen:[...]} in welchen Klassen die Übung (bzw. Kopien) liegt
 //   klassen/{k}/appMeta/gruppenMitglieder           -> {uids:[...]} alle Mitglieder der Gruppen dieser Seite
 //   klassen/{k}/appMeta/schulden                    -> {enabled} 💸 Schulden-Liste auf dieser Seite an/aus
+//   passwortAnfragen/{id}                           -> {uid, name, klasse, vonUid, vonName, status, neuesPasswort} (admin/passwort-reset.js)
 //   Seiten ohne Klasse: klassen/flp-<name>, isf-<name>, praktikum-<n> (FLP, ISF, Praktikum)
 //   students/{uid}.nurFach                          -> optional, z.B. 'mathe': Fach-Gast aus einer anderen
 //                                                       Klasse, nur in diesem Fach dabei (siehe index.html)
@@ -121,6 +122,11 @@ function inKlasse(klasse) {
 // (Fragebox, Quiz-Antworten) vorkommt.
 function isLeitung() {
   return isSignedIn() && request.auth.token.leitung == true;
+}
+
+// Jan (Konto helfenberger): sieht z. B. alle Passwort-Anfragen.
+function isJan() {
+  return isSignedIn() && request.auth.token.email == 'helfenberger@helfenberger-library.app';
 }
 
 function canReadAll() {
@@ -290,6 +296,21 @@ service cloud.firestore {
         && request.resource.data.klassen.size() <= 100;
       // Separat: bei einem delete ist request.resource null.
       allow delete: if isTeacher();
+    }
+
+    // 🔑 Passwort-Anfragen der Lehrpersonen (admin/passwort-reset.js setzt das
+    // Passwort und trägt es ein). Lesen/Löschen: wer angefragt hat, und Jan.
+    // Ändern nur das Admin-Skript (Admin-SDK).
+    match /passwortAnfragen/{id} {
+      allow read: if isTeacher() && (resource.data.vonUid == request.auth.uid || isJan());
+      allow create: if isTeacher()
+        && request.resource.data.vonUid == request.auth.uid
+        && request.resource.data.status == 'offen'
+        && request.resource.data.uid is string
+        && !('neuesPasswort' in request.resource.data);
+      allow update: if false;
+      // Separat: bei einem delete ist request.resource null.
+      allow delete: if isTeacher() && (resource.data.vonUid == request.auth.uid || isJan());
     }
 
     // Login mit Vorname oder Schul-Kürzel: loginAliases/{slug} = {konten:[...]}.
