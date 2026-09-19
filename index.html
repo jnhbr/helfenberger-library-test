@@ -3872,7 +3872,10 @@ function savePencilEgg(patch){
    Moment überdeckt, in dem es aufgeht - mit enter/leave würde es sich sofort
    wieder schliessen. Die Rechteck-Prüfung kennt dieses Problem nicht. Der
    mousemove-Handler hängt nur so lange am Dokument, wie tatsächlich ein per
-   Hover geöffnetes Fenster offen ist. */
+   Hover geöffnetes Fenster offen ist.
+
+   Seit 19.09.2026 sind die mouseenter/mouseleave-Listener an den Knöpfen
+   abgehängt: Beide Fenster öffnen sich nur noch per Klick (Wunsch Jan). */
 var HOVER_OPEN_MS = 140;   // kurze Absicht-Verzögerung: blosses Vorbeifahren öffnet nichts
 var HOVER_CLOSE_MS = 500;  // Karenz, um mit der Maus vom Knopf ins Fenster zu wechseln
 
@@ -4627,8 +4630,6 @@ function renderChrome(innerHtml){
     // Das Panel wird bei jedem renderChrome neu aufgebaut, also immer zu starten;
     // der Firestore-Listener dahinter läuft unabhängig davon weiter.
     todoBtn.addEventListener('click', function(e){ e.stopPropagation(); toggleTodoPopover(); });
-    todoBtn.addEventListener('mouseenter', todoHover.hoverIn);
-    todoBtn.addEventListener('mouseleave', todoHover.hoverOut);
     ensureTeacherTodoWatcher();
     updateTodoButton();
   }
@@ -4642,8 +4643,6 @@ function renderChrome(innerHtml){
   var coinBtn = document.getElementById('coinBtn');
   if(coinBtn){
     coinBtn.addEventListener('click', function(e){ e.stopPropagation(); onCoinClick(); });
-    coinBtn.addEventListener('mouseenter', coinHover.hoverIn);
-    coinBtn.addEventListener('mouseleave', coinHover.hoverOut);
   }
   updateCoinButton();
 
@@ -12861,6 +12860,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-19-klick-statt-hover', datum:'2026-09-19', fuer:'lehrer', text:'🖱️ To-do-Liste und 💸 Schulden-Fenster gehen wieder nur per Klick auf – blosses Drüberfahren mit der Maus öffnet nichts mehr.'},
   {id:'2026-09-19-schul-links', datum:'2026-09-19', fuer:'lehrer', text:'🔗 Neues Symbol oben: Links – ISF-Anmeldung, Zivi-Stundenplan und Aurora mit einem Klick (öffnen in neuem Tab). Unter «✏️ Bearbeiten» eigene Links hinzufügen und pro Link wählen, wer ihn sieht: nur du, alle Lehrpersonen oder alle inkl. Schüler:innen. Die Kacheln im Klassenzimmer sind dafür weg.'},
   {id:'2026-09-19-sikore-direkt', datum:'2026-09-19', fuer:'alle', text:'🧮 SIKORE ist jetzt kein Ordner mehr: In Mathe einfach auf «SIKORE – Sicher Kopfrechnen» tippen, und der Trainer startet direkt.'},
   {id:'2026-09-19-sikore-ziel-tempo', datum:'2026-09-19', fuer:'alle', text:'🧮 SIKORE-Trainer: Neu mit 🎯 Wochenziel (fehlerfreie Reihen pro Woche, Ziel selbst wählbar) und ⏱ Tempo-Modus – eine Reihe gegen die Uhr, deine Bestzeit pro Level wird gespeichert. Steigst du nach einer SIKORE-Prüfung ein Level auf, wird gefeiert! 🎉'},
