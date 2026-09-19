@@ -14296,7 +14296,7 @@ function pipStarten(art, id){
   if(pipv.video && pipv.art === art && pipv.id === (id || null)){ pipAnfordern(); return; }
   pipStoppen();
   var c = document.createElement('canvas'), v = document.createElement('video');
-  c.width = 640; c.height = 360;
+  c.width = PIP_W; c.height = PIP_H;
   pipv = { art:art, id:id || null, canvas:c, video:v, timer:null, offen:false };
   pipRefresh();
   v.muted = true; v.playsInline = true; v.autoplay = true;
@@ -14322,7 +14322,21 @@ function pipAnfordern(){
       if(v.requestPictureInPicture) pr = v.requestPictureInPicture();
       else { v.webkitSetPresentationMode('picture-in-picture'); pr = Promise.resolve(); }
     }catch(e){ pr = Promise.reject(e); }
-    Promise.resolve(pr).then(function(){ if(pipv.video === v) pipv.offen = true; })
+    Promise.resolve(pr).then(function(fenster){
+      if(pipv.video !== v) return;
+      pipv.offen = true;
+      // Chrome/Edge melden die Fenstergrösse: Bild aufs Seitenverhältnis des
+      // Fensters bringen, dann bleibt auch nach dem Ziehen kein schwarzer Rand.
+      if(fenster && fenster.addEventListener){
+        var anpassen = function(){
+          if(pipv.video !== v || !fenster.width || !fenster.height) return;
+          pipv.hoehe = Math.max(240, Math.min(1400, Math.round(PIP_W * fenster.height / fenster.width)));
+          pipRefresh();
+        };
+        fenster.addEventListener('resize', anpassen);
+        anpassen();
+      }
+    })
       .catch(function(err){ console.error('Bild-in-Bild', err); toast('📌 Bitte nochmals klicken, dann öffnet sich das Fenster.'); });
   };
   if(v.readyState >= 1) los();
@@ -14346,14 +14360,24 @@ function pipRund(x, l, o, b, h, r){
   x.moveTo(l + r, o); x.arcTo(l + b, o, l + b, o + h, r); x.arcTo(l + b, o + h, l, o + h, r);
   x.arcTo(l, o + h, l, o, r); x.arcTo(l, o, l + b, o, r); x.closePath();
 }
+// Die Canvas-Grösse bleibt fix: das Bild-in-Bild-Fenster übernimmt beim Öffnen
+// das Seitenverhältnis des Videos und passt sich späteren Grössenänderungen
+// nicht an — sonst entstehen schwarze Ränder. Stattdessen passt sich das Raster
+// (Spalten, Zeilenhöhe, Schrift) an die Anzahl Einträge an.
+var PIP_W = 640, PIP_H = 400;
 // eintraege: [{name, art:'rot'|'orange'|'gruen'|'grau', info}] — Rote zuerst.
 function pipZeichnen(titel, sub, eintraege, leerText){
   var c = pipv.canvas; if(!c) return;
-  var W = 640, SP = 2, ZH = 40, KOPF = 86, RAND = 16, GAP = 10;
+  var W = PIP_W, H = pipv.hoehe || PIP_H, KOPF = 86, RAND = 16, GAP = 10;
   var rang = {rot:0, orange:1, gruen:2, grau:3};
   var FARBE = {rot:'#ff4d4f', orange:'#ff9f40', gruen:'#3ecf6e', grau:'#6b7080'};
   var liste = eintraege.slice().sort(function(a, b){ return (rang[a.art] - rang[b.art]) || a.name.localeCompare(b.name, 'de'); });
-  var H = Math.max(200, Math.min(1400, KOPF + Math.max(1, Math.ceil(liste.length / SP)) * ZH + 12));
+  var platz = H - KOPF - 8, SP = 2, ZH = 0;
+  [2, 3, 4].forEach(function(sp){
+    var zh = Math.min(48, platz / Math.max(1, Math.ceil(liste.length / sp)));
+    if(zh > ZH + .5){ ZH = zh; SP = sp; }
+  });
+  var k = Math.min(1.1, ZH / 40);
   if(c.width !== W) c.width = W;
   if(c.height !== H) c.height = H;
   var x = c.getContext('2d'), font = '-apple-system, BlinkMacSystemFont, "Segoe UI", Karla, sans-serif';
@@ -14365,18 +14389,18 @@ function pipZeichnen(titel, sub, eintraege, leerText){
   if(!liste.length){ x.fillStyle = '#b9bdc7'; x.fillText(leerText || '', RAND, KOPF + 20, W - 2 * RAND); return; }
   var bw = (W - 2 * RAND - GAP * (SP - 1)) / SP;
   liste.forEach(function(e, i){
-    var l = RAND + (i % SP) * (bw + GAP), o = KOPF + Math.floor(i / SP) * ZH, h = ZH - 6, f = FARBE[e.art];
+    var l = RAND + (i % SP) * (bw + GAP), o = KOPF + Math.floor(i / SP) * ZH, h = ZH - Math.max(2, 6 * k), f = FARBE[e.art];
     if(e.art === 'rot' || e.art === 'orange'){
       x.globalAlpha = e.art === 'rot' ? (puls ? .5 : .28) : .25;
-      x.fillStyle = f; pipRund(x, l, o, bw, h, 9); x.fill();
+      x.fillStyle = f; pipRund(x, l, o, bw, h, Math.min(9, h / 2)); x.fill();
       x.globalAlpha = 1;
     }
-    x.fillStyle = f; x.beginPath(); x.arc(l + 16, o + h / 2, 7, 0, Math.PI * 2); x.fill();
+    x.fillStyle = f; x.beginPath(); x.arc(l + 16 * k, o + h / 2, 7 * k, 0, Math.PI * 2); x.fill();
     var info = e.info || '', iw = 0;
-    x.font = '600 15px ' + font;
-    if(info){ iw = Math.min(bw * .5, x.measureText(info).width); x.textAlign = 'right'; x.fillStyle = e.art === 'grau' ? '#8a8f9c' : '#ffffff'; x.fillText(info, l + bw - 10, o + h / 2, bw * .5); x.textAlign = 'left'; }
-    x.font = '700 19px ' + font; x.fillStyle = e.art === 'grau' ? '#9aa0ad' : '#ffffff';
-    x.fillText(e.name, l + 30, o + h / 2, Math.max(40, bw - 44 - iw));
+    x.font = '600 ' + Math.round(15 * k) + 'px ' + font;
+    if(info){ iw = Math.min(bw * .5, x.measureText(info).width); x.textAlign = 'right'; x.fillStyle = e.art === 'grau' ? '#8a8f9c' : '#ffffff'; x.fillText(info, l + bw - 10 * k, o + h / 2, bw * .5); x.textAlign = 'left'; }
+    x.font = '700 ' + Math.round(19 * k) + 'px ' + font; x.fillStyle = e.art === 'grau' ? '#9aa0ad' : '#ffffff';
+    x.fillText(e.name, l + 30 * k, o + h / 2, Math.max(30, bw - 44 * k - iw));
   });
 }
 
