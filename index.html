@@ -376,6 +376,7 @@
   .gr-chip small{color:var(--text-muted);}
   .gr-chip button{border:0;background:transparent;cursor:pointer;font-size:15px;line-height:1;padding:0 4px;color:inherit;}
   .gr-leer{font-size:13px;color:var(--text-muted);}
+  .gr-treffer{display:flex;flex-direction:column;max-height:30vh;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:4px 10px;margin-top:6px;}
   .gr-klassen{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px;align-items:start;max-height:46vh;overflow:auto;}
   .gr-klasse{border:1px solid var(--border);border-radius:10px;padding:6px 10px;}
   .gr-klasse > summary{cursor:pointer;}
@@ -1032,6 +1033,15 @@
   .settings-row .grow{flex:1;min-width:0;}
   .settings-row small{display:block;color:var(--text-muted);}
   .settings-list{max-height:45vh;overflow:auto;}
+  .einf-icon{font-size:46px;text-align:center;line-height:1.1;margin-top:4px;}
+  .einf-text{text-align:center;line-height:1.5;margin:6px 4px 12px;}
+  .einf-dots{display:flex;justify-content:center;gap:6px;margin-bottom:4px;}
+  .einf-dots span{width:8px;height:8px;border-radius:50%;background:var(--border);}
+  .einf-dots span.on{background:var(--brand);}
+  .stat-tab{width:100%;border-collapse:collapse;font-size:13.5px;}
+  .stat-tab th{text-align:left;font-weight:600;color:var(--text-muted);font-size:12px;padding:4px 6px;}
+  .stat-tab td{padding:5px 6px;border-top:1px solid var(--border);vertical-align:middle;}
+  .stat-tab tr.stat-sum td{font-weight:700;}
   .klassen-wahl{display:flex;flex-direction:column;gap:8px;}
   .klassen-wahl .btn{justify-content:flex-start;text-align:left;}
   .klassen-wahl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));}
@@ -1446,7 +1456,7 @@ import {
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   getFirestore, doc, getDoc, getDocFromCache, getDocs, collection, query, where, onSnapshot, serverTimestamp, increment,
-  setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, Bytes, deleteField
+  setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, Bytes, deleteField, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 /* =====================================================================
@@ -2322,7 +2332,20 @@ function uiCalendarEntryForm(existing, onSaved){
   });
 }
 
-async function loadStudentRoster(){
+// Einmal pro Klasse und 5 Minuten laden (wird an über zehn Stellen gebraucht);
+// jede:r Aufrufer:in bekommt eigene Kopien, darf sie also verändern.
+var rosterCache = { klasse:null, at:0, promise:null };
+function loadStudentRoster(force){
+  if(force || !rosterCache.promise || rosterCache.klasse !== state.klasse || Date.now() - rosterCache.at > 5*60*1000){
+    var p = ladeStudentRoster();
+    rosterCache = { klasse:state.klasse, at:Date.now(), promise:p };
+    p.catch(function(){ if(rosterCache.promise === p) rosterCache.promise = null; });
+  }
+  return rosterCache.promise.then(function(list){ return list.map(function(s){ return Object.assign({}, s); }); });
+}
+function rosterCacheLeeren(){ rosterCache.promise = null; }
+
+async function ladeStudentRoster(){
   // Nur die offene Klasse; die Rolle wird hier gefiltert statt in der Abfrage
   // (zwei where() hätten einen zusammengesetzten Index gebraucht).
   var stuSnap = await getDocs(query(collection(db,'students'), where('klasse','==',state.klasse)));
@@ -2522,7 +2545,7 @@ function openGruppenVerwaltung(onChanged){
         var g = list.find(function(x){ return x.id === b.getAttribute('data-gr-del'); });
         if(!g) return;
         uiConfirm('Gruppe «'+g.name+'» löschen?', 'Bisherige Einträge für diese Gruppe bleiben in deinem Kalender, sind für die Schüler:innen aus anderen Klassen aber nicht mehr sichtbar.', 'Löschen', async function(){
-          try{ await deleteDoc(doc(gruppenCol(), g.id)); toast('Gruppe gelöscht.'); }
+          try{ await deleteDoc(doc(gruppenCol(), g.id)); await gruppenMitgliederSync(g.ownerKlasse || state.profile.klasse); toast('Gruppe gelöscht.'); }
           catch(err){ console.error(err); toast('Löschen fehlgeschlagen.'); }
           openGruppenVerwaltung(onChanged);
         }, true);
@@ -2569,7 +2592,9 @@ function openGruppeEditor(g, onChanged){
     '<input type="text" id="grFachText" maxlength="30" placeholder="Fach, z. B. Jassen" hidden style="margin-top:8px;">'+
     '<label class="modal-label">Schüler:innen <span id="grAnzahl" class="gr-anzahl"></span></label>'+
     '<div class="gr-chips" id="grChips"></div>'+
-    '<p class="gr-hint">Klasse aufklappen und Schüler:innen ankreuzen – auch aus mehreren Klassen.</p>'+
+    '<input type="search" id="grSuche" placeholder="🔍 Schüler:in suchen – Vorname, Nachname oder Kürzel" autocomplete="off" style="margin-top:4px;">'+
+    '<div class="gr-treffer" id="grTreffer" hidden></div>'+
+    '<p class="gr-hint">… oder Klasse aufklappen und Schüler:innen ankreuzen – auch aus mehreren Klassen.</p>'+
     '<div class="gr-klassen">'+klassen.map(function(k){
       return '<details class="gr-klasse" data-k="'+esc(k.id)+'"><summary><b>'+esc(k.id)+'</b> · '+esc(k.lp)+' <span class="gr-cnt" data-cnt="'+esc(k.id)+'"></span></summary>'+
         '<div class="gr-body"><div class="empty-state">Wird geladen …</div></div></details>';
@@ -2632,6 +2657,44 @@ function openGruppeEditor(g, onChanged){
     var b = ev.target.closest && ev.target.closest('[data-gr-weg]');
     if(!b) return;
     delete sel[b.getAttribute('data-gr-weg')];
+    malen();
+  });
+  // Suche über alle Klassen: lädt die Klassenlisten erst beim ersten Tippen.
+  var sucheEl = document.getElementById('grSuche'), trefferEl = document.getElementById('grTreffer');
+  var alleLaden = null, trefferByUid = {};
+  function alleSchueler(){
+    if(!alleLaden) alleLaden = Promise.all(klassen.map(function(k){
+      return klassenListeFuerGruppe(k.id).catch(function(err){ console.error(err); return []; });
+    })).then(function(r){ return [].concat.apply([], r); });
+    return alleLaden;
+  }
+  function suchen(){
+    var t = sucheEl.value.trim().toLowerCase();
+    if(t.length < 2){ trefferEl.hidden = true; trefferEl.innerHTML = ''; return; }
+    trefferEl.hidden = false;
+    if(!trefferEl.innerHTML) trefferEl.innerHTML = '<div class="empty-state">Wird geladen …</div>';
+    var woerter = t.split(/\s+/);
+    alleSchueler().then(function(alle){
+      if(sucheEl.value.trim().toLowerCase() !== t) return;
+      var hits = alle.filter(function(x){
+        var text = (x.n+' '+x.nn+' '+x.u+' '+x.k).toLowerCase();
+        return woerter.every(function(w){ return text.indexOf(w) >= 0; });
+      });
+      trefferByUid = {};
+      hits.forEach(function(x){ trefferByUid[x.uid] = x; });
+      trefferEl.innerHTML = hits.length ? hits.slice(0, 30).map(function(x){
+        return '<label class="submission-row"><input type="checkbox" class="gr-check" value="'+esc(x.uid)+'"'+(sel[x.uid]?' checked':'')+'> <span>'+esc(x.n)+' '+esc(x.nn)+' <small style="color:var(--text-muted);">'+esc(x.k)+'</small></span></label>';
+      }).join('') + (hits.length > 30 ? '<div class="gr-hint">… und '+(hits.length-30)+' weitere – genauer suchen.</div>' : '')
+        : '<div class="empty-state">Niemand gefunden.</div>';
+    });
+  }
+  sucheEl.addEventListener('input', suchen);
+  trefferEl.addEventListener('change', function(ev){
+    var cb = ev.target;
+    if(!cb.classList || !cb.classList.contains('gr-check')) return;
+    var x = trefferByUid[cb.value];
+    if(!x) return;
+    if(cb.checked) sel[x.uid] = {n:x.n, nn:x.nn, u:x.u, k:x.k}; else delete sel[x.uid];
     malen();
   });
   modalEl.querySelectorAll('.gr-klasse').forEach(function(det){
@@ -2697,6 +2760,7 @@ function openGruppeEditor(g, onChanged){
     try{
       // Ganz ersetzen (kein merge): sonst blieben entfernte Namen in der Map stehen.
       await setDoc(doc(gruppenCol(), id), data);
+      await gruppenMitgliederSync(ownerKlasse);
       if(g) await gruppeEintraegeNachfuehren(id, ownerKlasse, data);
       toast(g ? 'Gruppe gespeichert.' : 'Gruppe «'+data.name+'» angelegt.');
       klasseRosterReset();
@@ -2709,7 +2773,32 @@ function openGruppeEditor(g, onChanged){
   });
 }
 
-function klasseRosterReset(){ klasseRoster.loaded = false; }
+function klasseRosterReset(){ klasseRoster.loaded = false; rosterCacheLeeren(); }
+
+// Wer sieht die Übungen der Seite `klasse`, ohne in der Klasse zu sein?
+// klassen/{k}/appMeta/gruppenMitglieder = {uids:[...]}: alle Mitglieder aller
+// Gruppen dieser Seite — firestore.rules (inGruppeVon) prüft damit resources
+// und folders. Nach jeder Gruppenänderung neu berechnet.
+async function gruppenMitgliederSync(klasse){
+  if(!klasse) return;
+  var gruppen = await loadSeitenGruppen(klasse);
+  var uids = [];
+  gruppen.forEach(function(g){ (g.mitglieder || []).forEach(function(u){ if(uids.indexOf(u) < 0) uids.push(u); }); });
+  await setDoc(kdocFor(klasse, 'appMeta', 'gruppenMitglieder'), { uids:uids, updatedAt:serverTimestamp() });
+}
+// Gruppen von vor dem 19.09.2026 (bzw. vom Admin-Skript) haben die Liste noch
+// nicht: einmal pro Sitzung für die eigenen Gruppen nachtragen.
+var gruppenMitgliederGeprueft = false;
+async function gruppenMitgliederNachtragen(){
+  if(gruppenMitgliederGeprueft || state.profile.role !== 'teacher' || isLeitung()) return;
+  gruppenMitgliederGeprueft = true;
+  var seiten = [];
+  (await loadMeineGruppen()).forEach(function(g){ if(g.ownerKlasse && seiten.indexOf(g.ownerKlasse) < 0) seiten.push(g.ownerKlasse); });
+  for(var i = 0; i < seiten.length; i++){
+    var snap = await getDoc(kdocFor(seiten[i], 'appMeta', 'gruppenMitglieder'));
+    if(!snap.exists()) await gruppenMitgliederSync(seiten[i]);
+  }
+}
 
 // Mitglieder/Name in allen Kalender-Einträgen der Gruppe nachführen.
 async function gruppeEintraegeNachfuehren(id, ownerKlasse, data){
@@ -3711,6 +3800,42 @@ var debtLoadToken = 0;
 
 function coinIsTeacher(){ return !!(state.profile && state.profile.role === 'teacher'); }
 
+// 💸 pro Seite ein-/ausschaltbar: klassen/{k}/appMeta/schulden = {enabled}.
+// Ohne Eintrag nur in der G3b an (dort ist die Funktion entstanden).
+var schulden = { klasse:null, an:false };
+function schuldenLaden(){
+  var k = state.klasse;
+  schulden = { klasse:k, an: k === 'G3b' };
+  return getDoc(kdoc('appMeta', 'schulden')).then(function(snap){
+    if(schulden.klasse !== k) return;
+    if(snap.exists() && typeof snap.data().enabled === 'boolean') schulden.an = snap.data().enabled;
+  }).catch(function(err){ console.error(err); });
+}
+function schuldenSchalten(an){
+  return setDoc(kdoc('appMeta', 'schulden'), { enabled:!!an }, {merge:true}).then(function(){
+    schulden.an = !!an;
+    startDebtWatch();
+    toast(an ? '💸 Schulden-Liste eingeschaltet.' : '💸 Schulden-Liste ausgeschaltet.');
+  });
+}
+// «Schulden bei …»: Name der Klassenlehrperson(en) dieser Seite
+// (students/{uid} mit role 'teacher' und derselben klasse).
+var klpNameCache = {};
+function klassenLpName(){
+  var k = state.klasse, info = klasseInfo(k);
+  if(info.dativ && info.dativ !== 'deiner Lehrperson') return Promise.resolve(info.dativ);
+  if(klpNameCache[k]) return Promise.resolve(klpNameCache[k]);
+  return getDocs(query(collection(db,'students'), where('klasse','==',k))).then(function(snap){
+    var namen = [];
+    snap.forEach(function(d){
+      var x = d.data();
+      if(x.role === 'teacher') namen.push(((x.vorname || '')+' '+(x.displayName || '')).trim());
+    });
+    klpNameCache[k] = namen.filter(Boolean).join(' / ') || info.dativ;
+    return klpNameCache[k];
+  }).catch(function(err){ console.error(err); return info.dativ; });
+}
+
 var coinHover = makeHoverPanel({
   trigger: function(){ return document.getElementById('coinBtn'); },
   isOpen: function(){
@@ -3759,6 +3884,8 @@ function fmtDebtDate(ms){
 function startDebtWatch(){
   stopDebtWatch();
   if(!state.user) return;
+  if(schulden.klasse !== state.klasse){ schuldenLaden().then(startDebtWatch); return; }
+  if(!schulden.an){ updateCoinButton(); return; }
   if(state.profile && state.profile.role === 'teacher'){ loadTeacherDebtCount(); return; }
   myDebtUnsub = onSnapshot(kdoc('debts', state.user.uid), function(snap){
     myDebt.entries = snap.exists() ? normalizeDebtEntries(snap.data()) : [];
@@ -3788,7 +3915,10 @@ function updateCoinButton(){
   if(!btn) return;
   var badge = document.getElementById('coinBadge');
   var isTeacher = state.profile && state.profile.role === 'teacher';
-  if(isTeacher){
+  if(!schulden.an){
+    btn.hidden = true;
+    if(badge) badge.hidden = true;
+  } else if(isTeacher){
     btn.hidden = false;
     btn.title = teacherDebtCount ? teacherDebtCount+' mit offenen Schulden' : 'Schulden verwalten';
     if(badge){ badge.hidden = !teacherDebtCount; badge.textContent = teacherDebtCount ? String(teacherDebtCount) : ''; }
@@ -3817,11 +3947,15 @@ function openCoinBubble(){
   document.body.insertAdjacentHTML('beforeend',
     '<div class="coin-bubble" id="coinBubble">'+
       '<button type="button" class="coin-bubble-close" id="coinBubbleClose" aria-label="Schliessen">×</button>'+
-      '<h4>Du schuldest '+esc(lpDativ())+'</h4>'+
+      '<h4 id="coinBubbleTitel">Schulden bei '+esc(lpDativ())+'</h4>'+
       '<div class="coin-bubble-total">'+esc(fmtChf(myDebt.total))+'</div>'+
       '<ul class="coin-list">'+items+'</ul>'+
     '</div>');
   document.getElementById('coinBubbleClose').addEventListener('click', closeCoinBubble);
+  klassenLpName().then(function(name){
+    var t = document.getElementById('coinBubbleTitel');
+    if(t) t.textContent = 'Schulden bei '+name;
+  });
   setTimeout(function(){ document.addEventListener('click', onOutsideCoinClick); }, 0);
 }
 function closeCoinBubble(){
@@ -3889,10 +4023,16 @@ function renderDebtOverview(rows){
       debtors.map(debtRowHtml).join('')+
       (rest.length ? '<div class="debt-divider">Ohne Schulden</div>'+rest.map(debtRowHtml).join('') : '')+
     '</div>'+
-    '<div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Fertig</button></div>',
+    '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="debtAusBtn" type="button">💸 Funktion ausschalten</button>'+
+    '<button class="btn btn-primary btn-sm" id="modalOk" type="button">Fertig</button></div>',
     'modal-wide'
   );
   document.getElementById('modalOk').addEventListener('click', closeModal);
+  document.getElementById('debtAusBtn').addEventListener('click', function(){
+    uiConfirm('💸 Schulden-Liste ausschalten?', 'Das Symbol verschwindet in '+klasseLabel()+' für alle. Die Einträge bleiben gespeichert. Wieder einschalten: ⚙️ Einstellungen.', 'Ausschalten', function(){
+      schuldenSchalten(false).catch(function(err){ console.error(err); toast('Hat nicht geklappt.'); });
+    });
+  });
   Array.prototype.forEach.call(document.querySelectorAll('.debt-open'), function(b){
     b.addEventListener('click', function(){
       var uid = b.getAttribute('data-uid');
@@ -4106,9 +4246,19 @@ onAuthStateChanged(auth, async function(user){
       await signOut(auth);
       return;
     }
+    var profil = snap.data();
+    // Ohne Klasse nie still irgendwo landen (früher: G3b) — sonst würde ein
+    // unvollständiges Konto in einer fremden Klasse lesen und schreiben.
+    if(!profil.klasse){
+      if(profil.role === 'leitung') profil.klasse = KLASSEN[0].id;
+      else {
+        toast('Dein Konto ist noch keiner Klasse zugeordnet – bitte bei Herrn Helfenberger melden.');
+        await signOut(auth);
+        return;
+      }
+    }
     lastAuthedUid = user.uid;
-    state.profile = snap.data();
-    if(!state.profile.klasse) state.profile.klasse = 'G3b';
+    state.profile = profil;
     state.klasse = state.profile.klasse;
     if(state.profile.role === 'leitung'){
       var ansicht = null;
@@ -4130,6 +4280,8 @@ onAuthStateChanged(auth, async function(user){
     startQuizWatcher();
     startUmfrageWatcher();
     startPruefungWatcher();
+    gruppenMitgliederNachtragen().catch(function(err){ console.error('Gruppen-Mitglieder', err); });
+    setTimeout(einfuehrungPruefen, 1500);
     // Ämtliplan gleich nach dem Anmelden im Hintergrund holen. Er ist winzig,
     // wird von Startseiten-Hinweis, Besen und Plan gleichermassen gebraucht —
     // und ohne dieses Vorladen sah man beim ersten Öffnen des Plans erst ein
@@ -4737,36 +4889,91 @@ function uiInfo(title, description){
    alten Klasse hängen bleiben. Die Wahl gilt nur für diesen Tab
    (sessionStorage) — nach einem neuen Login oder App-Start landet man wieder
    in der eigenen Klasse. */
+// «⭐ Meine Seiten» oben: eigene Seite, die Klassen aus dem persönlichen
+// 🗓️ Stundenplan (Lektionen mit Klasse) und die zuletzt besuchten Seiten.
+// Darüber ein Suchfeld (Klasse, Lehrperson) über alle ~33 Seiten.
+var KLASSEN_ZULETZT_KEY = LIB_PREFIX+'klassen_zuletzt';
+function klassenZuletzt(){ try{ return JSON.parse(lsGet(KLASSEN_ZULETZT_KEY) || '[]') || []; }catch(e){ return []; } }
+function meineSeiten(){
+  var ids = [];
+  function dazu(id){ if(id && ids.indexOf(id) < 0 && KLASSEN.some(function(k){ return k.id === id; })) ids.push(id); }
+  if(!isLeitung()) dazu(state.profile.klasse);
+  var zellen = (stp.geladen && stp.eigen && stp.eigen.zellen) || {};
+  Object.keys(zellen).map(function(k){ return zellen[k] && zellen[k].kl; }).filter(Boolean).sort().forEach(dazu);
+  klassenZuletzt().forEach(dazu);
+  return ids.map(function(id){ return klasseInfo(id); });
+}
 function openKlassenWahl(){
   function knopf(k){
     var aktiv = k.id === state.klasse;
     var eigene = k.id === state.profile.klasse && !isLeitung();
-    var titel = k.art === 'klasse' ? '<b>'+esc(k.id)+'</b> · '+esc(k.lp) : '<b>'+esc(k.lp)+'</b>'+(k.art === 'isf' ? ' · ISF' : '');
-    return '<button class="btn '+(aktiv?'btn-primary':'btn-ghost')+'" type="button" data-klasse="'+esc(k.id)+'">'+
+    var titel = k.art === 'klasse' ? '<b>'+esc(k.id)+'</b> · '+esc(k.lp) : '<b>'+esc(k.lp)+'</b>'+(k.art === 'isf' ? ' · ISF' : k.art === 'flp' ? ' · FLP' : '');
+    var such = (k.id+' '+k.lp+' '+(k.art === 'klasse' ? '' : k.art)).toLowerCase();
+    return '<button class="btn '+(aktiv?'btn-primary':'btn-ghost')+'" type="button" data-klasse="'+esc(k.id)+'" data-such="'+esc(such)+'">'+
          '<span>'+titel+(eigene?(k.art === 'klasse' ? ' (deine Klasse)' : ' (deine Seite)'):'')+(aktiv?' ✓':'')+'</span></button>';
   }
   function art(a){ return KLASSEN.filter(function(k){ return k.art === a; }); }
   // Offen, wenn man gerade dort ist (oder dort zuhause).
   function offen(list){ return list.some(function(k){ return k.id === state.klasse || k.id === state.profile.klasse; }) ? ' open' : ''; }
-  var flpIsf = art('flp').concat(art('isf')), prakt = art('praktikum');
-  var h = '<h3>🏫 Klasse wechseln</h3><div class="klassen-wahl klassen-wahl-grid">';
+  var flpIsf = art('flp').concat(art('isf')), prakt = art('praktikum'), meine = meineSeiten();
+  var h = '<h3>🏫 Klasse wechseln</h3>';
+  h += '<input type="search" id="kwSuche" placeholder="🔍 Klasse oder Lehrperson suchen …" autocomplete="off" style="margin-bottom:10px;">';
+  if(meine.length){
+    h += '<div class="kw-teil"><div class="section-label" style="margin:0 0 6px;">⭐ Meine Seiten</div><div class="klassen-wahl klassen-wahl-grid">';
+    meine.forEach(function(k){ h += knopf(k); });
+    h += '</div></div>';
+  }
+  h += '<div class="kw-teil"><div class="section-label" style="margin:12px 0 6px;">Alle Klassen</div><div class="klassen-wahl klassen-wahl-grid">';
   art('klasse').forEach(function(k){ h += knopf(k); });
-  h += '</div>';
-  h += '<details class="klassen-wahl-mehr"'+offen(flpIsf.concat(prakt))+'><summary>🎓 Fachlehrpersonen (FLP) &amp; ISF</summary><div class="klassen-wahl klassen-wahl-grid">';
+  h += '</div></div>';
+  h += '<details class="klassen-wahl-mehr kw-teil"'+offen(flpIsf.concat(prakt))+'><summary>🎓 Fachlehrpersonen (FLP) &amp; ISF</summary><div class="klassen-wahl klassen-wahl-grid">';
   flpIsf.forEach(function(k){ h += knopf(k); });
-  h += '</div><details class="klassen-wahl-mehr"'+offen(prakt)+'><summary>🧑‍🎓 Praktikant:innen</summary><div class="klassen-wahl klassen-wahl-grid">';
+  h += '</div><details class="klassen-wahl-mehr kw-teil"'+offen(prakt)+'><summary>🧑‍🎓 Praktikant:innen</summary><div class="klassen-wahl klassen-wahl-grid">';
   prakt.forEach(function(k){ h += knopf(k); });
   h += '</div></details></details>';
+  h += '<div class="empty-state" id="kwLeer" hidden>Nichts gefunden.</div>';
   h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button></div>';
   openModal(h, 'modal-wide');
   document.getElementById('modalCancel').addEventListener('click', closeModal);
   modalEl.querySelectorAll('[data-klasse]').forEach(function(btn){
     btn.addEventListener('click', function(){ wechsleKlasse(btn.getAttribute('data-klasse')); });
   });
+  var suche = document.getElementById('kwSuche');
+  var offenVorher = [].map.call(modalEl.querySelectorAll('details.kw-teil'), function(d){ return d.open; });
+  function filtern(){
+    var t = suche.value.trim().toLowerCase();
+    var gesehen = {}, treffer = [];
+    modalEl.querySelectorAll('[data-klasse]').forEach(function(btn){
+      var id = btn.getAttribute('data-klasse');
+      // Bei der Suche jede Seite nur einmal zeigen (nicht in «Meine Seiten» und unten).
+      var passt = !t || (btn.getAttribute('data-such').indexOf(t) >= 0 && !gesehen[id]);
+      if(t && passt){ gesehen[id] = true; treffer.push(btn); }
+      btn.hidden = !passt;
+    });
+    modalEl.querySelectorAll('details.kw-teil').forEach(function(d, i){ d.open = t ? true : offenVorher[i]; });
+    modalEl.querySelectorAll('.kw-teil').forEach(function(teil){
+      var sichtbar = [].some.call(teil.querySelectorAll('[data-klasse]'), function(b){ return !b.hidden; });
+      teil.hidden = !!t && !sichtbar;
+    });
+    document.getElementById('kwLeer').hidden = !t || treffer.length > 0;
+    return treffer;
+  }
+  suche.addEventListener('input', filtern);
+  suche.addEventListener('keydown', function(e){
+    if(e.key !== 'Enter') return;
+    var treffer = filtern();
+    if(treffer.length === 1) wechsleKlasse(treffer[0].getAttribute('data-klasse'));
+  });
+  if(window.matchMedia && window.matchMedia('(pointer:fine)').matches) suche.focus();
 }
 function wechsleKlasse(id){
   if(!state.profile || (state.profile.role !== 'teacher' && !isLeitung())) return;
   if(id === state.klasse){ closeModal(); return; }
+  if(id !== state.profile.klasse){
+    var zuletzt = klassenZuletzt().filter(function(x){ return x !== id; });
+    zuletzt.unshift(id);
+    lsSet(KLASSEN_ZULETZT_KEY, JSON.stringify(zuletzt.slice(0, 4)));
+  }
   try{
     if(id === state.profile.klasse && !isLeitung()) sessionStorage.removeItem(KLASSE_ANSICHT_KEY);
     else sessionStorage.setItem(KLASSE_ANSICHT_KEY, id);
@@ -4862,6 +5069,7 @@ async function uebungZuMir(r, quelle, heim){
     if(r.externalUrl) copy.externalUrl = r.externalUrl;
     if(r.pdf) copy.pdf = true;
     await setDoc(ref, copy);
+    indexDazu(r.id, home);
     toast('«'+copy.title+'» ist jetzt bei dir in '+subjectName(r.subject)+' ('+klasseLabel(home)+').');
   } else {
     var alt = resourceContentId(heim);
@@ -4869,7 +5077,7 @@ async function uebungZuMir(r, quelle, heim){
     if(r.externalUrl) patch.externalUrl = r.externalUrl;
     if(heim.originKlasse === quelle) patch.originVersion = r.version || 0;
     await updateDoc(ref, patch);
-    if(heim.prevContentId && heim.prevContentId !== alt && heim.prevContentId !== patch.contentId) deleteContentIfUnused(heim.prevContentId);
+    if(heim.prevContentId && heim.prevContentId !== alt && heim.prevContentId !== patch.contentId) deleteContentIfUnused(heim.prevContentId, r.id);
     toast('«'+(heim.title || heim.fileName)+'» ist in '+klasseLabel(home)+' jetzt auf dem neuen Stand.');
   }
   settingsCache.at = 0;
@@ -4945,9 +5153,21 @@ function openSettings(){
   h += '<div class="settings-section"><h4>Konto</h4><div class="settings-actions">'+
        '<button class="btn btn-ghost btn-sm" id="setPwBtn" type="button">🔑 Passwort ändern</button>'+
        '<button class="btn btn-danger btn-sm" id="setLogoutBtn" type="button">Abmelden</button></div></div>';
-  if(isTeacher){
+  if(isTeacher && !isLeitung()){
     h += '<div class="settings-section"><h4>💾 Mein Speicher</h4><div id="setQuota"><div class="empty-state" style="padding:10px;">Wird geladen …</div></div></div>';
     if(heimKlasse()) h += '<div class="settings-section"><h4>⭐ Von Lehrern empfohlen</h4><div class="settings-list" id="setVorschlaege"><div class="empty-state" style="padding:10px;">Wird geladen …</div></div></div>';
+    h += '<div class="settings-section"><h4>💸 Schulden-Liste</h4><p style="margin:0 0 8px;color:var(--text-muted);font-size:12.5px;">Kleine Beträge (z. B. Schoggibrötli), die Schüler:innen dir schulden – Symbol 💸 oben. Gilt für '+esc(klasseLabel())+'.</p>'+
+         '<div class="settings-actions"><button class="btn btn-ghost btn-sm" id="setSchuldenBtn" type="button">'+(schulden.an ? 'Ausschalten' : 'Einschalten')+'</button></div></div>';
+  }
+  if(isTeacher || isLeitung()){
+    h += '<div class="settings-section"><h4>❓ Hilfe</h4><div class="settings-actions">'+
+         '<a class="btn btn-ghost btn-sm" href="'+HILFE_URL+'" target="_blank" rel="noopener">📖 Anleitung für Lehrpersonen</a>'+
+         '<button class="btn btn-ghost btn-sm" id="setEinfBtn" type="button">👋 Einführung</button></div></div>';
+  } else {
+    h += '<div class="settings-section"><h4>❓ Hilfe</h4><div class="settings-actions"><button class="btn btn-ghost btn-sm" id="setEinfBtn" type="button">👋 Einführung</button></div></div>';
+  }
+  if(darfSchulStatistik()){
+    h += '<div class="settings-section"><h4>📊 Schule</h4><div class="settings-actions"><button class="btn btn-ghost btn-sm" id="setStatBtn" type="button">📊 Übersicht: Nutzung &amp; Speicher</button></div></div>';
   }
   h += '<div class="settings-section"><h4>🧩 Widgets</h4><p style="margin:0 0 8px;color:var(--text-muted);font-size:12.5px;">Ausgeblendete '+(isTeacher?'Fächer und ':'')+'Symbole der oberen Leiste wieder hinzufügen. Verschieben und Ausblenden: «✏️ Anordnen» (oder lange auf eine Kachel drücken).</p><div class="settings-actions">'+
        '<button class="btn btn-primary btn-sm" id="setWidgetsBtn" type="button">🧩 Widgets'+(layoutAusAnzahl()?' ('+layoutAusAnzahl()+' ausgeblendet)':'')+'</button>'+
@@ -4959,22 +5179,141 @@ function openSettings(){
   document.getElementById('setAnordnenBtn').addEventListener('click', function(){ closeModal(); wackelnStart(); });
   document.getElementById('setPwBtn').addEventListener('click', uiChangePassword);
   document.getElementById('setLogoutBtn').addEventListener('click', function(){ closeModal(); doLogout(); });
-  if(isTeacher){ if(heimKlasse()) paintSettingsAbgleich(false); showQuotaUsage(); }
+  document.getElementById('setEinfBtn').addEventListener('click', function(){ closeModal(); openEinfuehrung(); });
+  var statBtn = document.getElementById('setStatBtn');
+  if(statBtn) statBtn.addEventListener('click', openSchulStatistik);
+  var schuldenBtn = document.getElementById('setSchuldenBtn');
+  if(schuldenBtn) schuldenBtn.addEventListener('click', function(){
+    schuldenBtn.disabled = true;
+    schuldenSchalten(!schulden.an).then(function(){
+      schuldenBtn.textContent = schulden.an ? 'Ausschalten' : 'Einschalten';
+    }, function(err){ console.error(err); if(!err || err.code !== 'klasse/abgebrochen') toast('Hat nicht geklappt.'); })
+      .then(function(){ schuldenBtn.disabled = false; });
+  });
+  if(isTeacher && !isLeitung()){ if(heimKlasse()) paintSettingsAbgleich(false); showQuotaUsage(); }
 }
 
+/* ===================== 📊 SCHUL-ÜBERSICHT (Schulleitung, Jan) =====================
+   Nur auf Knopfdruck (liest alle students, streaks und resourceContent-Köpfe,
+   also einige hundert Dokumente): pro Klasse, wie viele in den letzten 7 Tagen
+   geübt haben (streaks/{uid}.days), und pro Lehrperson der belegte Speicher
+   (resourceContent.ownerUid/bytes, wie «💾 Mein Speicher»). */
+function darfSchulStatistik(){
+  return isLeitung() || !!(state.profile && state.profile.role === 'teacher' && state.profile.username === 'helfenberger');
+}
+async function openSchulStatistik(){
+  openModal('<h3>📊 Übersicht Schule</h3><div class="empty-state">Wird geladen …</div>', 'modal-wide');
+  try{
+    var res = await Promise.all([
+      getDocs(collection(db, 'students')),
+      getDocs(collection(db, 'streaks')),
+      getDocs(collection(db, 'resourceContent'))
+    ]);
+  }catch(err){
+    console.error(err);
+    openModal('<h3>📊 Übersicht Schule</h3><p>Konnte nicht geladen werden.</p><div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Ok</button></div>');
+    document.getElementById('modalOk').addEventListener('click', closeModal);
+    return;
+  }
+  var tage = [];
+  for(var i = 0; i < 7; i++){ var d = new Date(); d.setDate(d.getDate() - i); tage.push(localDateStr(d)); }
+  var aktiv = {};
+  res[1].forEach(function(snap){
+    var days = snap.data().days || {};
+    if(tage.some(function(t){ return (days[t] || 0) > 0; })) aktiv[snap.id] = true;
+  });
+  var proKlasse = {}, lehrer = {};
+  res[0].forEach(function(snap){
+    var x = snap.data();
+    if(x.role === 'teacher'){ lehrer[snap.id] = { name:((x.vorname || '')+' '+(x.displayName || x.username || '')).trim(), klasse:x.klasse || '', bytes:0, n:0 }; return; }
+    if(x.role !== 'student' || (x.username || '').toLowerCase() === 'schueler' || !x.klasse) return;
+    var k = proKlasse[x.klasse] = proKlasse[x.klasse] || { alle:0, aktiv:0 };
+    k.alle++;
+    if(aktiv[snap.id]) k.aktiv++;
+  });
+  var ohne = { name:'Ohne Zuordnung (ältere Inhalte)', klasse:'', bytes:0, n:0 }, gesamtBytes = 0;
+  res[2].forEach(function(snap){
+    var x = snap.data(), b = x.bytes || 0;
+    gesamtBytes += b;
+    var l = (x.ownerUid && lehrer[x.ownerUid]) || ohne;
+    l.bytes += b; l.n++;
+  });
+  function balken(pct){ return '<div style="height:6px;border-radius:3px;background:rgba(127,127,127,.2);overflow:hidden;min-width:60px;"><div style="height:100%;width:'+Math.min(100, pct)+'%;background:var(--brand);"></div></div>'; }
+  var klassenIds = KLASSEN.filter(function(k){ return k.art === 'klasse'; }).map(function(k){ return k.id; });
+  Object.keys(proKlasse).forEach(function(k){ if(klassenIds.indexOf(k) < 0) klassenIds.push(k); });
+  var sumAlle = 0, sumAktiv = 0;
+  var h = '<h3>📊 Übersicht Schule</h3>';
+  h += '<div class="settings-section"><h4>Wer hat in den letzten 7 Tagen geübt?</h4><table class="stat-tab"><tr><th>Klasse</th><th>Lehrperson</th><th>geübt</th><th></th></tr>';
+  klassenIds.forEach(function(id){
+    var k = proKlasse[id];
+    if(!k) return;
+    sumAlle += k.alle; sumAktiv += k.aktiv;
+    var pct = k.alle ? Math.round(k.aktiv / k.alle * 100) : 0;
+    h += '<tr><td><b>'+esc(klasseLabel(id))+'</b></td><td>'+esc(klasseInfo(id).lp)+'</td><td>'+k.aktiv+' / '+k.alle+' ('+pct+' %)</td><td>'+balken(pct)+'</td></tr>';
+  });
+  h += '<tr class="stat-sum"><td colspan="2">Ganze Schule</td><td>'+sumAktiv+' / '+sumAlle+' ('+(sumAlle ? Math.round(sumAktiv / sumAlle * 100) : 0)+' %)</td><td></td></tr></table>';
+  h += '<p class="gr-hint">Gezählt wird, wer an mindestens einem der letzten 7 Tage eine Übung offen hatte (Lern-Serie 🔥).</p></div>';
+  var liste = Object.keys(lehrer).map(function(uid){ return lehrer[uid]; }).filter(function(l){ return l.n; });
+  liste.sort(function(a, b){ return b.bytes - a.bytes; });
+  if(ohne.n) liste.push(ohne);
+  h += '<div class="settings-section"><h4>Speicher pro Lehrperson (je 1 GB)</h4><table class="stat-tab"><tr><th>Lehrperson</th><th>Seite</th><th>belegt</th><th></th></tr>';
+  liste.forEach(function(l){
+    h += '<tr><td>'+esc(l.name)+'</td><td>'+esc(l.klasse ? klasseLabel(l.klasse) : '')+'</td><td>'+esc(fmtMB(l.bytes))+' <small style="color:var(--text-muted);">('+l.n+')</small></td><td>'+(l === ohne ? '' : balken(l.bytes / TEACHER_QUOTA_BYTES * 100))+'</td></tr>';
+  });
+  if(!liste.length) h += '<tr><td colspan="4">Noch nichts hochgeladen.</td></tr>';
+  h += '<tr class="stat-sum"><td colspan="2">Total Übungen &amp; PDFs</td><td>'+esc(fmtMB(gesamtBytes))+'</td><td></td></tr></table>';
+  h += '<p class="gr-hint">Gezählt bei der Person, die hochgeladen hat (inkl. Vorversionen). Kopien in anderen Klassen zählen nicht doppelt.</p></div>';
+  h += '<div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
+  openModal(h, 'modal-wide');
+  document.getElementById('modalOk').addEventListener('click', closeModal);
+}
+
+// Fächer, die ich laut persönlichem 🗓️ Stundenplan unterrichte.
+function meineFaecher(){
+  var out = [], zellen = (stp.geladen && stp.eigen && stp.eigen.zellen) || {};
+  Object.keys(zellen).forEach(function(k){ var c = zellen[k]; if(c && c.f && out.indexOf(c.f) < 0) out.push(c.f); });
+  return out;
+}
+var vorschlagFilter = null;   // 'meine' | 'alle' | Fach-ID (gilt für diese Sitzung)
 function paintSettingsAbgleich(force){
+  if(!stp.geladen){ stpLaden().then(function(){ paintSettingsAbgleich(force); }, function(){ stp.geladen = true; paintSettingsAbgleich(force); }); return; }
   loadKlassenAbgleich(force).then(function(d){
     setSettingsBadge(d);
     var vEl = document.getElementById('setVorschlaege');
     if(!vEl) return;
-    vEl.innerHTML = d.liste.length ? d.liste.map(function(e, i){
-      var r = e.r;
+    // Filter nach Fach: zuerst die eigenen Fächer (aus dem Stundenplan).
+    var meine = meineFaecher();
+    if(!vorschlagFilter) vorschlagFilter = meine.length ? 'meine' : 'alle';
+    if(vorschlagFilter === 'meine' && !meine.length) vorschlagFilter = 'alle';
+    var zaehl = {};
+    d.liste.forEach(function(e){ zaehl[e.r.subject] = (zaehl[e.r.subject] || 0) + 1; });
+    var nMeine = d.liste.filter(function(e){ return meine.indexOf(e.r.subject) >= 0; }).length;
+    var faecher = Object.keys(zaehl).sort(function(a, b){
+      return (meine.indexOf(b) >= 0) - (meine.indexOf(a) >= 0) || subjectName(a).localeCompare(subjectName(b), 'de');
+    });
+    var sichtbar = d.liste.map(function(e, i){ return {e:e, i:i}; }).filter(function(x){
+      if(vorschlagFilter === 'alle') return true;
+      if(vorschlagFilter === 'meine') return meine.indexOf(x.e.r.subject) >= 0;
+      return x.e.r.subject === vorschlagFilter;
+    });
+    if(vorschlagFilter === 'alle') sichtbar.sort(function(a, b){
+      return (meine.indexOf(b.e.r.subject) >= 0) - (meine.indexOf(a.e.r.subject) >= 0) || a.i - b.i;
+    });
+    var filterHtml = d.liste.length ? '<select id="setVFach" style="margin-bottom:8px;">'+
+      (meine.length ? '<option value="meine"'+(vorschlagFilter === 'meine' ? ' selected' : '')+'>Meine Fächer ('+nMeine+')</option>' : '')+
+      '<option value="alle"'+(vorschlagFilter === 'alle' ? ' selected' : '')+'>Alle Fächer ('+d.liste.length+')</option>'+
+      faecher.map(function(f){ return '<option value="'+esc(f)+'"'+(vorschlagFilter === f ? ' selected' : '')+'>'+(meine.indexOf(f) >= 0 ? '⭐ ' : '')+esc(subjectName(f))+' ('+zaehl[f]+')</option>'; }).join('')+
+      '</select>' : '';
+    vEl.innerHTML = filterHtml + (sichtbar.length ? sichtbar.map(function(x){
+      var e = x.e, i = x.i, r = e.r;
       return '<div class="settings-row"><div class="grow"><b>'+esc(r.title || r.fileName)+'</b>'+
         '<small>'+esc(subjectName(r.subject))+' · von '+esc(klasseInfo(r.quelle).lp)+(istKlasse(r.quelle) ? ' ('+esc(r.quelle)+')' : '')+(e.art === 'anders' ? ' · neue Fassung' : '')+'</small></div>'+
         '<button class="btn btn-ghost btn-sm" type="button" data-v-open="'+i+'" title="Ansehen">👁️</button>'+
         '<button class="btn btn-ghost btn-sm" type="button" data-v-hide="'+i+'">Ausblenden</button>'+
         '<button class="btn btn-primary btn-sm" type="button" data-v-add="'+i+'">'+(e.art === 'neu' ? '📥 Duplizieren' : '🔄 Aktualisieren')+'</button></div>';
-    }).join('') : '<div class="empty-state" style="padding:10px;">Keine neuen Empfehlungen.</div>';
+    }).join('') : '<div class="empty-state" style="padding:10px;">'+(d.liste.length ? 'In diesem Fach gibt es keine neuen Empfehlungen.' : 'Keine neuen Empfehlungen.')+'</div>');
+    var fachSel = document.getElementById('setVFach');
+    if(fachSel) fachSel.addEventListener('change', function(){ vorschlagFilter = fachSel.value; paintSettingsAbgleich(false); });
 
     function wire(sel, fn){
       modalEl.querySelectorAll('['+sel+']').forEach(function(btn){
@@ -5027,15 +5366,7 @@ function goLiveToken(){
   try{ return localStorage.getItem(GO_LIVE_TOKEN_KEY) || ''; }catch(e){ return ''; }
 }
 
-// Solange die Klassen-Umstellung aussteht, würde "Jetzt live" den neuen Code
-// vor den neuen Passwörtern/Regeln veröffentlichen. Nach der Umstellung auf
-// false setzen (admin/klassen-accounts.js umstellen).
-const KLASSEN_UMSTELLUNG_AUSSTEHEND = false;
 function confirmGoLive(){
-  if(KLASSEN_UMSTELLUNG_AUSSTEHEND){
-    uiInfo('Noch nicht live schalten', 'Die Klassen-Umstellung (neue Logins, G3a/E1c) ist noch nicht abgeschlossen. Sie wird zusammen mit den neuen Passwörtern und Regeln live geschaltet.');
-    return;
-  }
   if(!goLiveToken()){ askGoLiveToken(); return; }
   uiConfirm('🚀 Jetzt live schalten?',
     'Der zuletzt gepushte Stand der Testseite wird sofort auf die Live-Seite übernommen. Nach ca. 1–2 Minuten sehen ihn die Schüler:innen (nach dem Neuladen).',
@@ -6259,10 +6590,11 @@ async function replaceResource(r, file){
 // Änderung automatisch mitgezogen; Kopien, die bewusst eine andere Fassung
 // haben (z.B. «Ignorieren» gewählt), bleiben unberührt.
 async function syncedResourceEntries(r){
-  var snaps = await Promise.all(KLASSEN.map(function(k){ return getDoc(kdocFor(k.id, 'resources', r.id)); }));
+  var klassen = await uebungKlassen(r.id);
+  var snaps = await Promise.all(klassen.map(function(k){ return getDoc(kdocFor(k, 'resources', r.id)); }));
   var all = [];
   snaps.forEach(function(snap, i){
-    if(snap.exists()) all.push({ klasse:KLASSEN[i].id, ref:kdocFor(KLASSEN[i].id, 'resources', r.id), data:Object.assign({id:r.id}, snap.data()) });
+    if(snap.exists()) all.push({ klasse:klassen[i], ref:kdocFor(klassen[i], 'resources', r.id), data:Object.assign({id:r.id}, snap.data()) });
   });
   var own = all.filter(function(e){ return e.klasse === state.klasse; })[0];
   var cid = own ? resourceContentId(own.data) : resourceContentId(r);
@@ -6307,7 +6639,7 @@ async function publishResourceContent(r, htmlText, fileName){
   });
   var dropped = repointEntries(batch, sync, newContentId, sync.contentId, fileName);
   await batch.commit();
-  dropped.forEach(deleteContentIfUnused);
+  dropped.forEach(function(cid){ deleteContentIfUnused(cid, r.id); });
 }
 
 // Tauscht aktuelle und vorherige Fassung (nochmals klicken = wieder zurück).
@@ -6321,7 +6653,7 @@ async function restorePreviousContent(r){
   var batch = writeBatch(db);
   var dropped = repointEntries(batch, sync, prev, sync.contentId, null);
   await batch.commit();
-  dropped.forEach(deleteContentIfUnused);
+  dropped.forEach(function(cid){ deleteContentIfUnused(cid, r.id); });
 }
 
 // PDFs liegen als rohe Bytes (Firestore-Typ Bytes, Feld `bin`) in denselben
@@ -6872,45 +7204,81 @@ async function deleteResource(r){
     toast('Löschen fehlgeschlagen.');
     return;
   }
-  deleteContentIfUnused(resourceContentId(r));
-  if(r.prevContentId) deleteContentIfUnused(r.prevContentId);
+  indexWeg(r.id, state.klasse);
+  deleteContentIfUnused(resourceContentId(r), r.id);
+  if(r.prevContentId) deleteContentIfUnused(r.prevContentId, r.id);
 }
 
 // Inhalt einer Übung: resources.contentId, bei alten Einträgen die eigene ID.
 function resourceContentId(r){ return r.contentId || r.id; }
 
-// true, solange irgendeine Übung (in irgendeiner Klasse) diesen Inhalt nutzt.
-// Im Zweifel (Abfrage scheitert) gilt er als genutzt — lieber ein verwaister
-// Inhalt als eine Übung ohne Inhalt.
-async function contentStillUsed(contentId){
+/* Wo liegt Übung rid überall? uebungsIndex/{rid} = {klassen:[...]}.
+   Kopien behalten die ID der Übung, und jeder Inhalt gehört zu genau einer
+   Übungs-ID (contentId = rid bzw. rid_<zeit>). Darum reicht es, die Übung rid
+   in den aufgeführten Klassen nachzuschauen, statt alle ~33 Seiten abzufragen.
+   Fehlt der Eintrag (Übungen von vor dem 19.09.2026), wird einmal alles
+   durchsucht und der Eintrag angelegt. Hochladen/Duplizieren ergänzt die
+   Klasse, Löschen nimmt sie wieder raus (eine Klasse zu viel schadet nicht). */
+// Die Live-Seite kennt bis zur nächtlichen Freigabe nur diese drei Klassen und
+// führt den Index nicht nach — sie werden darum immer mitgeprüft.
+// Kann weg, sobald die Live-Seite den Index kennt (ab 21.09.2026).
+var INDEX_ALT_KLASSEN = ['G3b', 'G3a', 'E1c'];
+function uebungsIndexRef(rid){ return doc(db, 'uebungsIndex', rid); }
+function indexDazu(rid, klasse){
+  return setDoc(uebungsIndexRef(rid), { klassen: arrayUnion(klasse) }, {merge:true})
+    .catch(function(err){ console.error('Übungs-Index', err); });
+}
+function indexWeg(rid, klasse){
+  return setDoc(uebungsIndexRef(rid), { klassen: arrayRemove(klasse) }, {merge:true})
+    .catch(function(err){ console.error('Übungs-Index', err); });
+}
+async function uebungKlassen(rid){
+  var liste = null;
   try{
-    var checks = KLASSEN.map(function(k){
-      return getDocs(query(kcolFor(k.id, 'resources'), where('contentId','==',contentId)))
-        .then(function(snap){ return !snap.empty; });
-    });
-    // Als «vorherige Version» aufbewahrte Inhalte gelten ebenfalls als genutzt.
-    KLASSEN.forEach(function(k){
-      checks.push(getDocs(query(kcolFor(k.id, 'resources'), where('prevContentId','==',contentId)))
-        .then(function(snap){ return !snap.empty; }));
-    });
-    // Einträge ohne contentId nutzen den Inhalt mit ihrer eigenen ID.
-    KLASSEN.forEach(function(k){
-      checks.push(getDoc(kdocFor(k.id, 'resources', contentId)).then(function(snap){ return snap.exists() && !snap.data().contentId; }));
-    });
-    // Die alte, klassenlose Liste (bis zur Umstellung von der Live-Seite
-    // genutzt). Nach der Umstellung ist sie leer bzw. nicht mehr lesbar.
-    checks.push(getDoc(doc(db, 'resources', contentId)).then(function(snap){ return snap.exists(); }, function(){ return false; }));
-    var res = await Promise.all(checks);
-    return res.some(Boolean);
+    var snap = await getDoc(uebungsIndexRef(rid));
+    if(snap.exists() && Array.isArray(snap.data().klassen)) liste = snap.data().klassen.slice();
+  }catch(err){ console.error('Übungs-Index', err); }
+  if(liste){
+    INDEX_ALT_KLASSEN.concat([state.klasse]).forEach(function(k){ if(liste.indexOf(k) < 0) liste.push(k); });
+    return liste;
+  }
+  var snaps = await Promise.all(KLASSEN.map(function(k){ return getDoc(kdocFor(k.id, 'resources', rid)); }));
+  var gefunden = KLASSEN.filter(function(k, i){ return snaps[i].exists(); }).map(function(k){ return k.id; });
+  if(gefunden.length && state.profile.role === 'teacher' && !isLeitung()){
+    setDoc(uebungsIndexRef(rid), { klassen: gefunden }, {merge:true}).catch(function(err){ console.error('Übungs-Index', err); });
+  }
+  if(gefunden.indexOf(state.klasse) < 0) gefunden.push(state.klasse);
+  return gefunden;
+}
+
+// true, solange irgendeine Übung (in irgendeiner Klasse) diesen Inhalt nutzt
+// (als aktuelle oder als «vorherige» Fassung). Im Zweifel (Abfrage scheitert)
+// gilt er als genutzt — lieber ein verwaister Inhalt als eine Übung ohne Inhalt.
+async function contentStillUsed(contentId, rid){
+  if(!rid) return true;
+  try{
+    var klassen = await uebungKlassen(rid);
+    // In Sechserpaketen: meistens ist der Inhalt gleich in den ersten Klassen
+    // noch in Gebrauch, dann spart das die restlichen Lesezugriffe.
+    for(var i = 0; i < klassen.length; i += 6){
+      var snaps = await Promise.all(klassen.slice(i, i+6).map(function(k){ return getDoc(kdocFor(k, 'resources', rid)); }));
+      var genutzt = snaps.some(function(snap){
+        if(!snap.exists()) return false;
+        var d = snap.data();
+        return resourceContentId(Object.assign({id:rid}, d)) === contentId || d.prevContentId === contentId;
+      });
+      if(genutzt) return true;
+    }
+    return false;
   }catch(err){
     console.error(err);
     return true;
   }
 }
 
-async function deleteContentIfUnused(contentId){
+async function deleteContentIfUnused(contentId, rid){
   try{
-    if(await contentStillUsed(contentId)) return;
+    if(await contentStillUsed(contentId, rid)) return;
     var contentSnap = await getDoc(doc(db,'resourceContent', contentId));
     if(!contentSnap.exists()) return;
     var chunkCount = contentSnap.data().chunkCount || 0;
@@ -6979,7 +7347,7 @@ function askAddLink(subjectId, folderId){
       uploadedAt: serverTimestamp(),
       uploadedBy: state.user.uid,
       version: 0
-    }).then(function(){ toast('«'+title+'» wurde hinzugefügt.'); })
+    }).then(function(){ indexDazu(resId, state.klasse); toast('«'+title+'» wurde hinzugefügt.'); })
       .catch(function(err){ console.error(err); toast('Hinzufügen fehlgeschlagen.'); });
   }
   document.getElementById('modalOk').addEventListener('click', submit);
@@ -7037,6 +7405,7 @@ async function doUpload(subjectId, folderId, file, title){
     };
     if(pdf) meta.pdf = true;
     batch.set(kdoc('resources', resId), meta);
+    batch.set(uebungsIndexRef(resId), { klassen:[state.klasse] });
     batch.set(doc(db,'resourceContent', resId), { chunkCount: chunks.length, bytes: bytes, ownerUid: state.user.uid });
     chunks.forEach(function(chunk, i){
       batch.set(doc(db,'resourceContent', resId, 'chunks', String(i)), chunk);
@@ -11990,6 +12359,14 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-19-einfuehrung', datum:'2026-09-19', fuer:'alle', text:'👋 Neu dabei? Beim ersten Anmelden zeigt dir eine kurze Einführung, was die Library kann – jederzeit wieder unter ⚙️ Einstellungen → «👋 Einführung».'},
+  {id:'2026-09-19-hilfe', datum:'2026-09-19', fuer:'lehrer', text:'📖 Anleitung für Lehrpersonen: ⚙️ Einstellungen → «📖 Anleitung für Lehrpersonen» (hilfe.html – der Link lässt sich auch einfach weiterschicken).'},
+  {id:'2026-09-19-klassenwahl-suche', datum:'2026-09-19', fuer:'lehrer', text:'🏫 Klasse wechseln: Zuoberst «⭐ Meine Seiten» (deine Seite, die Klassen aus deinem Stundenplan, zuletzt besuchte) und ein Suchfeld für Klasse oder Lehrperson (Enter springt beim einzigen Treffer direkt hin).'},
+  {id:'2026-09-19-gruppen-suche', datum:'2026-09-19', fuer:'lehrer', text:'👥 Gruppen: Schüler:innen lassen sich jetzt über ein Suchfeld quer durch alle Klassen finden (Vorname, Nachname oder Kürzel).'},
+  {id:'2026-09-19-empfohlen-fach', datum:'2026-09-19', fuer:'lehrer', text:'⭐ Von Lehrern empfohlen: Filter nach Fach – standardmässig deine Fächer aus dem Stundenplan, bei «Alle Fächer» stehen sie zuoberst.'},
+  {id:'2026-09-19-schulden-klasse', datum:'2026-09-19', fuer:'lehrer', text:'💸 Schulden-Liste pro Klasse ein-/ausschaltbar (⚙️ Einstellungen), neu nur in der G3b standardmässig an. Schüler:innen sehen «Schulden bei» mit dem Namen der Klassenlehrperson.'},
+  {id:'2026-09-19-uebungen-sichtbar', datum:'2026-09-19', fuer:'lehrer', text:'🔒 Die Übungen einer Seite sehen nur noch die eigene Klasse, Lehrpersonen und die Mitglieder deiner 👥 Gruppen. Löschen und Ersetzen von Übungen geht schneller.'},
+  {id:'2026-09-19-schul-statistik', datum:'2026-09-19', fuer:'lehrer', text:'📊 Für die Schulleitung: ⚙️ Einstellungen → «📊 Übersicht» zeigt pro Klasse, wer in den letzten 7 Tagen geübt hat, und den Speicher pro Lehrperson.'},
   {id:'2026-09-19-gruppen-eigenes-fach', datum:'2026-09-19', fuer:'lehrer', text:'👥 Gruppen: Beim Fach kannst du jetzt auch eigene Fächer aus deinem Stundenplan (z. B. «Jassen») wählen oder mit «✍️ Anderes Fach …» ein neues eintippen.'},
   {id:'2026-09-19-stundenplan-andere-lp', datum:'2026-09-19', fuer:'lehrer', text:'👀 Stundenplan: Mit «Andere Lehrperson …» siehst du den persönlichen Stundenplan einer Kollegin oder eines Kollegen (nur ansehen). Dein eigener ist umgekehrt für die anderen Lehrpersonen sichtbar, nicht für Schüler:innen.'},
   {id:'2026-09-19-alle-klassen', datum:'2026-09-19', fuer:'lehrer', text:'🏫 Jetzt sind alle Sek-Klassen dabei. Unter 🏫 oben ganz unten gibt es das Pulldown «Fachlehrpersonen (FLP) & ISF» – jede FLP und jedes ISF hat eine eigene Seite, darin nochmals ein Pulldown für die 4 Praktikant:innen.'},
@@ -12011,7 +12388,6 @@ const NEUIGKEITEN = [
   {id:'2026-09-18-pdf-4mb-cache', datum:'2026-09-18', fuer:'lehrer', text:'📄 PDFs neu max. 4 MB (grössere komprimieren oder als «🔗 Link» ablegen). Übungen und PDFs werden pro Gerät nur noch einmal heruntergeladen und danach aus dem Speicher geöffnet – spart Firebase-Kontingent und lädt schneller.'},
   {id:'2026-09-18-mehrere-links-aktuell', datum:'2026-09-18', fuer:'alle', text:'📘 Bei Hausaufgaben können jetzt mehrere Übungen oder PDFs verlinkt sein – und pro Fach können mehrere Themen gleichzeitig rot als «Aktuell» markiert sein.'},
   {id:'2026-09-18-pdf-link', datum:'2026-09-18', fuer:'lehrer', text:'📄 PDFs: Einfach ins gleiche Feld wie die Übungsseiten ziehen (max. 4 MB, gespeichert ohne Aufschlag). Neu auch «🔗 Link hinzufügen» – z.B. für ein PDF aus iCloud/OneDrive: es wird nur der Link gespeichert, öffnet in neuem Tab. Beides lässt sich wie Übungen bei Hausaufgaben verlinken.'},
-  {id:'2026-09-18-gaeste-pruefung', datum:'2026-09-18', fuer:'lehrer', text:'Fach-Gäste (z.B. Elena und Letizia) erscheinen bei Prüfungen nur noch in Mathe-Prüfungen — in der Live-Übersicht und bei ihnen selbst.'},
   {id:'2026-09-18-pruefung-formate', datum:'2026-09-18', fuer:'lehrer', text:'📝 Prüfungen: Beim Erstellen wählst du jetzt die Aufgabenformate — ✍️ Frei formulieren, 🔤 Selbst hinschreiben (ohne Auswahl), ☑️ Auswählen, 🔗 Zuordnen & Ordnen. Standard 30/40/20/10 %, frei änderbar. Hat die Übung zu wenig Kurzantwort-Fragen, werden Auswahlfragen mit kurzer Antwort und Zuordnungs-Paare automatisch zu Fragen ohne Auswahl umgewandelt (kleine Tippfehler zählen als richtig).'},
   {id:'2026-09-18-fluestern-alle', datum:'2026-09-18', fuer:'lehrer', text:'🗣 Flüstern: Mit «Alle hinzufügen» darf die ganze Klasse auf einmal flüstern.'},
   {id:'2026-09-18-pruefung-massstab-bloom', datum:'2026-09-18', fuer:'lehrer', text:'📝 Prüfungen: Notenmassstab pro Prüfung wählbar — DBK linear (Standard), DBK mit reduzierter 6, Bestehensgrenze (Note 4 bei x %), Fehlerabzug (mit «Fehler für eine 6») oder eigene Punktetabelle. Beim Erstellen Niveau G/E wählen: Die Fragen werden nach Bloom verteilt (G 50/35/15, E 30/40/30 % Erinnern/Verstehen/Anwenden, anpassbar) und nach Bereichen und Aufgabentypen gemischt. Jede Aufgabe bekommt einen Punktevorschlag (halbe Punkte möglich), unter «🧮 Aufgaben & Punkte» änderbar. Karteikarten der Übung werden zu offenen Fragen, vorkorrigiert über Stichwörter der Musterlösung. In den Details gibst du volle, keine oder Teilpunkte.'},
@@ -12027,13 +12403,11 @@ const NEUIGKEITEN = [
   {id:'2026-09-18-aemtli-stuhl', datum:'2026-09-18', fuer:'lehrer', text:'Ämtli-Erinnerung: am Dienstag steht zusätzlich gross «AUFSTUHLEN», am Freitag «NICHT aufstuhlen».'},
   {id:'2026-09-18-aemtli-gross', datum:'2026-09-18', fuer:'lehrer', text:'Ämtli-Erinnerung: 5 Minuten vor jeder Ämtli-Zeit poppt der Hinweis gross und pulsierend über allem auf (auch im Vollbild). Antippen = weg, zur Ämtli-Zeit verschwindet er sowieso.'},
   {id:'2026-09-18-uebung-bearbeiten', datum:'2026-09-18', fuer:'lehrer', text:'Übungen direkt bearbeiten: «✏️ Bearbeiten» bei jeder Übung — Texte & Lösungen als Formularfelder (nach Aufgabe gruppiert, mit Suche) oder im Code-Modus. Mit Vorschau, Syntaxprüfung und «↩️ Vorherige Version». Kopien in anderen Klassen werden automatisch mitaktualisiert, auch bei «Datei ersetzen».'},
-  {id:'2026-09-18-fach-gaeste', datum:'2026-09-18', fuer:'lehrer', text:'Fach-Gäste (z.B. Elena und Letizia in Mathe): erscheinen in Abgabe-Checklisten, Vergessen-Zähler und Live-Klasse nur bei Mathe, in Spielen per «👭 Gäste»-Schalter, im Sitzplan nur von Hand — auch als zweite Person auf einem besetzten Platz.'},
   {id:'2026-09-18-quiz-punkte-plus', datum:'2026-09-18', fuer:'alle', text:'Klassen-Quiz: Nach jeder Frage siehst du gross, wie viele Punkte du dazubekommen hast. Und «mitmachen» klappt jetzt zuverlässig.'},
   {id:'2026-09-18-quiz-stopp', datum:'2026-09-18', fuer:'lehrer', text:'Klassen-Quiz: Neuer Knopf «⏸ Zeit stoppen» am Beamer — der Countdown friert ein, niemand wird gesperrt, aufgelöst wird per Knopf.'},
   {id:'2026-09-17-neuigkeiten', datum:'2026-09-17', fuer:'alle', text:'Neuer Reiter 🆕: Hier siehst du, was sich an der Library geändert hat. Leuchtet das Symbol rot, gibt es etwas Neues.'},
   {id:'2026-09-17-erinnerungen', datum:'2026-09-17', fuer:'alle', text:'Erinnerungen kommen zuverlässiger an, auch wenn der Versand sich verspätet.'},
   {id:'2026-09-17-klassen', datum:'2026-09-17', fuer:'alle', text:'Jede und jeder hat jetzt ein persönliches Login (Vorname + eigenes Passwort).'},
-  {id:'2026-09-17-klassen-lp', datum:'2026-09-17', fuer:'lehrer', text:'Mehrere Klassen (G3b, G3a, E1c): Klassenwechsel über den 🏫-Knopf oben, Einstellungen mit Übungs-Vorschlägen und Aktualisierungen.'},
   {id:'2026-09-17-pflanzen', datum:'2026-09-17', fuer:'lehrer', text:'🪴 Pflanzen-Giesserinnerung mit rotem Band bis abgehakt; Giessplan berücksichtigt Wochenenden und Ferien.'},
   {id:'2026-09-17-slf', datum:'2026-09-17', fuer:'lehrer', text:'Klassenzimmer: Stadt Land Fluss mit Drehscheibe, Kategorien, Sanduhr und STOPP.'},
   {id:'2026-09-17-datei-ersetzen', datum:'2026-09-17', fuer:'lehrer', text:'«Datei ersetzen» für hochgeladene HTML-Übungen: Inhalt tauschen, Titel, Ort und Lernstände bleiben.'},
@@ -12064,6 +12438,9 @@ function neuLoadSeen(force){
   return neuState.loading;
 }
 function neuIstNeu(n, seen){
+  // Seite, auf der die Neuigkeiten noch nie geöffnet wurden (neue Klasse):
+  // der ganze bisherige Verlauf gilt nicht als neu (dafür gibt es 👋 Einführung).
+  if(!seen || !Object.keys(seen).length) return false;
   var t = seen && seen[n.id];
   return !t || (Date.now() - t) < NEU_TAGE * 86400000;
 }
@@ -12100,7 +12477,9 @@ function renderNeuigkeiten(){
     // Lehrperson in der eigenen Klasse: Uhr für noch nicht gestartete Einträge starten.
     if(isTeacher && !isFremdeKlasse()){
       var patch = {}, jetzt = Date.now(), neuGestartet = false;
-      NEUIGKEITEN.forEach(function(n){ if(!seen[n.id]){ patch[n.id] = jetzt; neuGestartet = true; } });
+      // Erstes Mal auf dieser Seite: alles Bisherige gleich als «Nüme so neu».
+      var start = Object.keys(seen).length ? jetzt : jetzt - (NEU_TAGE + 1) * 86400000;
+      NEUIGKEITEN.forEach(function(n){ if(!seen[n.id]){ patch[n.id] = start; neuGestartet = true; } });
       if(neuGestartet){
         setDoc(kdoc('appMeta', 'neuigkeiten'), { seen: patch }, {merge:true})
           .catch(function(err){ console.error('Neuigkeiten speichern', err); });
@@ -12140,6 +12519,67 @@ function paintNeuigkeiten(liste, seen, vorher, isTeacher){
   }
   h += '</div>';
   host.innerHTML = h;
+}
+
+/* ---------- 👋 Einführung für neue Konten ----------
+   Einmal pro Person ein paar Seiten «Das kann die Library» (gemerkt unter
+   progress/{uid}/einstellungen/einfuehrung, gilt also auf allen Geräten).
+   Wer schon vor dem 19.09.2026 dabei war (G3b, G3a, E1c), bekommt sie nicht
+   automatisch. Jederzeit wieder: ⚙️ Einstellungen → «👋 Einführung». */
+var EINFUEHRUNG_ALTE_KLASSEN = ['G3b', 'G3a', 'E1c'];
+var HILFE_URL = 'hilfe.html';
+function einfuehrungRef(){ return doc(db, 'progress', state.user.uid, 'einstellungen', 'einfuehrung'); }
+function einfuehrungPruefen(){
+  if(!state.profile || !state.user || isLeitung() || EINFUEHRUNG_ALTE_KLASSEN.indexOf(state.profile.klasse) >= 0) return;
+  getDoc(einfuehrungRef()).then(function(snap){
+    if(snap.exists() || !state.user) return;
+    // Nicht über einen offenen Dialog oder eine Übung legen — dann eben beim nächsten Mal.
+    if(modalEl.classList.contains('show') || !state.route || state.route.name !== 'home') return;
+    openEinfuehrung();
+  }).catch(function(err){ console.error('Einführung', err); });
+}
+function einfuehrungSeiten(){
+  if(state.profile.role === 'teacher') return [
+    ['👋', 'Willkommen in der Library', 'Übungen, Hausaufgaben, Stundenplan und Werkzeuge für den Unterricht – für deine Klasse bzw. (FLP, ISF) für deine eigene Seite. Deine Schüler:innen melden sich mit Vorname oder Schul-Kürzel und ihrem Passwort an.'],
+    ['📚', 'Übungen und PDFs ablegen', 'Fach öffnen und die HTML-Übung oder das PDF (max. 4 MB) ins Feld ziehen – oder «🔗 Link hinzufügen». Mit Ordnern sortieren. Du hast 1 GB Speicher (Anzeige unter ⚙️ Einstellungen).'],
+    ['📅', 'Kalender und 👥 Gruppen', 'Im 📅 Kalender Hausaufgaben, Prüfungen und Erinnerungen eintragen und Übungen oder PDFs verlinken. Unter «👥 Gruppen» stellst du Schüler:innen aus mehreren Klassen zusammen und wählst die Gruppe beim Eintrag unter «Für».'],
+    ['🏫', 'Andere Seiten und ⭐ Empfehlungen', 'Mit 🏫 oben schaust du bei anderen Klassen und Lehrpersonen hinein (gelbes Band = nicht deine Seite). «☆ Empfehlen» schlägt eine Übung allen vor; Vorschläge der anderen übernimmst du unter ⚙️ Einstellungen.'],
+    ['🎯', 'Klassenzimmer', 'Der Knopf «🏫 Klassenzimmer» auf der Startseite öffnet die Beamer-Werkzeuge: Sitzplan, Klassen-Quiz, Blitzumfrage, Online-Prüfungen, Würfel, Glücksrad und mehr.'],
+    ['❓', 'Hilfe', 'Die ausführliche Anleitung: <a href="'+HILFE_URL+'" target="_blank" rel="noopener">Hilfe für Lehrpersonen öffnen</a>. Was neu ist, steht unter 🆕. Diese Einführung findest du jederzeit wieder unter ⚙️ Einstellungen.']
+  ];
+  return [
+    ['👋', 'Willkommen in der Library', 'Hier findest du die Übungen deiner Lehrpersonen, deine Hausaufgaben und deinen Stundenplan.'],
+    ['📚', 'Üben', 'Tippe auf ein Fach und öffne eine Übung. Dein Fortschritt wird automatisch gespeichert – auch wenn du später an einem anderen Gerät weitermachst.'],
+    ['📅', 'Hausaufgaben', 'Auf der Startseite siehst du, was ansteht. Im 📅 Kalender hakst du Erledigtes ab und kannst eigene Einträge machen.'],
+    ['⭐', 'Die Symbole oben', '🗓️ Stundenplan · 🔔 Erinnerungen · 🔥 Lern-Serie · ❓ anonyme Fragebox · 🆕 Neuigkeiten. Kacheln und Symbole verschiebst du, indem du lange draufdrückst.'],
+    ['🔑', 'Dein Konto', 'Unter ⚙️ Einstellungen kannst du dein Passwort ändern. Gib es niemandem weiter. Diese Einführung findest du dort auch wieder.']
+  ];
+}
+function openEinfuehrung(){
+  var seiten = einfuehrungSeiten(), i = 0;
+  function fertig(){
+    closeModal();
+    if(state.user) setDoc(einfuehrungRef(), { gesehen:serverTimestamp() }).catch(function(err){ console.error('Einführung', err); });
+  }
+  function malen(){
+    var sd = seiten[i], letzte = i === seiten.length - 1;
+    openModal(
+      '<div class="einf-icon">'+sd[0]+'</div>'+
+      '<h3 style="text-align:center;">'+esc(sd[1])+'</h3>'+
+      '<p class="einf-text">'+sd[2]+'</p>'+
+      '<div class="einf-dots">'+seiten.map(function(x, j){ return '<span'+(j === i ? ' class="on"' : '')+'></span>'; }).join('')+'</div>'+
+      '<div class="modal-actions">'+
+        (letzte ? '' : '<button class="btn btn-ghost btn-sm" id="einfSkip" type="button">Überspringen</button>')+
+        (i ? '<button class="btn btn-ghost btn-sm" id="einfBack" type="button">Zurück</button>' : '')+
+        '<button class="btn btn-primary btn-sm" id="einfNext" type="button">'+(letzte ? 'Los geht\'s!' : 'Weiter')+'</button>'+
+      '</div>'
+    );
+    var skip = document.getElementById('einfSkip'), back = document.getElementById('einfBack');
+    if(skip) skip.addEventListener('click', fertig);
+    if(back) back.addEventListener('click', function(){ i--; malen(); });
+    document.getElementById('einfNext').addEventListener('click', function(){ if(letzte) fertig(); else { i++; malen(); } });
+  }
+  malen();
 }
 
 /* ---------- 🧹 Besen in der Kopfzeile (nur Klasse) ---------- */
