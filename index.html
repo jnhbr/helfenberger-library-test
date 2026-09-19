@@ -1765,7 +1765,7 @@ const SUBJECTS = [
   {id:'berufswahl', name:'Berufswahl', gruppe:'neben', color:'#E8752C', soft:'#FBE4D4', img:'assets/subject-berufswahl.png'},
   {id:'gtz', name:'GTZ', gruppe:'frei', color:'#3D6A8A', soft:'#DCE8EF', img:'assets/subject-gtz.png'},
   {id:'fotokurs', name:'Fotokurs', gruppe:'frei', color:'#6B7280', soft:'#E7E9EE', img:'assets/subject-fotokurs.png', full:true},
-  {id:'psychologie', name:'Psychologie', gruppe:'frei', color:'#A16207', soft:'#F3E8D2', img:'assets/subject-psychologie.png', full:true},
+  {id:'psychologie', name:'ERG', gruppe:'frei', color:'#A16207', soft:'#F3E8D2', img:'assets/subject-psychologie.png', full:true},
   {id:'freies-schreiben', name:'Freies Schreiben', gruppe:'frei', color:'#0369A1', soft:'#DCEBF5', img:'assets/subject-freies-schreiben.png', full:true}
 ];
 SUBJECTS.forEach(function(s){ s.icon = subjectVisual(s); });
@@ -11413,7 +11413,7 @@ function aemtliMeineTermine_(cfg, uid){
 const NEUIGKEITEN = [
   {id:'2026-09-19-stundenplan-pause', datum:'2026-09-19', fuer:'alle', text:'🗓️ Stundenplan korrigiert: Am Nachmittag ist die Pause von 15:05 bis 15:20 – die letzten zwei Lektionen beginnen darum 5 Minuten später, Schluss ist um 16:55.'},
   {id:'2026-09-19-stundenplan', datum:'2026-09-19', fuer:'alle', text:'🗓️ Neu: dein Stundenplan (Symbol oben). Deine Lehrperson trägt den Klassenplan ein, du kannst danach deine eigenen Freilektionen eintragen. Auf der Startseite siehst du, was jetzt und als Nächstes kommt.'},
-  {id:'2026-09-19-anordnen', datum:'2026-09-19', fuer:'alle', text:'✏️ Kacheln und Symbole oben kannst du jetzt wie beim iPhone verschieben: lange draufdrücken, bis alles wackelt, dann ziehen. Symbole mit «−» ausblenden und unter ⚙️ Einstellungen › 🧩 Widgets zurückholen. Neue Fächer: Englisch, Französisch, ISF, Musik, TTG, WAH, Fotokurs, Psychologie, Freies Schreiben.'},
+  {id:'2026-09-19-anordnen', datum:'2026-09-19', fuer:'alle', text:'✏️ Kacheln und Symbole oben kannst du jetzt wie beim iPhone verschieben: lange draufdrücken, bis alles wackelt, dann ziehen. Symbole mit «−» ausblenden und unter ⚙️ Einstellungen › 🧩 Widgets zurückholen. Neue Fächer: Englisch, Französisch, ISF, Musik, TTG, WAH, Fotokurs, ERG, Freies Schreiben.'},
   {id:'2026-09-19-faecher-lp', datum:'2026-09-19', fuer:'lehrer', text:'🧩 Fächer, die dich nicht betreffen, kannst du im Wackelmodus mit «−» ausblenden (nur für dich, die Klasse sieht weiterhin alle). Im 🗓️ Stundenplan füllst du deinen eigenen Plan und den Klassenplan separat; «⏰ Lektionszeiten» beim Bearbeiten anpassen.'},
   {id:'2026-09-18-speicher-kontingent', datum:'2026-09-18', fuer:'lehrer', text:'💾 Jede Lehrperson hat neu 1 GB Speicher für eigene Übungen und PDFs (Anzeige unter ⚙️ Einstellungen → «💾 Mein Speicher»). Ist er voll: Altes löschen oder grosse Dateien als «🔗 Link» ablegen.'},
   {id:'2026-09-18-pdf-4mb-cache', datum:'2026-09-18', fuer:'lehrer', text:'📄 PDFs neu max. 4 MB (grössere komprimieren oder als «🔗 Link» ablegen). Übungen und PDFs werden pro Gerät nur noch einmal heruntergeladen und danach aus dem Speicher geöffnet – spart Firebase-Kontingent und lädt schneller.'},
