@@ -1223,6 +1223,21 @@
   .pr-lock-icon{font-size:64px;}
   .pr-grund{font-size:13px;}
   .modal.pr-modal{max-width:640px;}
+  .modal.pr-modal.pr-modal-breit{max-width:860px;}
+  .pr-bk-row{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:start;padding:8px;border:1px solid var(--border);border-radius:10px;}
+  .pr-bk-f{min-width:0;} .pr-bk-f > div:last-child{overflow-wrap:anywhere;}
+  .pr-bk-akt{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+  .pr-bk-akt .btn{padding:2px 8px;}
+  .pr-bk-als{width:auto;max-width:230px;padding:4px 8px;font-size:13px;}
+  .pr-bk-opts{font-size:12.5px;color:var(--text-muted);margin-top:3px;}
+  .pr-bk-opts .btn{padding:0 6px;}
+  .pr-bk-poolliste{max-height:32vh;margin-top:8px;}
+  .pr-bk-pool{display:grid;grid-template-columns:36px 1fr;gap:8px;align-items:start;padding:6px 8px;border:1px dashed var(--border);border-radius:10px;font-size:14px;}
+  .pr-bk-pool > div{min-width:0;overflow-wrap:anywhere;}
+  .pr-bk-eigen{margin-top:12px;border-top:1px solid var(--border);padding-top:8px;}
+  .pr-bk-eigen > summary{cursor:pointer;font-weight:600;}
+  .pr-druck{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0;}
+  @media (max-width:560px){ .pr-bk-row{grid-template-columns:24px 1fr;} .pr-bk-akt{grid-column:2;flex-direction:row;justify-content:space-between;} .pr-druck{grid-template-columns:1fr;} }
   .pr-regeln{display:flex;flex-direction:column;gap:8px;background:var(--surface-2);border-radius:var(--radius-sm);padding:12px 14px;margin:0 0 16px;font-size:14px;line-height:1.45;}
   .pr-hinweis{font-size:13px;color:var(--text-muted);}
   .pr-kats{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 12px;font-size:14px;}
@@ -7405,12 +7420,12 @@ async function doUpload(subjectId, folderId, file, title){
     };
     if(pdf) meta.pdf = true;
     batch.set(kdoc('resources', resId), meta);
-    batch.set(uebungsIndexRef(resId), { klassen:[state.klasse] });
     batch.set(doc(db,'resourceContent', resId), { chunkCount: chunks.length, bytes: bytes, ownerUid: state.user.uid });
     chunks.forEach(function(chunk, i){
       batch.set(doc(db,'resourceContent', resId, 'chunks', String(i)), chunk);
     });
     await batch.commit();
+    indexDazu(resId, state.klasse);   // separat: darf das Hochladen nie scheitern lassen
     toast('«'+title+'» wurde veröffentlicht.');
   }catch(err){
     console.error(err);
@@ -12359,6 +12374,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-19-pruefung-baukasten-druck', datum:'2026-09-19', fuer:'lehrer', text:'📝 Prüfungen: «🧩 Baukasten» – Aufgaben selbst zusammenstellen und ordnen, pro Aufgabe den Typ wählen (wie in der Übung, 🔤 selbst hinschreiben, ☑️ Auswahl, ✍️ frei formulieren) und eigene Aufgaben ergänzen. «🖨️ Drucken»: Prüfung und Lösungsblatt als PDF oder Word für Prüfungen auf Papier.'},
   {id:'2026-09-19-einfuehrung', datum:'2026-09-19', fuer:'alle', text:'👋 Neu dabei? Beim ersten Anmelden zeigt dir eine kurze Einführung, was die Library kann – jederzeit wieder unter ⚙️ Einstellungen → «👋 Einführung».'},
   {id:'2026-09-19-hilfe', datum:'2026-09-19', fuer:'lehrer', text:'📖 Anleitung für Lehrpersonen: ⚙️ Einstellungen → «📖 Anleitung für Lehrpersonen» (hilfe.html – der Link lässt sich auch einfach weiterschicken).'},
   {id:'2026-09-19-klassenwahl-suche', datum:'2026-09-19', fuer:'lehrer', text:'🏫 Klasse wechseln: Zuoberst «⭐ Meine Seiten» (deine Seite, die Klassen aus deinem Stundenplan, zuletzt besuchte) und ein Suchfeld für Klasse oder Lehrperson (Enter springt beim einzigen Treffer direkt hin).'},
@@ -14905,6 +14921,48 @@ function pruefBildSauber(s){
 // Sortiert: Erinnern → Verstehen → Anwenden, darin nach Bereich und Original.
 // Liefert die öffentlichen Fragen (ohne Lösung), die Lösungen und die Bilder getrennt.
 var PRUEF_LV = ['erinnern', 'verstehen', 'anwenden'];
+function pruefKatNamen(info){
+  var katName = {};
+  (info.kategorien || []).forEach(function(k){ katName[k.id] = k.name; });
+  return katName;
+}
+// Sammelt die Bilder (SVG) einer Prüfung; gleiche Bilder nur einmal.
+function pruefBildSammler(){
+  var liste = [], nr = {};
+  return { liste:liste, add:function(svg, sauber){
+    if(!nr.hasOwnProperty(svg)){ nr[svg] = liste.length; liste.push(sauber ? svg : pruefBildSauber(svg)); }
+    return nr[svg];
+  }};
+}
+// Eine Frage der Übung (f) → öffentliche Prüfungsfrage q (ohne Lösung) + Lösung L.
+function pruefFrageBauen(f, lv, id, katName, bild, rnd){
+  var q = {id:id, typ:f.typ, kat:katName[f.kat] || f.kat || '', frage:f.frage || ''};
+  if(f.typ !== 'diktat') q.bloom = lv || pruefBloom(f);
+  if(f.kontext) q.kontext = f.kontext;
+  if(f.bild) q.bild = bild.add(f.bild);
+  var L = {punkte:pruefPunkteVorschlag(f)};
+  if(f.typ === 'mc'){ q.optionen = f.optionen; L.loesung = f.loesung; L.anzeige = f.optionen[f.loesung] || ''; }
+  else if(f.typ === 'tf'){ L.loesung = f.loesung; L.anzeige = f.loesung ? 'Wahr' : 'Falsch'; }
+  else if(f.typ === 'text'){ L.loesung = f.loesung; L.anzeige = f.loesung[0] || ''; if(f.locker) L.locker = true; }
+  else if(f.typ === 'offen'){ L.loesung = f.loesung; L.stichworte = pruefStichworte(f.loesung, f.begriff); L.anzeige = f.loesung; }
+  else if(f.typ === 'diktat'){ L.text = f.text; L.alt = f.alt || []; L.punkte = pruefDiktatTokens(f.text.join(' ')).length || 1; L.anzeige = ''; }
+  else if(f.typ === 'zahl'){ q.einheit = f.einheit || ''; L.loesung = f.loesung; L.anzeige = String(f.loesung.wert).replace('.', ',') + (f.einheit ? ' ' + f.einheit : ''); }
+  else if(f.typ === 'zuordnen'){
+    var perm = pruefMischen(f.rechts.map(function(r, j){ return j; }), rnd);
+    q.links = f.links; q.rechts = perm.map(function(j){ return f.rechts[j]; });
+    L.loesung = f.links.map(function(l, li){ return perm.indexOf(li); });
+    L.anzeige = f.links.map(function(l, li){ return l + ' → ' + f.rechts[li]; }).join('; ');
+  }
+  else if(f.typ === 'reihenfolge'){
+    var pm = pruefMischen(f.items.map(function(r, j){ return j; }), rnd);
+    q.items = pm.map(function(j){ return f.items[j]; });
+    L.loesung = f.items.map(function(it, j){ return pm.indexOf(j); });
+    L.anzeige = f.items.join(' → ');
+  }
+  L.typ = f.typ;
+  if(f.typ !== 'diktat') q.punkte = L.punkte;
+  return {q:q, L:L};
+}
 function pruefBankPool(info, kats, mitUmwandeln){
   var pool = [];
   info.fragen.forEach(function(f, i){
@@ -14964,41 +15022,14 @@ function pruefBankZiehen(info, kats, anzahl, seed, bloomPct, formPct){
     zieheBeide(function(){ return true; }, offen);
   }
   gezogen.sort(function(a, b){ return (lvIdx[a.lv] - lvIdx[b.lv]) || (katIdx[a.f.kat] - katIdx[b.f.kat]) || (a.i - b.i) || (a.um - b.um); });
-  var katName = {};
-  info.kategorien.forEach(function(k){ katName[k.id] = k.name; });
-  var bilder = [], bildNr = {}, fragen = [], loesungen = {};
+  var katName = pruefKatNamen(info), bild = pruefBildSammler(), fragen = [], loesungen = {};
   gezogen.forEach(function(x, i){
-    var f = x.f, id = 'q' + i;
-    var q = {id:id, typ:f.typ, kat:katName[f.kat] || f.kat, frage:f.frage || ''};
-    if(f.typ !== 'diktat') q.bloom = x.lv;
-    if(f.kontext) q.kontext = f.kontext;
-    if(f.bild){
-      if(!bildNr.hasOwnProperty(f.bild)){ bildNr[f.bild] = bilder.length; bilder.push(pruefBildSauber(f.bild)); }
-      q.bild = bildNr[f.bild];
-    }
-    var L = {punkte:pruefPunkteVorschlag(f)};
-    if(f.typ === 'mc'){ q.optionen = f.optionen; L.loesung = f.loesung; L.anzeige = f.optionen[f.loesung] || ''; }
-    else if(f.typ === 'tf'){ L.loesung = f.loesung; L.anzeige = f.loesung ? 'Wahr' : 'Falsch'; }
-    else if(f.typ === 'text'){ L.loesung = f.loesung; L.anzeige = f.loesung[0] || ''; if(f.locker) L.locker = true; }
-    else if(f.typ === 'offen'){ L.loesung = f.loesung; L.stichworte = pruefStichworte(f.loesung, f.begriff); L.anzeige = f.loesung; }
-    else if(f.typ === 'diktat'){ L.text = f.text; L.alt = f.alt || []; L.punkte = pruefDiktatTokens(f.text.join(' ')).length || 1; L.anzeige = ''; }
-    else if(f.typ === 'zahl'){ q.einheit = f.einheit || ''; L.loesung = f.loesung; L.anzeige = String(f.loesung.wert).replace('.', ',') + (f.einheit ? ' ' + f.einheit : ''); }
-    else if(f.typ === 'zuordnen'){
-      var perm = pruefMischen(f.rechts.map(function(r, j){ return j; }), rnd);
-      q.links = f.links; q.rechts = perm.map(function(j){ return f.rechts[j]; });
-      L.loesung = f.links.map(function(l, li){ return perm.indexOf(li); });
-      L.anzeige = f.links.map(function(l, li){ return l + ' → ' + f.rechts[li]; }).join('; ');
-    }
-    else if(f.typ === 'reihenfolge'){
-      var pm = pruefMischen(f.items.map(function(r, j){ return j; }), rnd);
-      q.items = pm.map(function(j){ return f.items[j]; });
-      L.loesung = f.items.map(function(it, j){ return pm.indexOf(j); });
-      L.anzeige = f.items.join(' → ');
-    }
-    L.typ = f.typ;
-    if(f.typ !== 'diktat') q.punkte = L.punkte;
-    fragen.push(q); loesungen[id] = L;
+    var b = pruefFrageBauen(x.f, x.lv, 'q' + i, katName, bild, rnd);
+    b.q.src = x.i;
+    if(x.um) b.q.als = 'text';
+    fragen.push(b.q); loesungen[b.q.id] = b.L;
   });
+  var bilder = bild.liste;
   return {fragen:fragen, loesungen:loesungen, bilder:bilder};
 }
 
@@ -15606,7 +15637,8 @@ async function pruefEditor(p){
       var zh = document.getElementById('prZiehHint');
       if(zh) zh.textContent = neuZiehen
         ? 'Die Fragen werden beim Speichern so gezogen (Erinnern → Verstehen → Anwenden). Punkte und Bloom-Stufe jeder Frage kannst du danach unter «🧮 Aufgaben & Punkte» ändern.'
-        : 'Die bisher gezogenen Fragen und deine Punkte bleiben. Änderst du oben etwas, wird beim Speichern neu gezogen.';
+        : (c.baukasten ? 'Die im 🧩 Baukasten zusammengestellten Aufgaben bleiben. Änderst du oben etwas, wird beim Speichern neu gezogen und die Zusammenstellung ersetzt.'
+          : 'Die bisher gezogenen Fragen und deine Punkte bleiben. Änderst du oben etwas, wird beim Speichern neu gezogen.');
       maxInfoZeichnen();
     }
     var fsBtn = document.getElementById('prFormStd');
@@ -15769,6 +15801,496 @@ async function pruefAufgabenPunkte(p){
   });
 }
 
+/* ---------- Lehrperson: 🧩 Baukasten ----------
+   Die Prüfung selbst zusammensetzen: Aufgaben aus der Übung einzeln
+   hinzufügen/entfernen/verschieben, pro Aufgabe den Aufgabentyp wählen
+   (wie in der Übung, 🔤 selbst hinschreiben, ☑️ Auswahl, ✍️ frei formulieren)
+   und eigene Aufgaben ergänzen. Nur solange die Prüfung ein Entwurf ist.
+   Gespeichert wird genau wie beim Ziehen: fragen/bilder im Prüfungsdokument,
+   Lösungen in intern/loesung. q.src = Index der Frage in der Übung, q.als =
+   gewählter Typ, q.eigen = eigene Aufgabe (so findet der Baukasten sie wieder). */
+var PRUEF_ALS = [
+  {id:'orig', name:'wie in der Übung'},
+  {id:'text', name:'🔤 selbst hinschreiben'},
+  {id:'mc', name:'☑️ Auswahl (4 Antworten)'},
+  {id:'offen', name:'✍️ frei formulieren'}
+];
+// Kurze Antworten eines Bereichs — Material für falsche Auswahl-Antworten.
+function pruefKurzAntworten(info, kat){
+  var out = [], seen = {};
+  function dazu(t){ t = String(t || '').trim(); var k = pruefNorm(t); if(pruefKurzeAntwort(t) && !seen[k]){ seen[k] = 1; out.push(t); } }
+  // zuerst echte Kurzantworten, dann Antworten aus Auswahl/Zuordnen
+  info.fragen.forEach(function(f){ if(f.kat === kat && f.typ === 'text') dazu((f.loesung || [])[0]); });
+  info.fragen.forEach(function(f){
+    if(f.kat !== kat) return;
+    if(f.typ === 'mc') (f.optionen || []).forEach(dazu);
+    else if(f.typ === 'zuordnen') (f.rechts || []).forEach(dazu);
+  });
+  return out;
+}
+function pruefAntwortText(f){
+  if(f.typ === 'mc') return (f.optionen || [])[f.loesung] || '';
+  if(f.typ === 'text') return (f.loesung || [])[0] || '';
+  if(f.typ === 'offen') return String(f.loesung || '');
+  if(f.typ === 'zahl') return f.loesung ? String(f.loesung.wert).replace('.', ',') + (f.einheit ? ' ' + f.einheit : '') : '';
+  if(f.typ === 'tf') return f.loesung ? 'Wahr' : 'Falsch';
+  return '';
+}
+// Frage f als Typ `als` — Liste von Übungsfragen (Zuordnen → selbst hinschreiben
+// ergibt eine Frage pro Paar), leer = geht bei dieser Frage nicht.
+function pruefAlsTyp(f, als, info, rnd){
+  if(!als || als === 'orig' || als === f.typ) return [f];
+  var basis = {kat:f.kat};
+  if(f.kontext) basis.kontext = f.kontext;
+  if(f.bild) basis.bild = f.bild;
+  if(f.bloom) basis.bloom = f.bloom;
+  var antwort = pruefAntwortText(f);
+  if(als === 'text'){
+    if(f.typ === 'mc' || f.typ === 'zuordnen') return pruefUmwandeln(f);
+    if(f.typ === 'offen' && pruefKurzeAntwort(antwort)) return [Object.assign({}, basis, {typ:'text', frage:f.frage, loesung:pruefVarianten(antwort), locker:true})];
+    return [];
+  }
+  if(als === 'offen'){
+    if(f.typ === 'tf') return [Object.assign({}, basis, {typ:'offen', frage:'Stimmt diese Aussage? Begründe. — ' + f.frage, loesung:antwort})];
+    if(['mc', 'text', 'zahl'].indexOf(f.typ) >= 0 && antwort) return [Object.assign({}, basis, {typ:'offen', frage:f.frage, loesung:antwort})];
+    return [];
+  }
+  if(als === 'mc'){
+    if(['text', 'offen'].indexOf(f.typ) < 0 || !pruefKurzeAntwort(antwort)) return [];
+    var falsch = pruefKurzAntworten(info, f.kat).filter(function(t){ return pruefNorm(t) !== pruefNorm(antwort); });
+    if(falsch.length < 3) return [];
+    var opts = pruefMischen([antwort].concat(pruefMischen(falsch, rnd).slice(0, 3)), rnd);
+    return [Object.assign({}, basis, {typ:'mc', frage:f.frage, optionen:opts, loesung:opts.indexOf(antwort)})];
+  }
+  return [];
+}
+function pruefAlsMoeglich(f, info){
+  var rnd = pruefRng(1);
+  return PRUEF_ALS.filter(function(a){ return a.id === 'orig' || (a.id !== f.typ && pruefAlsTyp(f, a.id, info, rnd).length); });
+}
+// Eigene Aufgabe (im Baukasten geschrieben) → Übungsfrage.
+function pruefEigeneFrage(e){
+  if(e.typ === 'text') return {typ:'text', kat:'eigen', frage:e.frage, loesung:pruefVarianten(e.loesung), locker:true};
+  return {typ:'offen', kat:'eigen', frage:e.frage, loesung:e.loesung};
+}
+
+async function pruefBaukasten(p){
+  if(p.status !== 'entwurf'){ uiInfo('🧩 Baukasten', 'Die Prüfung wurde schon freigegeben – die Aufgaben bleiben, wie sie sind. Punkte lassen sich weiterhin unter «🧮 Aufgaben & Punkte» ändern.'); return; }
+  openModal('<h3>🧩 Baukasten</h3><p class="pr-hinweis">Übung und Lösungen werden geladen …</p>', 'pr-modal pr-modal-breit');
+  var info = null, loes = {};
+  try{ loes = await pruefLoesungLaden(p.id); }catch(err){ console.error(err); }
+  try{ info = await pruefProbe(p.contentId); }catch(err){ console.error(err); }
+  if(!info || info.art !== 'bank') info = {art:'bank', fragen:[], kategorien:[]};
+  var katName = pruefKatNamen(info);
+  var alsName = {}; PRUEF_ALS.forEach(function(a){ alsName[a.id] = a.name; });
+
+  // Bausteine aus der bestehenden Prüfung: {i, f, als, punkte} | {eigen:{typ,frage,loesung}, punkte} | {fix:{q,L}}
+  var bs = [], zuletzt = null;
+  (p.fragen || []).forEach(function(q){
+    var L = loes[q.id] || {}, pk = +q.punkte > 0 ? +q.punkte : (L.punkte || 1);
+    if(q.eigen){ bs.push({eigen:{typ:q.typ, frage:q.frage, loesung:L.typ === 'text' ? (L.anzeige || '') : String(L.loesung || '')}, punkte:pk}); zuletzt = null; return; }
+    var i = q.src != null ? q.src : -1, f = info.fragen[i];
+    if(!f){
+      // ältere Prüfung ohne q.src: über den Fragetext wiederfinden
+      i = info.fragen.findIndex(function(x){ return x.frage === q.frage && (x.typ === q.typ || (q.typ === 'text' && x.typ === 'mc')); });
+      f = info.fragen[i];
+    }
+    if(!f){ bs.push({fix:{q:q, L:L}, punkte:pk}); zuletzt = null; return; }
+    var als = q.als || (q.typ === f.typ ? 'orig' : q.typ);
+    // Zuordnen → selbst hinschreiben: mehrere Fragen, ein Baustein
+    if(zuletzt && zuletzt.i === i && zuletzt.als === als && als !== 'orig') return;
+    zuletzt = {i:i, f:f, als:als, punkte:pk};
+    // Umgewandelte Auswahlfrage genau so behalten, wie sie ist (gleiche falsche Antworten).
+    if(als === 'mc' && f.typ !== 'mc' && q.optionen) zuletzt.v = [Object.assign({}, f, {typ:'mc', frage:q.frage, optionen:q.optionen, loesung:L.loesung})];
+    bs.push(zuletzt);
+  });
+  var filterKat = '', suche = '';
+
+  function bausteinText(b){
+    if(b.eigen) return b.eigen.frage;
+    if(b.fix) return b.fix.q.frage;
+    return b.f.frage || (b.f.links ? 'Zuordnen: ' + b.f.links.slice(0, 3).join(', ') + ' …' : b.f.items ? 'Reihenfolge: ' + b.f.items.slice(0, 3).join(', ') + ' …' : '');
+  }
+  // Umgewandelte Fassungen einmal berechnen und merken — gespeichert wird genau das Angezeigte.
+  function bausteinVarianten(b){
+    if(b.als === 'orig') return [b.f];
+    if(!b.v) b.v = pruefAlsTyp(b.f, b.als, info, pruefRng(Math.floor(Math.random() * 2147483646) + 1));
+    return b.v;
+  }
+  function anzahlFragen(b){ return b.f && b.als === 'text' && b.f.typ === 'zuordnen' ? pruefUmwandeln(b.f).length : 1; }
+  function summe(){ return Math.round(bs.reduce(function(s, b){ return s + b.punkte * anzahlFragen(b); }, 0) * 100) / 100; }
+  function benutzt(){ var u = {}; bs.forEach(function(b){ if(b.f) u[b.i] = 1; }); return u; }
+
+  function listeHtml(){
+    if(!bs.length) return '<div class="empty-state">Noch keine Aufgaben – unten hinzufügen.</div>';
+    return bs.map(function(b, k){
+      var typ;
+      if(b.f){
+        typ = '<select class="modal-input pr-bk-als" data-als="'+k+'">' + pruefAlsMoeglich(b.f, info).map(function(a){
+          return '<option value="'+a.id+'"'+(b.als === a.id ? ' selected' : '')+'>'+esc(a.id === 'orig' ? (PRUEF_TYPEN[b.f.typ] || b.f.typ) + ' (wie Übung)' : a.name)+'</option>';
+        }).join('') + '</select>';
+      } else if(b.eigen){
+        typ = '<select class="modal-input pr-bk-als" data-eigtyp="'+k+'"><option value="offen"'+(b.eigen.typ !== 'text' ? ' selected' : '')+'>✍️ frei formulieren</option><option value="text"'+(b.eigen.typ === 'text' ? ' selected' : '')+'>🔤 selbst hinschreiben</option></select>';
+      } else typ = '<span class="pr-badge">'+esc(PRUEF_TYPEN[b.fix.q.typ] || b.fix.q.typ)+'</span>';
+      var n = anzahlFragen(b), opts = '';
+      if(b.f && b.als === 'mc'){
+        var mv = bausteinVarianten(b)[0];
+        if(mv) opts = '<div class="pr-bk-opts">'+mv.optionen.map(function(o, j){ return j === mv.loesung ? '<b>'+esc(o)+' ✓</b>' : esc(o); }).join(' · ')+
+          ' <button class="btn btn-ghost btn-sm" data-neumisch="'+k+'" type="button" title="andere falsche Antworten">🎲</button></div>';
+      }
+      return '<div class="pr-bk-row"><span class="pr-ap-nr">'+(k+1)+'.</span>'+
+        '<div class="pr-bk-f"><div class="pr-ap-meta">'+typ+'<small>'+esc(b.f ? (katName[b.f.kat] || b.f.kat || '') : b.eigen ? '✏️ eigene Aufgabe' : (b.fix.q.kat || ''))+(n > 1 ? ' · ergibt '+n+' Fragen' : '')+'</small></div>'+
+        '<div>'+esc(bausteinText(b))+'</div>'+opts+'</div>'+
+        '<div class="pr-bk-akt"><label class="pr-ap-p"><input type="number" class="modal-input" data-pk="'+k+'" min="0.5" max="50" step="0.5" value="'+b.punkte+'"><span>P.'+(n > 1 ? ' je' : '')+'</span></label>'+
+        '<span><button class="btn btn-ghost btn-sm" data-hoch="'+k+'" type="button" title="nach oben"'+(k ? '' : ' disabled')+'>↑</button>'+
+        '<button class="btn btn-ghost btn-sm" data-runter="'+k+'" type="button" title="nach unten"'+(k < bs.length - 1 ? '' : ' disabled')+'>↓</button>'+
+        '<button class="btn btn-ghost btn-sm" data-weg="'+k+'" type="button" title="entfernen">✕</button></span></div></div>';
+    }).join('');
+  }
+  function poolHtml(){
+    var u = benutzt(), t = suche.trim().toLowerCase();
+    var liste = info.fragen.map(function(f, i){ return {f:f, i:i}; }).filter(function(x){
+      if(u[x.i] || x.f.typ === 'diktat') return false;
+      if(filterKat && x.f.kat !== filterKat) return false;
+      return !t || JSON.stringify([x.f.frage, x.f.optionen, x.f.links, x.f.rechts, x.f.items, x.f.loesung]).toLowerCase().indexOf(t) >= 0;
+    });
+    if(!info.fragen.length) return '<div class="empty-state">Die Fragen der Übung konnten nicht gelesen werden – eigene Aufgaben gehen trotzdem.</div>';
+    if(!liste.length) return '<div class="empty-state">Keine weiteren Fragen'+(filterKat || t ? ' für diese Auswahl' : '')+'.</div>';
+    return liste.slice(0, 80).map(function(x){
+      return '<div class="pr-bk-pool"><button class="btn btn-ghost btn-sm" data-dazu="'+x.i+'" type="button" title="zur Prüfung">＋</button>'+
+        '<div><span class="pr-badge">'+esc(PRUEF_TYPEN[x.f.typ] || x.f.typ)+'</span> <small>'+esc(katName[x.f.kat] || x.f.kat || '')+' · '+esc(PRUEF_BLOOM.filter(function(bl){ return bl.id === pruefBloom(x.f); }).map(function(bl){ return bl.icon; }).join(''))+'</small><div>'+
+        esc(x.f.frage || (x.f.links ? 'Zuordnen: ' + x.f.links.join(', ') : x.f.items ? 'Reihenfolge: ' + x.f.items.join(', ') : ''))+'</div></div></div>';
+    }).join('') + (liste.length > 80 ? '<p class="pr-hinweis">… und '+(liste.length - 80)+' weitere – mit Bereich oder Suche eingrenzen.</p>' : '');
+  }
+  function zeichnen(){
+    var el = document.getElementById('prBkListe');
+    if(!el) return;
+    el.innerHTML = listeHtml();
+    document.getElementById('prBkPool').innerHTML = poolHtml();
+    document.getElementById('prBkKopf').innerHTML = bs.length + ' Aufgaben · <b>' + pruefZahlText(summe()) + '</b> Punkte';
+  }
+
+  var h = '<h3>🧩 Baukasten: '+esc(p.titel)+'</h3>';
+  h += '<p class="pr-hinweis">Aufgaben zusammenstellen, ordnen und pro Aufgabe den Typ wählen. Die Reihenfolge hier gilt auch für den Druck (online wird sie pro Person gemischt, falls eingestellt).</p>';
+  h += '<p class="pr-hinweis" id="prBkKopf"></p>';
+  h += '<div class="pr-ap" id="prBkListe"></div>';
+  h += '<h4 class="pr-h4">➕ Aufgaben hinzufügen</h4>';
+  h += '<div class="pr-grid2"><select id="prBkKat" class="modal-input"><option value="">Alle Bereiche</option>' + (info.kategorien || []).map(function(k){
+    return '<option value="'+esc(k.id)+'">'+esc(k.name)+'</option>'; }).join('') + '</select>'+
+    '<input type="search" id="prBkSuche" class="modal-input" placeholder="🔍 in den Fragen suchen" autocomplete="off"></div>';
+  h += '<div class="pr-ap pr-bk-poolliste" id="prBkPool"></div>';
+  h += '<details class="pr-bk-eigen"><summary>✏️ Eigene Aufgabe schreiben</summary>'+
+    '<label class="modal-label">Aufgabe</label><textarea id="prBkEF" class="modal-input" rows="2" maxlength="600" placeholder="z. B. Erkläre, warum …"></textarea>'+
+    '<label class="modal-label">Musterlösung</label><textarea id="prBkEL" class="modal-input" rows="2" maxlength="600" placeholder="für die Korrektur und das Lösungsblatt"></textarea>'+
+    '<div class="pr-grid2"><select id="prBkET" class="modal-input"><option value="offen">✍️ frei formulieren</option><option value="text">🔤 selbst hinschreiben (kurz)</option></select>'+
+    '<button class="btn btn-primary btn-sm" id="prBkEDazu" type="button">＋ Hinzufügen</button></div></details>';
+  h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button><button class="btn btn-primary btn-sm" id="modalOk" type="button">Speichern</button></div>';
+  openModal(h, 'pr-modal pr-modal-breit');
+  zeichnen();
+  var host = modalEl.querySelector('.pr-modal');
+  document.getElementById('prBkKat').addEventListener('change', function(){ filterKat = this.value; document.getElementById('prBkPool').innerHTML = poolHtml(); });
+  document.getElementById('prBkSuche').addEventListener('input', function(){ suche = this.value; document.getElementById('prBkPool').innerHTML = poolHtml(); });
+  host.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    var k;
+    if((k = b.getAttribute('data-hoch')) != null){ k = +k; var x = bs[k]; bs[k] = bs[k-1]; bs[k-1] = x; zeichnen(); }
+    else if((k = b.getAttribute('data-runter')) != null){ k = +k; var y = bs[k]; bs[k] = bs[k+1]; bs[k+1] = y; zeichnen(); }
+    else if((k = b.getAttribute('data-weg')) != null){ bs.splice(+k, 1); zeichnen(); }
+    else if((k = b.getAttribute('data-neumisch')) != null){ bs[+k].v = null; zeichnen(); }
+    else if((k = b.getAttribute('data-dazu')) != null){
+      var f = info.fragen[+k];
+      bs.push({i:+k, f:f, als:'orig', punkte:pruefPunkteVorschlag(f)});
+      zeichnen();
+      var liste = document.getElementById('prBkListe'); liste.scrollTop = liste.scrollHeight;
+    }
+    else if(b.id === 'prBkEDazu'){
+      var fr = document.getElementById('prBkEF').value.trim(), lo = document.getElementById('prBkEL').value.trim(), ty = document.getElementById('prBkET').value;
+      if(!fr){ document.getElementById('prBkEF').focus(); return; }
+      if(!lo){ toast('Bitte eine Musterlösung angeben (für Korrektur und Lösungsblatt).'); document.getElementById('prBkEL').focus(); return; }
+      if(ty === 'text' && !pruefKurzeAntwort(lo)){ toast('«Selbst hinschreiben» braucht eine kurze Antwort (höchstens 4 Wörter) – sonst «frei formulieren» wählen.'); return; }
+      bs.push({eigen:{typ:ty, frage:fr, loesung:lo}, punkte:ty === 'text' ? 1 : 2});
+      document.getElementById('prBkEF').value = ''; document.getElementById('prBkEL').value = '';
+      zeichnen();
+    }
+  });
+  host.addEventListener('change', function(e){
+    var k = e.target.getAttribute('data-als');
+    if(k != null){
+      var b = bs[+k]; b.als = e.target.value; b.v = null;
+      var v = bausteinVarianten(b)[0];
+      if(v) b.punkte = pruefPunkteVorschlag(v);
+      zeichnen(); return;
+    }
+    k = e.target.getAttribute('data-eigtyp');
+    if(k != null){
+      var eb = bs[+k];
+      if(e.target.value === 'text' && !pruefKurzeAntwort(eb.eigen.loesung)){ toast('Die Musterlösung ist zu lang für «selbst hinschreiben».'); e.target.value = 'offen'; return; }
+      eb.eigen.typ = e.target.value; zeichnen();
+    }
+  });
+  host.addEventListener('input', function(e){
+    var k = e.target.getAttribute('data-pk');
+    if(k == null) return;
+    var v = Math.round(parseFloat(String(e.target.value).replace(',', '.')) * 2) / 2;
+    if(v > 0){ bs[+k].punkte = v; document.getElementById('prBkKopf').innerHTML = bs.length + ' Aufgaben · <b>' + pruefZahlText(summe()) + '</b> Punkte'; }
+  });
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  document.getElementById('modalOk').addEventListener('click', async function(){
+    if(!bs.length){ toast('Mindestens eine Aufgabe.'); return; }
+    var rnd = pruefRng(p.seed || 1), bild = pruefBildSammler(), fragen = [], loesungen = {};
+    function neu(q, L, punkte){
+      q.id = 'q' + fragen.length; L.punkte = punkte; q.punkte = punkte;
+      fragen.push(q); loesungen[q.id] = L;
+    }
+    bs.forEach(function(b){
+      if(b.fix){
+        var q = JSON.parse(JSON.stringify(b.fix.q)), L = JSON.parse(JSON.stringify(b.fix.L));
+        if(q.bild != null && (p.bilder || [])[q.bild] != null) q.bild = bild.add(p.bilder[q.bild], true); else delete q.bild;
+        neu(q, L, b.punkte); return;
+      }
+      if(b.eigen){
+        var r = pruefFrageBauen(pruefEigeneFrage(b.eigen), null, '', {eigen:'Eigene Aufgabe'}, bild, rnd);
+        r.q.eigen = true;
+        neu(r.q, r.L, b.punkte); return;
+      }
+      bausteinVarianten(b).forEach(function(v){
+        var r = pruefFrageBauen(v, null, '', katName, bild, rnd);
+        r.q.src = b.i; if(b.als !== 'orig') r.q.als = b.als;
+        if(v.locker) r.L.locker = true;
+        neu(r.q, r.L, b.punkte);
+      });
+    });
+    var maxP = Math.round(Object.keys(loesungen).reduce(function(s, id){ return s + loesungen[id].punkte; }, 0) * 100) / 100;
+    var upd = {fragen:fragen, bilder:bild.liste, maxPunkte:maxP, 'cfg.anzahl':fragen.length, 'cfg.baukasten':true};
+    if(JSON.stringify(upd).length > 900000){ toast('Zu viele/zu grosse Aufgaben – bitte weniger wählen.'); return; }
+    this.disabled = true;
+    try{
+      await writeBatch().update(pruefRef(p.id), upd).set(loesRef(p.id), {loesungen:loesungen}).commit();
+      pruef.loes[p.id] = loesungen;
+      closeModal();
+      toast('Prüfung gespeichert: ' + fragen.length + ' Fragen, ' + pruefZahlText(maxP) + ' Punkte.');
+    }catch(err){ this.disabled = false; pruefFehler(err); }
+  });
+}
+
+/* ---------- Lehrperson: 🖨️ Prüfung drucken (PDF / Word) ----------
+   Für Prüfungen auf Papier: Kopf mit Logo, Name/Klasse/Datum/Punkte/Note,
+   nummerierte Aufgaben mit Punkten und Platz zum Schreiben (Linien,
+   Kästchen). Mit «Lösungen» dieselben Seiten mit den Antworten in Rot.
+   PDF: Druckansicht in einem neuen Tab (dort «Drucken / Als PDF sichern»),
+   also kein Druckdialog in der Library selbst. Word: .doc-Datei im
+   MHTML-Format (HTML + Bilder als Teile) — öffnet sich in Word
+   und lässt sich dort weiter bearbeiten; SVG-Bilder werden dafür in PNG
+   umgerechnet. Reihenfolge = gespeicherte Reihenfolge (Baukasten). */
+function pruefDruckDialog(p){
+  openModal('<h3>🖨️ Prüfung drucken</h3>'+
+    '<p class="pr-hinweis">«'+esc(p.titel)+'» auf Papier – zum Schreiben von Hand. Das Lösungsblatt enthält dieselben Seiten mit den Antworten in Rot.</p>'+
+    '<div class="pr-druck">'+
+      '<button class="btn btn-primary btn-sm" data-dr="pdf" type="button">📄 Prüfung als PDF</button>'+
+      '<button class="btn btn-ghost btn-sm" data-dr="word" type="button">📝 Prüfung als Word</button>'+
+      '<button class="btn btn-ghost btn-sm" data-dr="pdf-l" type="button">📄 Lösungsblatt als PDF</button>'+
+      '<button class="btn btn-ghost btn-sm" data-dr="word-l" type="button">📝 Lösungsblatt als Word</button>'+
+    '</div>'+
+    '<p class="pr-hinweis">PDF öffnet eine Druckansicht in einem neuen Tab: dort «Drucken» → «Als PDF sichern» oder direkt drucken. Word lädt eine .doc-Datei herunter, die du noch anpassen kannst.</p>'+
+    '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button></div>');
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  modalEl.querySelectorAll('[data-dr]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var a = b.getAttribute('data-dr'), word = a.indexOf('word') === 0, mitL = /-l$/.test(a);
+      // PDF: Tab sofort öffnen (sonst blockt der Browser das Fenster nach dem Laden).
+      var tab = word ? null : window.open('', '_blank');
+      b.disabled = true;
+      pruefDrucken(p, word, mitL, tab).catch(function(err){
+        console.error(err);
+        if(tab) try{ tab.close(); }catch(e){}
+        toast('Drucken hat nicht geklappt.');
+      }).then(function(){ b.disabled = false; });
+    });
+  });
+}
+function pruefDruckName(p, mitL){
+  return ((p.titel || 'Pruefung') + (mitL ? ' Loesungen' : '')).replace(/[äÄ]/g, 'ae').replace(/[öÖ]/g, 'oe').replace(/[üÜ]/g, 'ue').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') || 'Pruefung';
+}
+function pruefSvgMass(svg){
+  var w = 0, h = 0, m = /viewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(svg);
+  if(m){ w = +m[1]; h = +m[2]; }
+  var mw = /<svg[^>]*\swidth\s*=\s*["']?([\d.]+)(px)?["'\s>]/i.exec(svg), mh = /<svg[^>]*\sheight\s*=\s*["']?([\d.]+)(px)?["'\s>]/i.exec(svg);
+  if(mw && mh){ w = +mw[1]; h = +mh[1]; }
+  if(!(w > 0 && h > 0)){ w = 400; h = 300; }
+  var f = Math.min(1, 420 / w);
+  return {w:Math.round(w * f), h:Math.round(h * f)};
+}
+// SVG → PNG (Base64 ohne Präfix) für Word.
+function pruefSvgPng(svg){
+  var m = pruefSvgMass(svg);
+  if(!/xmlns\s*=/.test(svg)) svg = svg.replace(/<svg\b/i, '<svg xmlns="http://www.w3.org/2000/svg"');
+  return new Promise(function(resolve){
+    var img = new Image();
+    img.onload = function(){
+      try{
+        var c = document.createElement('canvas'), k = 2;
+        c.width = m.w * k; c.height = m.h * k;
+        var ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        resolve({b64:c.toDataURL('image/png').split(',')[1], w:m.w, h:m.h});
+      }catch(e){ console.error(e); resolve(null); }
+    };
+    img.onerror = function(){ resolve(null); };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+}
+function pruefBlobB64(blob){
+  return new Promise(function(resolve, reject){
+    var r = new FileReader();
+    r.onload = function(){ resolve(String(r.result).split(',')[1]); };
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+function pruefUtf8B64(s){
+  var bytes = new TextEncoder().encode(s), bin = '';
+  for(var i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+async function pruefDrucken(p, word, mitL, tab){
+  var loes = {};
+  if(pruefArt(p) === 'bank') loes = await pruefLoesungLaden(p.id);
+  var basis = location.href.replace(/[#?].*$/, '').replace(/[^\/]*$/, '');
+  var teile = [], bildHtml = {};
+  // Bilder: PDF inline als SVG, Word als PNG-Teile der MHTML-Datei.
+  var bilder = p.bilder || [];
+  for(var i = 0; i < bilder.length; i++){
+    if(!word){ var m = pruefSvgMass(bilder[i]); bildHtml[i] = '<div class="bild" style="max-width:'+m.w+'px">'+bilder[i]+'</div>'; continue; }
+    var png = await pruefSvgPng(bilder[i]);
+    if(!png){ bildHtml[i] = ''; continue; }
+    teile.push({name:'bild'+i+'.png', typ:'image/png', b64:png.b64});
+    bildHtml[i] = '<p><img src="bild'+i+'.png" width="'+png.w+'" height="'+png.h+'"></p>';
+  }
+  var logo = basis + 'assets/logo.png';
+  if(word){
+    try{
+      var lb = await (await fetch('assets/logo.png')).blob();
+      teile.push({name:'logo.png', typ:'image/png', b64:await pruefBlobB64(lb)});
+      logo = 'logo.png';
+    }catch(e){ console.error('Logo', e); logo = ''; }
+  }
+  var html = pruefDruckHtml(p, loes, mitL, word, bildHtml, logo);
+  var name = pruefDruckName(p, mitL);
+  if(!word){
+    var url = URL.createObjectURL(new Blob([html], {type:'text/html;charset=utf-8'}));
+    if(tab && !tab.closed) tab.location.href = url; else window.open(url, '_blank');
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 120000);
+    return;
+  }
+  var grenze = '----=_LibraryPruefung_' + Date.now().toString(36), ort = 'file:///C:/Pruefung/';
+  var mht = 'MIME-Version: 1.0\r\nContent-Type: multipart/related; boundary="' + grenze + '"; type="text/html"\r\n\r\n';
+  function teil(typ, loc, b64){
+    return '--' + grenze + '\r\nContent-Type: ' + typ + '\r\nContent-Transfer-Encoding: base64\r\nContent-Location: ' + ort + loc + '\r\n\r\n' + b64.replace(/.{76}/g, '$&\r\n') + '\r\n\r\n';
+  }
+  mht += teil('text/html; charset="utf-8"', 'pruefung.htm', pruefUtf8B64(html));
+  teile.forEach(function(t){ mht += teil(t.typ, t.name, t.b64); });
+  mht += '--' + grenze + '--\r\n';
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([mht], {type:'application/msword'}));
+  a.download = name + '.doc';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 60000);
+  toast('Word-Datei «' + name + '.doc» wird heruntergeladen.');
+}
+
+function pruefDruckHtml(p, loes, mitL, word, bildHtml, logo){
+  var fragen = p.fragen || [], maxP = p.maxPunkte || 0;
+  var leer = word ? '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' : '&nbsp;';   // Word kennt keine Breite für Kästchen
+  function e(t){ return esc(t == null ? '' : String(t)); }
+  function rot(t){ return mitL ? '<span class="l">' + e(t) + '</span>' : ''; }
+  function linien(n, text){
+    var h = '';
+    for(var i = 0; i < n; i++) h += '<p class="linie">' + (i === 0 && mitL && text ? '<span class="l">' + e(text) + '</span>' : '&nbsp;') + '</p>';
+    return h;
+  }
+  var kopf = '<table class="kopf"><tr>' +
+    (logo ? '<td class="logo" rowspan="2"><img src="' + e(logo) + '" width="120" height="66" alt=""></td>' : '') +
+    '<td colspan="2" class="titel">' + e(p.titel) + (mitL ? ' – Lösungen' : '') + '</td></tr><tr><td colspan="2" class="klein">Sekundarschule Altnau' +
+    (+p.zeitMin > 0 ? ' · Zeit: ' + p.zeitMin + ' Minuten' : '') + '</td></tr></table>';
+  kopf += '<table class="felder"><tr><td>Name:</td><td class="f"></td><td>Klasse:</td><td class="f k"></td><td>Datum:</td><td class="f k"></td></tr>' +
+    '<tr><td>' + (p.diktat ? 'Fehler:' : 'Punkte:') + '</td><td class="f">' + (p.diktat ? '' : '<span class="max">von ' + e(pruefZahlText(maxP)) + '</span>') + '</td><td>Note:</td><td class="f k"></td><td>Visum:</td><td class="f k"></td></tr></table>';
+  var body = '';
+  if(p.diktat){
+    var L0 = loes[(fragen[0] || {}).id] || {}, woerter = +p.woerterInfo || 120;
+    body += '<div class="a"><p class="frage"><b>Diktat</b> – schreibe den diktierten Text sauber ab. Achte auf Gross-/Kleinschreibung und Satzzeichen.</p>';
+    if(mitL && L0.text) body += (L0.text || []).map(function(t){ return '<p class="l">' + e(t) + '</p>'; }).join('');
+    else body += linien(Math.max(12, Math.ceil(woerter / 7)), '');
+    body += '</div>';
+  } else fragen.forEach(function(q, n){
+    var L = loes[q.id] || {}, pk = +q.punkte > 0 ? +q.punkte : (L.punkte || 1);
+    var h = '<div class="a"><table class="akopf"><tr><td><b>Aufgabe ' + (n + 1) + '</b>' + (q.kat ? ' <span class="kat">' + e(q.kat) + '</span>' : '') + '</td>' +
+      '<td class="pkt">___ / ' + e(pruefZahlText(pk)) + ' P.</td></tr></table>';
+    if(q.kontext) h += '<p class="kontext">' + e(q.kontext) + '</p>';
+    if(q.bild != null && bildHtml[q.bild]) h += bildHtml[q.bild];
+    if(q.typ === 'tf') h += '<p class="frage">Stimmt die Aussage? Kreuze an.</p><p class="frage"><i>' + e(q.frage) + '</i></p>';
+    else if(q.frage) h += '<p class="frage">' + e(q.frage) + '</p>';
+    if(q.typ === 'mc'){
+      h += (q.optionen || []).map(function(o, i){
+        var ok = mitL && L.loesung === i;
+        return '<p class="opt">' + (ok ? '<span class="l">☒</span>' : '☐') + ' ' + String.fromCharCode(65 + i) + ') ' + (ok ? '<span class="l">' + e(o) + '</span>' : e(o)) + '</p>';
+      }).join('');
+    } else if(q.typ === 'tf'){
+      h += '<p class="opt">' + (mitL && L.loesung === true ? '<span class="l">☒</span>' : '☐') + ' Wahr &nbsp;&nbsp;&nbsp;&nbsp; ' + (mitL && L.loesung === false ? '<span class="l">☒</span>' : '☐') + ' Falsch</p>';
+    } else if(q.typ === 'text'){
+      h += '<p class="linie kurz">' + (mitL ? rot(L.anzeige) : '&nbsp;') + '</p>';
+    } else if(q.typ === 'zahl'){
+      h += '<p class="frage klein">Lösungsweg:</p>' + linien(3, '') + '<p class="linie kurz">Resultat: ' + (mitL ? rot(L.anzeige) : '&nbsp;') + (q.einheit && !mitL ? ' <span class="einheit">' + e(q.einheit) + '</span>' : '') + '</p>';
+    } else if(q.typ === 'offen'){
+      h += linien(pk >= 3 ? 6 : 4, L.anzeige || L.loesung);
+    } else if(q.typ === 'zuordnen'){
+      h += '<p class="frage klein">Schreibe den passenden Buchstaben ins Kästchen.</p><table class="zu"><tr><td class="sp">';
+      h += (q.links || []).map(function(l, i){
+        var bst = mitL && L.loesung ? String.fromCharCode(65 + L.loesung[i]) : '';
+        return '<p><span class="box">' + (bst ? '<span class="l">' + bst + '</span>' : leer) + '</span> ' + e(l) + '</p>';
+      }).join('');
+      h += '</td><td class="sp">' + (q.rechts || []).map(function(r, i){ return '<p><b>' + String.fromCharCode(65 + i) + ')</b> ' + e(r) + '</p>'; }).join('') + '</td></tr></table>';
+    } else if(q.typ === 'reihenfolge'){
+      h += '<p class="frage klein">Nummeriere in der richtigen Reihenfolge (1 = zuerst).</p>';
+      h += (q.items || []).map(function(it, k){
+        var rang = mitL && L.loesung ? L.loesung.indexOf(k) + 1 : 0;
+        return '<p><span class="box">' + (rang ? '<span class="l">' + rang + '</span>' : leer) + '</span> ' + e(it) + '</p>';
+      }).join('');
+    } else {
+      h += linien(3, L.anzeige);
+    }
+    body += h + '</div>';
+  });
+  var css =
+    '@page{size:21cm 29.7cm;margin:1.6cm 1.8cm 1.6cm 1.8cm;}' +
+    (word ? '@page Section1{size:21cm 29.7cm;margin:1.6cm 1.8cm 1.6cm 1.8cm;} div.Section1{page:Section1;}' : '') +
+    'body{font-family:Arial,Helvetica,sans-serif;font-size:11pt;color:#000;background:#fff;margin:0;}' +
+    (word ? '' : '.blatt{max-width:17.4cm;margin:0 auto;padding:16px;} @media print{.blatt{padding:0;} .werkzeug{display:none;}}') +
+    'p{margin:0 0 5pt 0;} table{border-collapse:collapse;}' +
+    '.kopf{width:100%;margin-bottom:8pt;} .kopf td{vertical-align:middle;padding:2pt 4pt;} .kopf .logo{width:130px;}' +
+    '.titel{font-size:17pt;font-weight:bold;} .klein{font-size:9.5pt;color:#444;}' +
+    '.felder{width:100%;margin:0 0 14pt 0;} .felder td{padding:7pt 4pt 2pt 4pt;font-size:10.5pt;white-space:nowrap;} .felder td.f{border-bottom:1px solid #000;width:32%;} .felder td.f.k{width:14%;}' +
+    '.max{color:#555;font-size:9pt;float:right;}' +
+    '.a{margin:0 0 12pt 0;page-break-inside:avoid;break-inside:avoid;} .akopf{width:100%;border-bottom:1.5px solid #000;margin-bottom:5pt;} .akopf td{padding:2pt 0;} .akopf .pkt{text-align:right;white-space:nowrap;font-size:10pt;}' +
+    '.kat{color:#555;font-size:9pt;font-weight:normal;} .kontext{font-size:10pt;color:#333;background:#f3f3f3;padding:4pt 6pt;}' +
+    '.frage{margin:4pt 0 6pt 0;} .frage.klein{font-size:9.5pt;color:#444;} .opt{margin:3pt 0 3pt 12pt;}' +
+    '.linie{border-bottom:1px solid #777;height:22pt;line-height:22pt;margin:0;mso-line-height-rule:exactly;} .linie.kurz{width:60%;}' +
+    '.einheit{color:#555;} .box{display:inline-block;border:1px solid #000;width:18pt;height:15pt;text-align:center;margin-right:6pt;}' +
+    '.zu{width:100%;} .zu td.sp{width:50%;vertical-align:top;padding-right:10pt;}' +
+    '.bild{margin:4pt 0;} .bild svg{width:100%;height:auto;}' +
+    '.l{color:#c00000;font-weight:bold;} p.l{margin:4pt 0;}' +
+    '.werkzeug{position:sticky;top:0;background:#fffbe6;border-bottom:1px solid #e5d58a;padding:10px 16px;font-family:system-ui,sans-serif;font-size:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}' +
+    '.werkzeug button{font:inherit;font-weight:600;padding:7px 14px;border-radius:8px;border:0;background:#4361EE;color:#fff;cursor:pointer;}';
+  var kopfHtml = word
+    ? '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><meta http-equiv="Content-Type" content="text/html; charset=utf-8">' +
+      '<title>' + e(p.titel) + '</title><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'
+    : '<!doctype html><html lang="de-CH"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' + e(p.titel) + (mitL ? ' – Lösungen' : '') + '</title>';
+  var werkzeug = word ? '' : '<div class="werkzeug"><button type="button" onclick="window.print()">🖨️ Drucken / Als PDF sichern</button><span>Tipp: Im Druckdialog «Kopf- und Fusszeilen» ausschalten.</span></div>';
+  return kopfHtml + '<style>' + css + '</style></head><body>' + werkzeug +
+    '<div class="' + (word ? 'Section1' : 'blatt') + '">' + kopf + body + '</div></body></html>';
+}
+
 /* ---------- Lehrperson: Live-Übersicht ---------- */
 
 var pruefRosterCache = {klasse:null, list:null};
@@ -15830,6 +16352,8 @@ function pruefMonitorZeichnen(){
   h += '<button class="btn btn-ghost btn-sm" data-a="vorschau" type="button">👀 Ausprobieren</button>';
   h += '<button class="btn btn-ghost btn-sm" data-a="bearbeiten" type="button">✏️ Bearbeiten</button>';
   if(pruefArt(p) === 'bank' && !p.diktat) h += '<button class="btn btn-ghost btn-sm" data-a="punkte" type="button">🧮 Aufgaben & Punkte</button>';
+  if(pruefArt(p) === 'bank' && !p.diktat && p.status === 'entwurf') h += '<button class="btn btn-ghost btn-sm" data-a="baukasten" type="button">🧩 Baukasten</button>';
+  if(pruefArt(p) === 'bank') h += '<button class="btn btn-ghost btn-sm" data-a="drucken" type="button">🖨️ Drucken (PDF/Word)</button>';
   if(p.status !== 'offen') h += '<button class="btn btn-ghost btn-sm" data-a="loeschen" type="button">🗑 Löschen</button>';
   h += '</div>';
   if(!teil || !roster){ el.innerHTML = h + '<div class="empty-state">Klasse wird geladen …</div>'; pruefMonitorVerdrahten(p); return; }
@@ -15896,6 +16420,8 @@ function pruefMonitorVerdrahten(p){
     else if(a === 'vorschau') pruefStarten(p, false, true);
     else if(a === 'bearbeiten') pruefEditor(p);
     else if(a === 'punkte') pruefAufgabenPunkte(p);
+    else if(a === 'baukasten') pruefBaukasten(p);
+    else if(a === 'drucken') pruefDruckDialog(p);
     else if(a === 'alleEntsperren'){
       var batch = writeBatch();
       Object.keys(teil).forEach(function(uid){ if(teil[uid].status === 'gesperrt') batch.update(teilRef(p.id, uid), {status:'laeuft', aktiv:false, entsperrtAm:serverTimestamp()}); });
