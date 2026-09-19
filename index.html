@@ -1355,6 +1355,8 @@
   .stp-slot.heute{background:color-mix(in srgb, var(--brand) 6%, transparent);}
   .stp-zeit{display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--text-muted);line-height:1.25;border-radius:12px;background:var(--surface-2);padding:4px 2px;}
   .stp-zeit b{font-size:15px;color:var(--text);}
+  .stp-zeit.extra{background:color-mix(in srgb, #D97706 12%, var(--surface-2));}
+  .stp-doppel-check{margin:10px 0 0;background:var(--surface-2);font-weight:600;}
   .stp-pause{grid-column:1/-1;text-align:center;font-size:11.5px;font-weight:700;color:var(--text-muted);padding:1px 0;background:repeating-linear-gradient(90deg, var(--border) 0 6px, transparent 6px 12px) center/100% 1px no-repeat;}
   .stp-pause.mittag{padding:6px 0;font-size:12.5px;}
   .stp-cell{--c:#94A3B8;position:relative;flex:1;min-width:0;min-height:60px;display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:12px;text-align:left;cursor:default;
@@ -11425,6 +11427,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-19-stundenplan-doppel', datum:'2026-09-19', fuer:'alle', text:'⏩ Stundenplan: Doppellektionen mit einem Häkchen eintragen. Bei WAH mit Kochen kommen die Lektionen über Mittag bzw. am Abend nach 16:55 automatisch dazu.'},
   {id:'2026-09-19-klassenzimmer-anordnen', datum:'2026-09-19', fuer:'lehrer', text:'🏫 Klassenzimmer: Die Werkzeuge lassen sich jetzt wie die Startseite anordnen – lange drücken oder «✏️ Anordnen», ziehen, mit «−» ausblenden. Zurückholen unter ⚙️ Einstellungen › 🧩 Widgets › Klassenzimmer.'},
   {id:'2026-09-19-stundenplan-von-mir', datum:'2026-09-19', fuer:'lehrer', text:'📋 Stundenplan › Klasse › Bearbeiten: «Aus meinem Plan» übernimmt deine Lektionen mit dieser Klasse (oder ohne Klasse) aus deinem persönlichen Plan in den Klassenplan – danach frei anpassbar.'},
   {id:'2026-09-19-stundenplan-klasse', datum:'2026-09-19', fuer:'lehrer', text:'👥 Persönlicher Stundenplan: Pro Lektion lässt sich jetzt die Klasse auswählen (E1a–G3b); sie erscheint in der Lektion und im «Jetzt/Danach» auf der Startseite.'},
@@ -15414,6 +15417,28 @@ function stpZeitenAktuell(z){
   if(z && STP_ZEITEN_ALT.indexOf(z.map(function(x){ return x.von+'-'+x.bis; }).join(',')) >= 0) return STP_ZEITEN_STANDARD;
   return z || null;
 }
+// Zusatzlektionen (z. B. Kochen in WAH): über Mittag und nach Schulschluss. Keys 'tag-m1' usw.;
+// die Zeilen erscheinen nur, wenn an irgendeinem Tag etwas drinsteht.
+var STP_EXTRA = [
+  {s:'m1', von:'11:50', bis:'12:35'}, {s:'m2', von:'12:40', bis:'13:25'},
+  {s:'a1', von:'17:00', bis:'17:45'}, {s:'a2', von:'17:50', bis:'18:35'}
+];
+function stpBelegt(plan, sl){ return [0,1,2,3,4].some(function(t){ return !stpLeer(plan.zelle(stpKey(t, sl))); }); }
+// Alle anzuzeigenden Zeilen, nach Zeit sortiert: {s (Index oder Zusatz-ID), von, bis, nr, extra}
+function stpZeilen(plan){
+  var rows = plan.zeiten.map(function(z, i){ return {s:i, von:z.von, bis:z.bis, nr:String(i+1)}; });
+  STP_EXTRA.forEach(function(x){ if(stpBelegt(plan, x.s)) rows.push({s:x.s, von:x.von, bis:x.bis, nr:'＋', extra:true}); });
+  rows.sort(function(a, b){ return stpMin(a.von) - stpMin(b.von); });
+  return rows;
+}
+// Zusatzlektionen direkt nach Lektion k (Index), wenn danach Mittag oder Schulschluss kommt.
+function stpKochSlots(zeiten, k){
+  if(!zeiten[k]) return [];
+  var ende = stpMin(zeiten[k].bis), naechste = zeiten[k+1] ? stpMin(zeiten[k+1].von) : 24*60;
+  if(naechste - ende < 40) return [];
+  return STP_EXTRA.filter(function(x){ return stpMin(x.von) >= ende && stpMin(x.bis) <= naechste; });
+}
+
 // Klassen fürs Feld «Klasse» im persönlichen Plan der Lehrperson (kl).
 var STP_KLASSEN = ['E1a','E1b','E1c','G1a','G1b','E2a','E2b','E2c','G2a','G2b','E3a','E3b','G3a','G3b'];
 var STP_FREI_FARBEN = ['#0EA5E9','#F43F5E','#14B8A6','#F59E0B','#6366F1','#84CC16','#EC4899','#64748B'];
@@ -15511,14 +15536,15 @@ function stpZeichnen(){
       ? (stp.ansicht === 'klasse' ? 'Tippe auf eine Lektion, um den Grobstundenplan der Klasse '+esc(state.klasse)+' zu füllen. Die Schüler:innen können danach ihre eigenen Freilektionen eintragen.' : 'Tippe auf eine Lektion, um deinen persönlichen Stundenplan zu füllen. Nur du siehst ihn.')
       : 'Tippe auf eine Lektion, um sie für dich zu ändern (z. B. 🌴 Freilektion). Nur du siehst deine Änderungen.')+'</div>';
   }
-  var hatWas = zeiten.some(function(z, i){ return [0,1,2,3,4].some(function(t){ return !stpLeer(plan.zelle(stpKey(t,i))); }); });
+  var zeilen = stpZeilen(plan);
+  var hatWas = zeilen.some(function(r){ return stpBelegt(plan, r.s); });
   if(!hatWas && !stp.bearbeiten){
     h += '<div class="stp-leerplan"><div class="stp-leer-emoji">🗓️</div><b>Noch leer.</b><br>'+
       (lehrer ? 'Mit «✏️ Bearbeiten» füllst du '+(stp.ansicht==='klasse'?'den Plan der Klasse':'deinen Plan')+'.' : 'Sobald deine Lehrperson den Stundenplan eingetragen hat, erscheint er hier.')+'</div>';
   }
 
-  function zelle(tag, i){
-    var key = stpKey(tag, i), c = plan.zelle(key), info = stpInfo(c), z = zeiten[i];
+  function zelle(tag, z){
+    var key = stpKey(tag, z.s), c = plan.zelle(key), info = stpInfo(c);
     var istJetzt = tag === heute && jetzt >= stpMin(z.von) && jetzt < stpMin(z.bis) && !stpLeer(c) && !c.frei;
     var eigen = plan.eigen && plan.eigen(key);
     var cls = 'stp-cell' + (info ? '' : (c && c.frei ? ' frei' : ' leer')) + (istJetzt ? ' jetzt' : '') + (eigen ? ' eigen' : '') + (stp.bearbeiten ? ' edit' : '') + (info && info.fachId && !stp.bearbeiten ? ' link' : '');
@@ -15539,30 +15565,30 @@ function stpZeichnen(){
     if(eigen) inner += '<span class="stp-eigen-tag" title="Von dir geändert">✎</span>';
     return '<button type="button" class="'+cls+'"'+st+' data-k="'+key+'">'+inner+'</button>';
   }
-  function pause(i){
-    if(i === 0) return '';
-    var gap = stpMin(zeiten[i].von) - stpMin(zeiten[i-1].bis);
+  function pause(j){
+    if(j === 0) return '';
+    var gap = stpMin(zeilen[j].von) - stpMin(zeilen[j-1].bis);
     if(gap >= 40) return '<div class="stp-pause mittag">🍽️ Mittag</div>';
     if(gap >= 15) return '<div class="stp-pause">☕ Pause</div>';
     return '';
   }
-  function zeit(i){ return '<div class="stp-zeit"><b>'+(i+1)+'</b><span>'+esc(zeiten[i].von)+'</span><span>'+esc(zeiten[i].bis)+'</span></div>'; }
+  function zeit(z){ return '<div class="stp-zeit'+(z.extra?' extra':'')+'"'+(z.extra?' title="Zusatzlektion"':'')+'><b>'+z.nr+'</b><span>'+esc(z.von)+'</span><span>'+esc(z.bis)+'</span></div>'; }
 
   if(schmal){
     h += '<div class="stp-tagwahl">'+STP_TAGE.map(function(t, d){
       return '<button type="button" class="stp-tagchip'+(d===stp.tag?' on':'')+(d===heute?' heute':'')+'" style="--tc:'+STP_TAG_FARBEN[d]+'" data-tag="'+d+'">'+t+'</button>';
     }).join('')+'</div>';
     h += '<div class="stp-tagliste">';
-    zeiten.forEach(function(z, i){ h += pause(i) + '<div class="stp-zeile">'+zeit(i)+zelle(stp.tag, i)+'</div>'; });
+    zeilen.forEach(function(z, j){ h += pause(j) + '<div class="stp-zeile">'+zeit(z)+zelle(stp.tag, z)+'</div>'; });
     h += '</div>';
   } else {
     h += '<div class="stp-grid">';
     h += '<div class="stp-ecke"></div>';
     STP_TAGE_LANG.forEach(function(t, d){ h += '<div class="stp-tag'+(d===heute?' heute':'')+'" style="--tc:'+STP_TAG_FARBEN[d]+'">'+t+(d===heute?' <small>heute</small>':'')+'</div>'; });
-    zeiten.forEach(function(z, i){
-      h += pause(i);
-      h += zeit(i);
-      for(var d = 0; d < 5; d++) h += '<div class="stp-slot'+(d===heute?' heute':'')+'">'+zelle(d, i)+'</div>';
+    zeilen.forEach(function(z, j){
+      h += pause(j);
+      h += zeit(z);
+      for(var d = 0; d < 5; d++) h += '<div class="stp-slot'+(d===heute?' heute':'')+'">'+zelle(d, z)+'</div>';
     });
     h += '</div>';
   }
@@ -15649,13 +15675,21 @@ function stpZelleBearbeiten(key){
   var lehrer = state.profile.role === 'teacher';
   var ansicht = stp.ansicht;
   var plan = stpPlan(ansicht);
-  var teile = key.split('-'), tag = +teile[0], i = +teile[1], z = plan.zeiten[i];
+  var teile = key.split('-'), tag = +teile[0];
+  var extra = STP_EXTRA.find(function(x){ return x.s === teile[1]; });
+  var i = extra ? -1 : +teile[1], z = extra || plan.zeiten[i];
   var c = plan.zelle(key) || {};
+  // Doppellektion: gleiche Lektion auch in die nächste; Kochen (WAH) zusätzlich
+  // die zwei Zusatzlektionen über Mittag bzw. nach Schulschluss.
+  var naechsteZ = !extra && plan.zeiten[i+1] ? plan.zeiten[i+1] : null;
+  var kochSlots = naechsteZ ? stpKochSlots(plan.zeiten, i+1) : [];
+  var istDoppel = !!naechsteZ && !stpLeer(c) && stpGleich(c, plan.zelle(stpKey(tag, i+1)));
+  var istKochen = istDoppel && kochSlots.length > 0 && kochSlots.every(function(x){ return stpGleich(c, plan.zelle(stpKey(tag, x.s))); });
   var schuelerEigen = !lehrer && plan.eigen && plan.eigen(key);
   var klassenZelle = stp.klasse.zellen[key];
   var fSel = c.f ? c.f : (c.t ? '__andere' : '');
   var q = function(v){ return esc(v || '').replace(/"/g, '&quot;'); };
-  var h = '<h3>'+STP_TAGE_LANG[tag]+' · '+(i+1)+'. Lektion</h3>';
+  var h = '<h3>'+STP_TAGE_LANG[tag]+' · '+(extra ? 'Zusatzlektion' : (i+1)+'. Lektion')+'</h3>';
   h += '<p style="margin:-4px 0 12px;color:var(--text-muted);font-size:13px;">'+esc(z.von)+' – '+esc(z.bis)+
        (!lehrer && !stpLeer(klassenZelle) ? ' · Klassenplan: <b>'+esc((stpInfo(klassenZelle)||{name:'Frei'}).name)+'</b>' : '')+'</p>';
   if(!lehrer) h += '<label class="stp-frei-check"><input type="checkbox" id="stpFrei"'+(c.frei?' checked':'')+'> 🌴 Hier habe ich frei (Freilektion)</label>';
@@ -15672,13 +15706,28 @@ function stpZelleBearbeiten(key){
          : '<div><label class="modal-label">Lehrperson</label><input type="text" id="stpLp" maxlength="40" placeholder="z. B. Helfenberger" value="'+q(c.lp)+'"></div>')+
        '</div>';
   h += '</div>';
+  if(naechsteZ){
+    h += '<label class="stp-frei-check stp-doppel-check"><input type="checkbox" id="stpDoppel"'+(istDoppel?' checked':'')+'> ⏩ Doppellektion (auch '+(i+2)+'. Lektion, '+esc(naechsteZ.von)+' – '+esc(naechsteZ.bis)+')</label>';
+    if(kochSlots.length){
+      var kochVon = kochSlots[0].von, kochBis = kochSlots[kochSlots.length-1].bis;
+      h += '<label class="stp-frei-check stp-doppel-check"><input type="checkbox" id="stpKochen"'+(istKochen?' checked':'')+'> 🍳 Kochen: '+kochSlots.length+' Lektionen '+
+           (plan.zeiten[i+2] ? 'über Mittag' : 'am Abend')+' dazu ('+esc(kochVon)+' – '+esc(kochBis)+')</label>';
+    }
+  }
   h += '<div class="modal-actions">';
   if(schuelerEigen) h += '<button class="btn btn-ghost btn-sm" id="stpReset" type="button" title="Eigene Änderung verwerfen">↺ Wie Klassenplan</button>';
   h += '<button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button>'+
        '<button class="btn btn-primary btn-sm" id="modalOk" type="button">Speichern</button></div>';
   openModal(h);
   var fach = document.getElementById('stpFach'), text = document.getElementById('stpText');
-  fach.addEventListener('change', function(){ text.hidden = fach.value !== '__andere'; if(!text.hidden) text.focus(); });
+  var doppelEl = document.getElementById('stpDoppel'), kochenEl = document.getElementById('stpKochen');
+  fach.addEventListener('change', function(){
+    text.hidden = fach.value !== '__andere'; if(!text.hidden) text.focus();
+    // WAH direkt vor Mittag/Schulschluss ist meist Kochen -> gleich vorschlagen.
+    if(fach.value === 'wah' && kochenEl){ kochenEl.checked = true; doppelEl.checked = true; }
+  });
+  if(kochenEl) kochenEl.addEventListener('change', function(){ if(kochenEl.checked) doppelEl.checked = true; });
+  if(doppelEl) doppelEl.addEventListener('change', function(){ if(!doppelEl.checked && kochenEl) kochenEl.checked = false; });
   var frei = document.getElementById('stpFrei');
   if(frei) frei.addEventListener('change', function(){ document.getElementById('stpFelder').hidden = frei.checked; });
   document.getElementById('modalCancel').addEventListener('click', closeModal);
@@ -15700,18 +15749,23 @@ function stpZelleBearbeiten(key){
       if(klEl && klEl.value) neu.kl = klEl.value;
     }
     closeModal();
-    if(ansicht === 'klasse'){
-      if(stpLeer(neu)) delete stp.klasse.zellen[key]; else stp.klasse.zellen[key] = neu;
-      stpSpeichern('klasse');
-    } else if(lehrer){
-      if(stpLeer(neu)) delete stp.eigen.zellen[key]; else stp.eigen.zellen[key] = neu;
-      stpSpeichern('mein');
-    } else {
-      // Gleich wie der Klassenplan -> keine eigene Abweichung speichern.
-      if(stpGleich(neu, klassenZelle) || (stpLeer(neu) && stpLeer(klassenZelle))) delete stp.eigen.zellen[key];
-      else stp.eigen.zellen[key] = neu;
-      stpSpeichern('mein');
-    }
+    var keys = [key];
+    if(doppelEl && doppelEl.checked) keys.push(stpKey(tag, i+1));
+    if(kochenEl && kochenEl.checked) kochSlots.forEach(function(x){ keys.push(stpKey(tag, x.s)); });
+    keys.forEach(function(k){
+      var n = JSON.parse(JSON.stringify(neu));
+      if(ansicht === 'klasse'){
+        if(stpLeer(n)) delete stp.klasse.zellen[k]; else stp.klasse.zellen[k] = n;
+      } else if(lehrer){
+        if(stpLeer(n)) delete stp.eigen.zellen[k]; else stp.eigen.zellen[k] = n;
+      } else {
+        // Gleich wie der Klassenplan -> keine eigene Abweichung speichern.
+        var kz = stp.klasse.zellen[k];
+        if(stpGleich(n, kz) || (stpLeer(n) && stpLeer(kz))) delete stp.eigen.zellen[k];
+        else stp.eigen.zellen[k] = n;
+      }
+    });
+    stpSpeichern(ansicht === 'klasse' ? 'klasse' : 'mein');
   });
 }
 
@@ -15757,8 +15811,8 @@ function stpZeitenBearbeiten(){
 
 // Startseiten-Widget «Jetzt / Als Nächstes».
 function stpNaechste(){
-  var plan = stpPlan('mein'), zeiten = plan.zeiten, heute = stpHeute(), jetzt = stpJetztMin();
-  function lektion(tag, i){ var c = plan.zelle(stpKey(tag, i)); var info = stpInfo(c); return info ? {tag:tag, i:i, c:c, info:info, z:zeiten[i]} : null; }
+  var plan = stpPlan('mein'), zeiten = stpZeilen(plan), heute = stpHeute(), jetzt = stpJetztMin();
+  function lektion(tag, i){ var z = zeiten[i], c = plan.zelle(stpKey(tag, z.s)); var info = stpInfo(c); return info ? {tag:tag, i:i, c:c, info:info, z:z} : null; }
   var aktuell = null, danach = null;
   if(heute >= 0){
     for(var i = 0; i < zeiten.length; i++){
