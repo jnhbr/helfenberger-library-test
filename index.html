@@ -11422,6 +11422,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-19-stundenplan-von-mir', datum:'2026-09-19', fuer:'lehrer', text:'📋 Stundenplan › Klasse › Bearbeiten: «Aus meinem Plan» übernimmt deine Lektionen mit dieser Klasse (oder ohne Klasse) aus deinem persönlichen Plan in den Klassenplan – danach frei anpassbar.'},
   {id:'2026-09-19-stundenplan-klasse', datum:'2026-09-19', fuer:'lehrer', text:'👥 Persönlicher Stundenplan: Pro Lektion lässt sich jetzt die Klasse auswählen (E1a–G3b); sie erscheint in der Lektion und im «Jetzt/Danach» auf der Startseite.'},
   {id:'2026-09-19-material-menu', datum:'2026-09-19', fuer:'alle', text:'📎 Hat eine Hausaufgabe mehrere Übungen oder PDFs, sind sie jetzt ordentlich unter «Material» zusammengefasst – draufklicken zum Aufklappen.'},
   {id:'2026-09-19-morgenpause', datum:'2026-09-19', fuer:'alle', text:'🗓️ Stundenplan korrigiert: Die Morgenpause ist nach der 3. Lektion (09:55–10:10). Die 3. Lektion dauert darum 09:10–09:55.'},
@@ -15478,6 +15479,7 @@ function stpZeichnen(){
   h += '<div class="stp-tools-r">';
   if(darf && stp.bearbeiten && lehrer) h += '<button class="btn btn-ghost btn-sm" type="button" id="stpZeitenBtn">⏰ Lektionszeiten</button>';
   if(darf && lehrer && stp.bearbeiten && stp.ansicht === 'mein') h += '<button class="btn btn-ghost btn-sm" type="button" id="stpKopieBtn" title="Klassenplan als Vorlage übernehmen">📋 Aus Klassenplan</button>';
+  if(darf && lehrer && stp.bearbeiten && stp.ansicht === 'klasse') h += '<button class="btn btn-ghost btn-sm" type="button" id="stpVonMirBtn" title="Deine Lektionen mit dieser Klasse in den Klassenplan übernehmen">📋 Aus meinem Plan</button>';
   if(darf) h += '<button class="btn '+(stp.bearbeiten?'btn-primary':'btn-ghost')+' btn-sm" type="button" id="stpEditBtn">'+(stp.bearbeiten?'✅ Fertig':'✏️ Bearbeiten')+'</button>';
   h += '</div></div>';
 
@@ -15559,6 +15561,26 @@ function stpZeichnen(){
     uiConfirm('Klassenplan übernehmen?', 'Dein persönlicher Plan wird durch den Plan der Klasse '+state.klasse+' ersetzt. Danach kannst du ihn anpassen.', 'Übernehmen', function(){
       stp.eigen = { zeiten: stp.klasse.zeiten ? stp.klasse.zeiten.slice() : null, zellen: JSON.parse(JSON.stringify(stp.klasse.zellen)) };
       stpSpeichern('mein');
+    });
+  });
+  // Umgekehrte Richtung: Lektionen aus dem persönlichen Plan, die mit dieser
+  // Klasse markiert sind (oder ohne Klasse), in den Klassenplan übernehmen.
+  // Nur diese Lektionen werden überschrieben, der Rest des Klassenplans bleibt.
+  var vb = document.getElementById('stpVonMirBtn');
+  if(vb) vb.addEventListener('click', function(){
+    var zellen = stp.eigen.zellen || {};
+    var keys = Object.keys(zellen).filter(function(k){ var c = zellen[k]; return !stpLeer(c) && !c.frei && (!c.kl || c.kl === state.klasse); });
+    if(!keys.length){ uiInfo('Nichts zu übernehmen', 'In «Mein Stundenplan» gibt es keine Lektionen mit der Klasse '+state.klasse+' (oder ohne Klasse).'); return; }
+    uiConfirm('Aus meinem Plan übernehmen?', keys.length+(keys.length===1?' Lektion':' Lektionen')+' aus deinem persönlichen Plan (Klasse '+state.klasse+' oder ohne Klasse) kommen in den Plan der Klasse '+state.klasse+'. Andere Lektionen im Klassenplan bleiben. Danach kannst du ihn anpassen.', 'Übernehmen', function(){
+      keys.forEach(function(k){
+        var neu = JSON.parse(JSON.stringify(zellen[k]));
+        delete neu.kl;
+        var alt = stp.klasse.zellen[k];
+        if(!neu.lp && alt && alt.lp) neu.lp = alt.lp;
+        stp.klasse.zellen[k] = neu;
+      });
+      if(!stp.klasse.zeiten && stp.eigen.zeiten) stp.klasse.zeiten = stp.eigen.zeiten.slice();
+      stpSpeichern('klasse');
     });
   });
   Array.prototype.forEach.call(body.querySelectorAll('.stp-cell'), function(b){
