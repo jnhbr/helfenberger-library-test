@@ -1297,6 +1297,36 @@
     .sk-res{flex-direction:column;align-items:flex-start;}
     .sk-lv-row{grid-template-columns:1fr;}
   }
+  .sk-tempo.an{background:var(--brand);color:var(--brand-contrast);}
+  .sk-best{font-size:13.5px;}
+  .sk-ziel{display:flex;align-items:center;gap:12px;margin-top:12px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--surface-2);font-size:14px;}
+  .sk-ziel small{display:block;color:var(--text-muted);font-size:12.5px;margin-top:2px;}
+  .sk-ziel.fertig{background:var(--good-soft);}
+  .sk-ziel-wahl{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
+  .sk-ziel-wahl select{width:auto;margin:0;padding:4px 8px;}
+  .sk-ring{flex-shrink:0;}
+  .sk-ring-bg{fill:none;stroke:var(--border);stroke-width:6;}
+  .sk-ring-fg{fill:none;stroke:var(--good);stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset .6s ease;}
+  .sk-fest{position:fixed;inset:0;z-index:5000;display:flex;align-items:center;justify-content:center;background:rgba(10,20,40,.45);overflow:hidden;animation:skFade .25s ease;}
+  .sk-fest.weg{opacity:0;transition:opacity .3s;}
+  .sk-fest-karte{position:relative;background:var(--surface);color:var(--text);border-radius:var(--radius);padding:26px 30px 20px;max-width:380px;margin:16px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:skPop .5s cubic-bezier(.2,1.6,.4,1);}
+  .sk-fest-karte h2{margin:6px 0 8px;}
+  .sk-fest-karte p{margin:0 0 16px;line-height:1.5;color:var(--text-muted);}
+  .sk-fest-icon{font-size:60px;animation:skHuepf 1s ease-in-out infinite alternate;}
+  .sk-konfetti{position:absolute;top:-40px;font-size:22px;font-weight:900;animation:skFall linear forwards;pointer-events:none;}
+  @keyframes skFall{to{transform:translate(var(--dx),110vh) rotate(var(--rot));}}
+  @keyframes skPop{from{transform:scale(.5);opacity:0;}to{transform:scale(1);opacity:1;}}
+  @keyframes skHuepf{from{transform:translateY(0);}to{transform:translateY(-8px);}}
+  @keyframes skFade{from{opacity:0;}to{opacity:1;}}
+  @media (prefers-reduced-motion:reduce){ .sk-konfetti{display:none;} .sk-fest-icon,.sk-fest-karte{animation:none;} }
+  .sk-ueb{display:flex;flex-direction:column;gap:4px;max-height:56vh;overflow:auto;}
+  .sk-ueb-row{display:grid;grid-template-columns:minmax(120px,1.6fr) .9fr .7fr 1.5fr .8fr .8fr .7fr;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;background:var(--surface);}
+  .sk-ueb-row.ziel{background:var(--good-soft);border-color:var(--good);}
+  .sk-ueb-row small{color:var(--text-muted);font-size:11.5px;}
+  .sk-ueb-kopf{font-size:11.5px;font-weight:700;color:var(--text-muted);background:none;border:0;position:sticky;top:0;background:var(--surface);z-index:1;}
+  .sk-ueb-woche{display:flex;align-items:center;gap:6px;}
+  .sk-ueb-woche small{display:block;}
+  @media (max-width:640px){ .sk-ueb-row{grid-template-columns:1fr 1fr;} .sk-ueb-kopf{display:none;} .sk-ziel{flex-wrap:wrap;} }
   .noten-sikore{margin:4px 0 8px;border:1px dashed var(--border);border-radius:8px;background:var(--surface-2);}
   .noten-sikore > summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;padding:7px 10px;font-weight:600;font-size:14px;}
   .noten-sikore > summary::-webkit-details-marker{display:none;}
@@ -12572,6 +12602,8 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-19-sikore-ziel-tempo', datum:'2026-09-19', fuer:'alle', text:'🧮 SIKORE-Trainer: Neu mit 🎯 Wochenziel (fehlerfreie Reihen pro Woche, Ziel selbst wählbar) und ⏱ Tempo-Modus – eine Reihe gegen die Uhr, deine Bestzeit pro Level wird gespeichert. Steigst du nach einer SIKORE-Prüfung ein Level auf, wird gefeiert! 🎉'},
+  {id:'2026-09-19-sikore-uebersicht-lp', datum:'2026-09-19', fuer:'lehrer', text:'📊 SIKORE-Übersicht (im SIKORE-Trainer oder unter Prüfungen): pro Schüler:in aktuelles Level mit Auf-/Abstieg, auf welchem Level geübt wird, Wochenziel, Total und Bestzeit.'},
   {id:'2026-09-19-sikore', datum:'2026-09-19', fuer:'alle', text:'🧮 Neu in Mathe: der Ordner «SIKORE – Sicher Kopfrechnen». Dort rechnest du Kettenrechnungen auf deinem Level – immer wieder neue. Am Zeilenende hilft dir die Quersumme, mit «Kontrollieren» siehst du sofort, was stimmt. Deine SIKORE-Noten findest du im 🎶 Notenrechner unter Mathematik in einem eigenen Pulldown.'},
   {id:'2026-09-19-sikore-lp', datum:'2026-09-19', fuer:'lehrer', text:'🧮 Prüfungen › «Neue SIKORE-Prüfung»: Alle aus der Matheklasse erscheinen mit einem Level (1–39). Ab dem zweiten Mal schlägt die Library das Level vor: Note unter 4 → eins tiefer, über 5 → eins höher. Online im Prüfungsmodus (für jede Person eigene Reihen, automatisch korrigiert, Folgefehler wählbar) oder auf Papier (Blätter pro Person drucken, Anzahl Richtige eintragen). Reihen, Länge, Zeit, Massstab und Gewichtung frei einstellbar.'},
   {id:'2026-09-19-passwort-anfrage', datum:'2026-09-19', fuer:'lehrer', text:'🔑 Passwort vergessen? ⚙️ Einstellungen → «Passwort einer Schüler:in zurücksetzen»: Anfrage stellen – sobald das neue Passwort gesetzt ist, steht es dort (und du bekommst beim Anmelden einen Hinweis).'},
@@ -15546,6 +15578,10 @@ function pruefResultatZeigen(p){
   try{ localStorage.setItem(pruefGesehenKey(p.id), '1'); }catch(e){}
   updatePruefungBanner();
   var note = pruefNote(p, t.punkte, t.max);
+  if(pruefArt(p) === 'sikore' && p.levels && p.levels[state.user.uid]){
+    var skAlt = +p.levels[state.user.uid];
+    setTimeout(function(){ sikoreAufstiegFeiern(p.id, skAlt, sikoreNaechstes(skAlt, note)); }, 400);
+  }
   var h = '<h3>📝 '+esc(p.titel)+'</h3>';
   h += '<div class="pr-resultat"><div><span>Note</span><b>'+pruefNoteText(note)+'</b></div><div><span>'+pruefPunkteLabel(p)+'</span><b>'+esc(pruefPunkteWert(p, t.punkte, t.max))+'</b></div></div>';
   h += pruefDetailsHtml(t.details || [], false);
@@ -15567,12 +15603,13 @@ function renderPruefungen(){
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
   html += '<h2 class="page-welcome" style="margin-bottom:6px;">📝 Prüfungen</h2>';
   html += '<p class="kz-intro">Online-Prüfung aus einer Übung. Die Bereiche kommen aus der Übung selbst (z.B. die Themen einer Prüfungsvorbereitung). Wer die Prüfung verlässt, wird gesperrt, bis du entsperrst.</p>';
-  html += '<div class="back-row"><button class="btn btn-primary btn-sm" id="prNeu" type="button">➕ Neue Prüfung</button><button class="btn btn-ghost btn-sm" id="prNeuSikore" type="button">🧮 Neue SIKORE-Prüfung</button></div>';
+  html += '<div class="back-row"><button class="btn btn-primary btn-sm" id="prNeu" type="button">➕ Neue Prüfung</button><button class="btn btn-ghost btn-sm" id="prNeuSikore" type="button">🧮 Neue SIKORE-Prüfung</button><button class="btn btn-ghost btn-sm" id="prSikoreUeb" type="button">📊 SIKORE-Übersicht</button></div>';
   html += '<div id="prListe"><div class="empty-state">Wird geladen …</div></div>';
   renderChrome(html);
   document.getElementById('backBtn').addEventListener('click', function(){ state.route = {name:'klassenzimmer'}; render(); });
   document.getElementById('prNeu').addEventListener('click', function(){ pruefEditor(null); });
   document.getElementById('prNeuSikore').addEventListener('click', function(){ sikoreEditor(null); });
+  document.getElementById('prSikoreUeb').addEventListener('click', sikoreUebersicht);
   startPruefungWatcher();
   pruefListeZeichnen();
 }
@@ -17186,7 +17223,7 @@ var sikoreT = null;
 function renderSikoreTrainer(r){
   var s = subjectById(r.subject);
   var gemerkt = +lsGet('libsikore_level') || 0;
-  sikoreT = {level:gemerkt || 1, eigen:null, reihen:+lsGet('libsikore_reihen') || 1, laenge:12, seed:0, data:null, ans:{}, erg:null, t0:null};
+  sikoreT = {level:gemerkt || 1, eigen:null, reihen:+lsGet('libsikore_reihen') || 1, laenge:12, seed:0, data:null, ans:{}, erg:null, t0:null, tempo:lsGet('libsikore_tempo') === '1', stats:null};
   var html = '<div class="sk-wrap">';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn">&larr; '+esc(s ? s.name : 'Mathe')+'</button></div>';
   html += '<div class="sk-hero"><div class="sk-hero-deko" aria-hidden="true"><span>+</span><span>−</span><span>·</span><span>:</span><span>=</span><span>∑</span></div>'+
@@ -17195,8 +17232,10 @@ function renderSikoreTrainer(r){
   html += '<div class="sk-panel"><div class="sk-panel-kopf"><div><div class="sk-lv-gross" id="skLvGross"></div><div class="sk-lv-text" id="skLvText"></div><div class="sk-lv-eigen" id="skLvEigen"></div></div>'+
     '<div class="sk-lv-knoepfe"><button class="btn btn-ghost btn-sm" id="skLvMinus" type="button" title="Level tiefer">◀</button><button class="btn btn-ghost btn-sm" id="skLvPlus" type="button" title="Level höher">▶</button></div></div>'+
     '<div id="skTreppe"></div>'+
-    '<div class="sk-optionen"><label>Reihen <select id="skAnz" class="modal-input">'+[1,2,3,4,5].map(function(n){ return '<option value="'+n+'"'+(n === sikoreT.reihen ? ' selected' : '')+'>'+n+'</option>'; }).join('')+'</select></label>'+
-    '<span class="sk-uhr" id="skUhr" hidden>⏱ 0:00</span></div></div>';
+    '<div class="sk-optionen"><label id="skAnzBox">Reihen <select id="skAnz" class="modal-input">'+[1,2,3,4,5].map(function(n){ return '<option value="'+n+'"'+(n === sikoreT.reihen ? ' selected' : '')+'>'+n+'</option>'; }).join('')+'</select></label>'+
+    '<button class="btn btn-ghost btn-sm sk-tempo" id="skTempo" type="button" title="Eine Reihe gegen die Uhr – nur fehlerfreie Reihen zählen für die Bestzeit">⏱ Tempo-Modus</button><span class="sk-best" id="skBest" hidden></span>'+
+    (pruefIstLehrer() ? '<button class="btn btn-ghost btn-sm" id="skUebersicht" type="button">📊 Klassenübersicht</button>' : '')+
+    '<span class="sk-uhr" id="skUhr" hidden>⏱ 0:00</span></div><div id="skZiel"></div></div>';
   html += '<div id="skBlatt"></div>';
   html += '<div class="sk-aktionen"><button class="btn btn-primary" id="skPruefen" type="button">✅ Kontrollieren</button><button class="btn btn-ghost" id="skNeu" type="button">🔄 Neue Reihen</button></div>';
   html += '<div id="skResultat"></div>';
@@ -17210,6 +17249,9 @@ function renderSikoreTrainer(r){
   document.getElementById('skAnz').addEventListener('change', function(){ sikoreT.reihen = +this.value || 1; lsSet('libsikore_reihen', String(sikoreT.reihen)); sikoreNeu(); });
   document.getElementById('skNeu').addEventListener('click', sikoreNeu);
   document.getElementById('skPruefen').addEventListener('click', sikorePruefen);
+  document.getElementById('skTempo').addEventListener('click', function(){ sikoreT.tempo = !sikoreT.tempo; lsSet('libsikore_tempo', sikoreT.tempo ? '1' : ''); sikoreTempoZeichnen(); sikoreNeu(); });
+  var ueb = document.getElementById('skUebersicht');
+  if(ueb) ueb.addEventListener('click', sikoreUebersicht);
   var blatt = document.getElementById('skBlatt');
   sikoreEnterWeiter(blatt);
   blatt.addEventListener('input', function(e){
@@ -17218,9 +17260,11 @@ function renderSikoreTrainer(r){
     if(!sikoreT.t0){ sikoreT.t0 = Date.now(); sikoreUhr(); }
   });
   sikoreLevelSetzen(sikoreT.level, true);
+  sikoreStatsLaden();
   sikoreMeinLevel().then(function(m){
     if(!m || !sikoreT || !document.getElementById('skBlatt')) return;
     sikoreT.eigen = m;
+    if(m.quelle === 'note') sikoreAufstiegFeiern(m.pid, m.alt, m.level);
     var leer = !Object.keys(sikoreT.ans).some(function(k){ return String(sikoreT.ans[k]).trim(); });
     if(leer) sikoreLevelSetzen(m.level, true); else sikoreKopfZeichnen();
   }).catch(function(err){ console.error(err); });
@@ -17250,6 +17294,7 @@ function sikoreKopfZeichnen(){
   document.getElementById('skTreppe').innerHTML = sikoreStufenHtml(t.level, e ? e.level : 0);
   document.getElementById('skLvMinus').disabled = t.level <= 1;
   document.getElementById('skLvPlus').disabled = t.level >= SIKORE_LEVELS.length;
+  sikoreTempoZeichnen();
 }
 function sikoreLevelSetzen(l, still){
   if(!sikoreT) return;
@@ -17263,7 +17308,7 @@ function sikoreLevelSetzen(l, still){
 function sikoreNeu(){
   var t = sikoreT; if(!t) return;
   t.seed = Math.floor(Math.random() * 2147483646) + 1;
-  t.data = sikoreReihen(t.level, t.reihen, t.laenge, t.seed);
+  t.data = sikoreReihen(t.level, t.tempo ? 1 : t.reihen, t.laenge, t.seed);
   t.ans = {}; t.erg = null; t.t0 = null;
   var uhr = document.getElementById('skUhr'); if(uhr){ uhr.hidden = true; uhr.textContent = '⏱ 0:00'; }
   document.getElementById('skBlatt').innerHTML = sikoreBlattHtml(t.data, {ans:t.ans, qs:true});
@@ -17278,7 +17323,8 @@ function sikoreSerie(delta){
 function sikorePruefen(){
   var t = sikoreT; if(!t || !t.data || t.erg) return;
   var erg = t.erg = sikoreAuswerten(t.data, t.ans, true);
-  var zeit = t.t0 ? pruefZeitText(Date.now() - t.t0) : null;
+  var ms = t.t0 ? Date.now() - t.t0 : null, zeit = ms ? sikoreZeitText(ms) : null;
+  var gebucht = sikoreBuchen(erg, ms);
   document.getElementById('skBlatt').innerHTML = sikoreBlattHtml(t.data, {ans:t.ans, marks:erg.marks, qs:true});
   document.getElementById('skPruefen').disabled = true;
   var ff = Object.keys(erg.marks).filter(function(k){ return erg.marks[k] === 'ff'; }).length;
@@ -17293,7 +17339,11 @@ function sikorePruefen(){
   else if(anteil >= 0.75) h += '<p><b>Gut gerechnet!</b> Schau dir die roten Kästchen an: Die kleine Zahl darunter ist das richtige Ergebnis.</p>';
   else h += '<p><b>Dranbleiben!</b> Rechne die roten Stellen nochmals in Ruhe nach – die kleine Zahl darunter ist das richtige Ergebnis.</p>';
   if(ff) h += '<p class="sk-klein">🟡 '+ff+'× Folgefehler: Da hast du mit deinem eigenen (falschen) Ergebnis richtig weitergerechnet – das zählt als richtig. Der Fehler steckt ein Kästchen weiter vorne.</p>';
+  if(gebucht.bestzeit) h += '<p><b>🏆 Neue Bestzeit auf Level '+t.level+': '+sikoreZeitText(gebucht.bestzeit)+'</b>'+(gebucht.alteBest ? ' (vorher '+sikoreZeitText(gebucht.alteBest)+')' : '')+'</p>';
+  else if(t.tempo && !perfekt) h += '<p class="sk-klein">⏱ Für die Bestzeit zählt nur eine fehlerfreie Reihe.</p>';
   if(zeit) h += '<p class="sk-klein">⏱ Zeit: '+zeit+'</p>';
+  if(gebucht.bestzeit && gebucht.alteBest) sikoreFest('🏆', 'Neue Bestzeit!', 'Level '+t.level+' in <b>'+sikoreZeitText(gebucht.bestzeit)+'</b> – '+Math.round((gebucht.alteBest - gebucht.bestzeit) / 1000)+' Sekunden schneller als vorher.');
+  else if(gebucht.ziel) sikoreFest('🎯', 'Wochenziel erreicht!', 'Du hast diese Woche schon <b>'+t.stats.wFehlerfrei+' fehlerfreie Reihen</b> gerechnet. Weiter so!');
   h += '<div class="sk-aktionen">';
   if(perfekt && t.level < SIKORE_LEVELS.length) h += '<button class="btn btn-primary btn-sm" data-sk="hoch" type="button">⬆️ Level '+(t.level+1)+' probieren</button>';
   if(anteil < 0.5 && t.level > 1) h += '<button class="btn btn-ghost btn-sm" data-sk="tief" type="button">⬇️ Level '+(t.level-1)+' üben</button>';
@@ -17650,6 +17700,150 @@ async function sikoreNotenEintragen(p, teil, nurUids){
     });
   }
   if(n) await batch.commit();
+}
+
+/* ---------- SIKORE: Übungsstand, Wochenziel, Tempo, Klassenübersicht ----------
+   progress/{uid}/resources/sikore_trainer -> {name, sikore:{woche, wReihen,
+   wFehlerfrei, reihen, fehlerfrei, ziel, best:{level: ms}, level, zuletzt}}.
+   Gleicher Pfad wie der Übungsstand normaler Übungen (die Person schreibt,
+   Lehrpersonen lesen) — darum keine eigene Regel nötig. Die Woche (ISO) wird
+   beim Lesen zurückgesetzt, sobald eine neue angefangen hat. */
+var SIKORE_ZIELE = [3, 5, 8, 10, 15];
+function sikoreWoche(d){
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var tag = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - tag);
+  var j0 = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return d.getUTCFullYear() + '-W' + String(Math.ceil(((d - j0) / 86400000 + 1) / 7)).padStart(2, '0');
+}
+function sikoreStatsRef(uid){ return doc(db, 'progress', uid, 'resources', 'sikore_trainer'); }
+function sikoreStatsNorm(x){
+  var s = Object.assign({wReihen:0, wFehlerfrei:0, reihen:0, fehlerfrei:0, ziel:5, best:{}, level:null, zuletzt:null}, x || {});
+  s.best = Object.assign({}, s.best || {});
+  var w = sikoreWoche(new Date());
+  if(s.woche !== w){ s.woche = w; s.wReihen = 0; s.wFehlerfrei = 0; }
+  return s;
+}
+function sikoreStatsSpeichern(){
+  var t = sikoreT; if(!t || !t.stats || !state.user) return;
+  var s = Object.assign({}, t.stats, {zuletzt:serverTimestamp()});
+  setDoc(sikoreStatsRef(state.user.uid), {name:(state.profile && state.profile.displayName) || '', sikore:s}, {merge:true})
+    .catch(function(err){ console.error('SIKORE-Stand speichern', err); });
+}
+function sikoreZeitText(ms){ var s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function sikoreRingSvg(anteil, gross){
+  var r = gross ? 26 : 18, u = 2 * Math.PI * r, w = (r + 5) * 2;
+  return '<svg class="sk-ring" width="'+w+'" height="'+w+'" viewBox="0 0 '+w+' '+w+'" aria-hidden="true"><circle cx="'+(w/2)+'" cy="'+(w/2)+'" r="'+r+'" class="sk-ring-bg"/>'+
+    '<circle cx="'+(w/2)+'" cy="'+(w/2)+'" r="'+r+'" class="sk-ring-fg" stroke-dasharray="'+u.toFixed(1)+'" stroke-dashoffset="'+(u * (1 - Math.min(1, anteil))).toFixed(1)+'" transform="rotate(-90 '+(w/2)+' '+(w/2)+')"/></svg>';
+}
+function sikoreZielZeichnen(){
+  var t = sikoreT, el = document.getElementById('skZiel');
+  if(!t || !el) return;
+  if(!t.stats){ el.innerHTML = ''; return; }
+  var s = t.stats, fertig = s.wFehlerfrei >= s.ziel;
+  el.className = 'sk-ziel' + (fertig ? ' fertig' : '');
+  el.innerHTML = sikoreRingSvg(s.wFehlerfrei / s.ziel, false) +
+    '<div><b>Wochenziel: '+Math.min(s.wFehlerfrei, 999)+' / '+s.ziel+'</b> fehlerfreie Reihen'+(fertig ? ' 🎉' : '')+
+    '<small>'+s.wReihen+' Reihe'+(s.wReihen === 1 ? '' : 'n')+' diese Woche · '+s.reihen+' insgesamt</small></div>'+
+    '<label class="sk-ziel-wahl">Ziel <select id="skZielWahl" class="modal-input">'+SIKORE_ZIELE.map(function(z){ return '<option value="'+z+'"'+(z === s.ziel ? ' selected' : '')+'>'+z+'</option>'; }).join('')+'</select></label>';
+  document.getElementById('skZielWahl').addEventListener('change', function(){ s.ziel = +this.value || 5; sikoreStatsSpeichern(); sikoreZielZeichnen(); });
+}
+function sikoreTempoZeichnen(){
+  var t = sikoreT; if(!t) return;
+  var btn = document.getElementById('skTempo'), info = document.getElementById('skBest'), anz = document.getElementById('skAnzBox');
+  if(!btn) return;
+  btn.classList.toggle('an', t.tempo);
+  btn.textContent = t.tempo ? '⏱ Tempo-Modus an' : '⏱ Tempo-Modus';
+  if(anz) anz.style.display = t.tempo ? 'none' : '';
+  var b = t.stats && t.stats.best[t.level];
+  info.hidden = !t.tempo;
+  info.innerHTML = '🏆 Bestzeit Level '+t.level+': <b>'+(b ? sikoreZeitText(b) : 'noch keine')+'</b>';
+}
+function sikoreStatsLaden(){
+  if(!state.user) return;
+  getDoc(sikoreStatsRef(state.user.uid)).then(function(snap){
+    if(!sikoreT) return;
+    sikoreT.stats = sikoreStatsNorm(snap.exists() ? snap.data().sikore : null);
+    sikoreZielZeichnen(); sikoreTempoZeichnen();
+  }).catch(function(err){
+    console.error('SIKORE-Stand', err);
+    if(sikoreT){ sikoreT.stats = sikoreStatsNorm(null); sikoreZielZeichnen(); sikoreTempoZeichnen(); }
+  });
+}
+// Nach «Kontrollieren»: Woche/Total nachführen, Bestzeit im Tempo-Modus.
+function sikoreBuchen(erg, ms){
+  var t = sikoreT; if(!t || !t.stats) return {};
+  var s = sikoreStatsNorm(t.stats), vorher = s.wFehlerfrei, res = {};
+  s.wReihen += t.data.length; s.wFehlerfrei += erg.fehlerfrei;
+  s.reihen += t.data.length; s.fehlerfrei += erg.fehlerfrei;
+  s.level = t.level;
+  if(t.tempo && ms && erg.fehlerfrei === t.data.length){
+    var alt = s.best[t.level];
+    if(!alt || ms < alt){ s.best[t.level] = ms; res.bestzeit = ms; res.alteBest = alt || null; }
+  }
+  if(vorher < s.ziel && s.wFehlerfrei >= s.ziel) res.ziel = true;
+  t.stats = s;
+  sikoreStatsSpeichern();
+  sikoreZielZeichnen(); sikoreTempoZeichnen();
+  return res;
+}
+
+// Feier-Overlay mit Konfetti (Aufstieg, Wochenziel, Bestzeit). Hängt an <body>,
+// ist kein natives Dialogfenster und schliesst sich per Klick oder nach 5 s.
+function sikoreFest(icon, titel, text){
+  var alt = document.getElementById('skFest'); if(alt) alt.remove();
+  var el = document.createElement('div');
+  el.id = 'skFest'; el.className = 'sk-fest';
+  var farben = ['#2E9E5B', '#D64545', '#3A7BBF', '#7B5CD6', '#E0A800', '#E8752C'], zeichen = ['+', '−', '·', ':', '=', '★'], k = '';
+  for(var i=0;i<46;i++){
+    k += '<span class="sk-konfetti" style="left:'+(Math.random() * 100).toFixed(1)+'%;color:'+farben[i % farben.length]+';animation-delay:'+(Math.random() * 0.9).toFixed(2)+'s;animation-duration:'+(2.2 + Math.random() * 1.6).toFixed(2)+'s;--dx:'+Math.round(Math.random() * 160 - 80)+'px;--rot:'+Math.round(Math.random() * 720 - 360)+'deg">'+zeichen[i % zeichen.length]+'</span>';
+  }
+  el.innerHTML = k + '<div class="sk-fest-karte" role="status"><div class="sk-fest-icon">'+icon+'</div><h2>'+esc(titel)+'</h2><p>'+text+'</p><button class="btn btn-primary btn-sm" type="button">Weiter</button></div>';
+  document.body.appendChild(el);
+  var zu = function(){ el.classList.add('weg'); setTimeout(function(){ el.remove(); }, 300); };
+  el.addEventListener('click', zu);
+  setTimeout(function(){ if(el.parentNode) zu(); }, 5000);
+}
+// Aufstieg nach einer SIKORE-Prüfung nur einmal pro Prüfung feiern.
+function sikoreAufstiegFeiern(pid, alt, neu){
+  if(!pid || !(neu > alt)) return;
+  var key = 'libsikore_auf_' + pid;
+  if(lsGet(key)) return;
+  lsSet(key, '1');
+  sikoreFest('⬆️', 'Level ' + neu + ' geschafft!', 'Mit deiner SIKORE-Prüfung bist du von Level ' + alt + ' auf <b>Level ' + neu + '</b> aufgestiegen. Stark gerechnet!');
+}
+
+// 📊 Klassenübersicht (Lehrperson): Level, Üben diese Woche, Bestzeiten.
+async function sikoreUebersicht(){
+  openModal('<h3>📊 SIKORE – Klassenübersicht</h3><p>Wird geladen …</p>', 'pr-modal pr-modal-breit');
+  try{
+    var roster = rosterFuerFach(await loadStudentRoster(), 'mathe');
+    var vorschlag = await sikoreVorschlaege(null), zug = {};
+    pruef.list.filter(function(p){ return p.art === 'sikore'; }).sort(function(a, b){ return pruefMs(a.createdAt) - pruefMs(b.createdAt); })
+      .forEach(function(p){ Object.keys(p.levels || {}).forEach(function(u){ zug[u] = +p.levels[u]; }); });
+    var stats = await Promise.all(roster.map(function(s){
+      return getDoc(sikoreStatsRef(s.uid)).then(function(d){ return d.exists() && d.data().sikore ? sikoreStatsNorm(d.data().sikore) : null; }).catch(function(){ return null; });
+    }));
+    var rows = roster.map(function(s, i){ return {s:s, st:stats[i], v:vorschlag[s.uid], lv:vorschlag[s.uid] ? vorschlag[s.uid].neu : zug[s.uid] || null}; });
+    rows.sort(function(a, b){ return (a.s.displayName || a.s.username || '').localeCompare(b.s.displayName || b.s.username || '', 'de'); });
+    var aktiv = rows.filter(function(r){ return r.st && r.st.wReihen; }).length, ziel = rows.filter(function(r){ return r.st && r.st.wFehlerfrei >= r.st.ziel; }).length;
+    var h = '<h3>📊 SIKORE – Klassenübersicht</h3>';
+    h += '<div class="pr-zahlen"><div><b>'+aktiv+' / '+rows.length+'</b><span>haben diese Woche geübt</span></div><div><b>'+ziel+'</b><span>Wochenziel erreicht</span></div></div>';
+    h += '<p class="pr-hinweis">«Level» = aktuelles Level aus den SIKORE-Prüfungen (mit Auf-/Abstieg). «Übt auf» = zuletzt im Trainer geübt. Bestzeit = Tempo-Modus, eine fehlerfreie Reihe auf dem Übungslevel.</p>';
+    h += '<div class="sk-ueb"><div class="sk-ueb-row sk-ueb-kopf"><span>Name</span><span>Level</span><span>Übt auf</span><span>Diese Woche</span><span>Total</span><span>Bestzeit</span><span>Zuletzt</span></div>';
+    rows.forEach(function(r){
+      var st = r.st, zl = st && pruefMs(st.zuletzt);
+      var lvTxt = r.lv ? String(r.lv) + (r.v && r.v.neu !== r.v.alt ? ' <small>'+(r.v.neu > r.v.alt ? '⬆️' : '⬇️')+' von '+r.v.alt+'</small>' : '') : '–';
+      var woche = st ? '<span class="sk-ueb-woche">'+sikoreRingSvg(st.wFehlerfrei / st.ziel, false)+'<span>'+st.wFehlerfrei+' / '+st.ziel+' ⭐<small>'+st.wReihen+' Reihen</small></span></span>' : '<small>noch nie geübt</small>';
+      var best = st && st.level && st.best[st.level] ? sikoreZeitText(st.best[st.level]) : '–';
+      h += '<div class="sk-ueb-row'+(st && st.wFehlerfrei >= st.ziel ? ' ziel' : '')+'"><span><b>'+esc(r.s.displayName || r.s.username || r.s.uid)+'</b></span><span>'+lvTxt+'</span><span>'+(st && st.level ? st.level : '–')+'</span>'+
+        '<span>'+woche+'</span><span>'+(st ? st.fehlerfrei+' / '+st.reihen : '–')+'</span><span>'+best+'</span>'+
+        '<span>'+(zl ? new Date(zl).toLocaleDateString('de-CH', {day:'numeric', month:'numeric'}) : '–')+'</span></div>';
+    });
+    h += '</div><div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
+    openModal(h, 'pr-modal pr-modal-breit');
+    document.getElementById('modalOk').addEventListener('click', closeModal);
+  }catch(err){ console.error(err); closeModal(); toast('Übersicht konnte nicht geladen werden.'); }
 }
 
 /* ===================== 📶 OFFLINE-ANZEIGE =====================
