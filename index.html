@@ -11411,6 +11411,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-19-stundenplan-pause', datum:'2026-09-19', fuer:'alle', text:'🗓️ Stundenplan korrigiert: Am Nachmittag ist die Pause von 15:05 bis 15:20 – die letzten zwei Lektionen beginnen darum 5 Minuten später, Schluss ist um 16:55.'},
   {id:'2026-09-19-stundenplan', datum:'2026-09-19', fuer:'alle', text:'🗓️ Neu: dein Stundenplan (Symbol oben). Deine Lehrperson trägt den Klassenplan ein, du kannst danach deine eigenen Freilektionen eintragen. Auf der Startseite siehst du, was jetzt und als Nächstes kommt.'},
   {id:'2026-09-19-anordnen', datum:'2026-09-19', fuer:'alle', text:'✏️ Kacheln und Symbole oben kannst du jetzt wie beim iPhone verschieben: lange draufdrücken, bis alles wackelt, dann ziehen. Symbole mit «−» ausblenden und unter ⚙️ Einstellungen › 🧩 Widgets zurückholen. Neue Fächer: Englisch, Französisch, ISF, Musik, TTG, WAH, Fotokurs, Psychologie, Freies Schreiben.'},
   {id:'2026-09-19-faecher-lp', datum:'2026-09-19', fuer:'lehrer', text:'🧩 Fächer, die dich nicht betreffen, kannst du im Wackelmodus mit «−» ausblenden (nur für dich, die Klasse sieht weiterhin alle). Im 🗓️ Stundenplan füllst du deinen eigenen Plan und den Klassenplan separat; «⏰ Lektionszeiten» beim Bearbeiten anpassen.'},
@@ -15362,8 +15363,14 @@ var STP_TAG_FARBEN = ['#4361EE','#E63950','#2E9E5B','#E8752C','#8B5CF6'];
 var STP_ZEITEN_STANDARD = [
   {von:'07:30', bis:'08:15'}, {von:'08:20', bis:'09:05'}, {von:'09:20', bis:'10:05'},
   {von:'10:10', bis:'10:55'}, {von:'11:00', bis:'11:45'},
-  {von:'13:30', bis:'14:15'}, {von:'14:20', bis:'15:05'}, {von:'15:15', bis:'16:00'}, {von:'16:05', bis:'16:50'}
+  {von:'13:30', bis:'14:15'}, {von:'14:20', bis:'15:05'}, {von:'15:20', bis:'16:05'}, {von:'16:10', bis:'16:55'}
 ];
+// Bis 19.09.2026 galt am Nachmittag 10 statt 15 Min. Pause — damit gespeicherte Pläne mit den alten Standardzeiten nachziehen.
+var STP_ZEITEN_ALT = '07:30-08:15,08:20-09:05,09:20-10:05,10:10-10:55,11:00-11:45,13:30-14:15,14:20-15:05,15:15-16:00,16:05-16:50';
+function stpZeitenAktuell(z){
+  if(z && z.map(function(x){ return x.von+'-'+x.bis; }).join(',') === STP_ZEITEN_ALT) return STP_ZEITEN_STANDARD;
+  return z || null;
+}
 var STP_FREI_FARBEN = ['#0EA5E9','#F43F5E','#14B8A6','#F59E0B','#6366F1','#84CC16','#EC4899','#64748B'];
 var stp = { klasse:null, eigen:null, geladen:false, klasseName:null, ansicht:null, bearbeiten:false, tag:null };
 
@@ -15373,8 +15380,8 @@ function stpLaden(){
   var k = getDoc(stpKlasseRef()).then(function(s){ return s.exists() ? s.data() : null; }).catch(function(err){ console.error('Stundenplan Klasse', err); return null; });
   var e = getDoc(stpEigenRef()).then(function(s){ return s.exists() ? s.data() : null; }).catch(function(err){ console.error('Stundenplan eigen', err); return null; });
   return Promise.all([k, e]).then(function(r){
-    stp.klasse = { zeiten:(r[0] && r[0].zeiten) || null, zellen:(r[0] && r[0].zellen) || {} };
-    stp.eigen = { zeiten:(r[1] && r[1].zeiten) || null, zellen:(r[1] && r[1].zellen) || {} };
+    stp.klasse = { zeiten:stpZeitenAktuell(r[0] && r[0].zeiten), zellen:(r[0] && r[0].zellen) || {} };
+    stp.eigen = { zeiten:stpZeitenAktuell(r[1] && r[1].zeiten), zellen:(r[1] && r[1].zellen) || {} };
     stp.klasseName = state.klasse;
     stp.geladen = true;
   });
