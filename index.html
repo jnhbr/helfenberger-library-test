@@ -2119,8 +2119,8 @@ const SUBJECTS = [
   {id:'lehrerbereich', name:'Lehrerbereich', color:'#475569', soft:'#E2E6EC', img:'assets/subject-lehrerbereich.png', teacherOnly:true, wide:true},
   {id:'mathe', name:'Mathe', gruppe:'haupt', color:'#4361EE', soft:'#E4E8FD', img:'assets/subject-mathe.png'},
   {id:'deutsch', name:'Deutsch', gruppe:'haupt', color:'#E63950', soft:'#FBDEE2', img:'assets/subject-deutsch.png'},
-  {id:'englisch', name:'Englisch', gruppe:'haupt', color:'#9B2C2C', soft:'#F5DADA', img:'assets/subject-englisch.png', full:true},
-  {id:'franzoesisch', name:'Französisch', gruppe:'haupt', color:'#2F3E9E', soft:'#DEE1F5', img:'assets/subject-franzoesisch.png', full:true},
+  {id:'englisch', name:'Englisch', gruppe:'haupt', color:'#9B2C2C', soft:'#F5DADA', img:'assets/subject-englisch.png'},
+  {id:'franzoesisch', name:'Französisch', gruppe:'haupt', color:'#2F3E9E', soft:'#DEE1F5', img:'assets/subject-franzoesisch.png'},
   {id:'biologie', name:'Biologie', gruppe:'haupt', color:'#17A398', soft:'#D9F1EE', img:'assets/subject-biologie.png'},
   {id:'chemie', name:'Chemie', gruppe:'haupt', color:'#8B5CF6', soft:'#EAE1FC', img:'assets/subject-chemie.png'},
   {id:'physik', name:'Physik', gruppe:'haupt', color:'#1E96C8', soft:'#DDEFF8', img:'assets/subject-physik.png'},
@@ -5842,15 +5842,15 @@ async function openSchulStatistik(){
   Object.keys(proKlasse).forEach(function(k){ if(klassenIds.indexOf(k) < 0) klassenIds.push(k); });
   var sumAlle = 0, sumAktiv = 0;
   var h = '<h3>📊 Übersicht Schule</h3>';
-  h += '<div class="settings-section"><h4>Wer hat in den letzten 7 Tagen geübt?</h4><table class="stat-tab"><tr><th>Klasse</th><th>Lehrperson</th><th>geübt</th><th></th></tr>';
+  h += '<div class="settings-section"><h4>Wer hat in den letzten 7 Tagen geübt?</h4><table class="stat-tab"><tr><th>Klasse</th><th>geübt</th><th></th></tr>';
   klassenIds.forEach(function(id){
     var k = proKlasse[id];
     if(!k) return;
     sumAlle += k.alle; sumAktiv += k.aktiv;
     var pct = k.alle ? Math.round(k.aktiv / k.alle * 100) : 0;
-    h += '<tr><td><b>'+esc(klasseLabel(id))+'</b></td><td>'+esc(klasseInfo(id).lp)+'</td><td>'+k.aktiv+' / '+k.alle+' ('+pct+' %)</td><td>'+balken(pct)+'</td></tr>';
+    h += '<tr><td><b>'+esc(klasseLabel(id))+'</b></td><td>'+k.aktiv+' / '+k.alle+' ('+pct+' %)</td><td>'+balken(pct)+'</td></tr>';
   });
-  h += '<tr class="stat-sum"><td colspan="2">Ganze Schule</td><td>'+sumAktiv+' / '+sumAlle+' ('+(sumAlle ? Math.round(sumAktiv / sumAlle * 100) : 0)+' %)</td><td></td></tr></table>';
+  h += '<tr class="stat-sum"><td>Ganze Schule</td><td>'+sumAktiv+' / '+sumAlle+' ('+(sumAlle ? Math.round(sumAktiv / sumAlle * 100) : 0)+' %)</td><td></td></tr></table>';
   h += '<p class="gr-hint">Gezählt wird, wer an mindestens einem der letzten 7 Tage eine Übung offen hatte (Lern-Serie 🔥).</p></div>';
   var liste = Object.keys(lehrer).map(function(uid){ return lehrer[uid]; }).filter(function(l){ return l.n; });
   liste.sort(function(a, b){ return b.bytes - a.bytes; });
@@ -13133,6 +13133,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-20-fach-bilder', datum:'2026-09-20', fuer:'alle', text:'🎨 Mathe, Deutsch, Englisch und Französisch haben neue Bilder bekommen.'},
   {id:'2026-09-20-pruefung-art-klasse', datum:'2026-09-20', fuer:'lehrer', text:'📝 Prüfungen: nur noch ein Knopf «➕ Neue Prüfung» – die Art (📄 aus einer Übung, 🧮 SIKORE, ⌨️ Tastaturschreiben) wählst du zuoberst im Dialog. Neu stellst du dort auch die Klasse ein (die Library wechselt dann dorthin) und unter «Für», ob die ganze Klasse oder nur eine deiner 👥 Gruppen die Prüfung schreibt – die übrigen sehen sie gar nicht.'},
   {id:'2026-09-20-tipp-pruefung', datum:'2026-09-20', fuer:'lehrer', text:'⌨️ Prüfungen › «⌨️ Neue Tipp-Prüfung»: klassische Abschreibprüfung im Prüfungsmodus – alle tippen denselben Text auf Zeit (Sätze aus dem Tipptrainer oder dein eigener Text). Bewertet werden die Netto-Anschläge pro Minute (Abzug pro Fehler einstellbar), Notengrenzen für 6 und 4 wählbar; die Note landet im Notenrechner.'},
   {id:'2026-09-20-tipp-pruefung-alle', datum:'2026-09-20', fuer:'alle', text:'⌨️ Neu: Tipp-Prüfungen. Du schreibst einen Text auf Zeit ab – bei einem Fehler wartet der Cursor, bis du die richtige Taste triffst. Üben kannst du in Medien und Informatik im Tipptrainer.'},
