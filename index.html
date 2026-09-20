@@ -1836,17 +1836,25 @@ async function backfillQuotaOwner(){
     });
   });
   var changed = false;
+  // Kopf-Dokumente und die Chunks jeweils in einem Rutsch holen. Nacheinander
+  // (await in der Schleife) dauerte «💾 Mein Speicher» bei vielen Uebungen
+  // spuerbar lange, weil jeder Chunk einzeln ueber die Leitung musste.
+  var headSnaps = await Promise.all(ids.map(function(id){ return getDoc(doc(db,'resourceContent', id)); }));
   for(var k=0; k<ids.length; k++){
-    var ref = doc(db,'resourceContent', ids[k]);
-    var cs = await getDoc(ref);
+    var cs = headSnaps[k];
     if(!cs.exists() || cs.data().ownerUid) continue;
-    var n = cs.data().chunkCount || 0, bytes = 0;
-    for(var i=0;i<n;i++){
-      var c = await getContentDoc(doc(db,'resourceContent', ids[k], 'chunks', String(i)));
-      if(!c.exists()) continue;
+    var ref = doc(db,'resourceContent', ids[k]);
+    var n = cs.data().chunkCount || 0, idx = [];
+    for(var i=0;i<n;i++) idx.push(i);
+    var chunkSnaps = await Promise.all(idx.map(function(i){
+      return getContentDoc(doc(db,'resourceContent', ids[k], 'chunks', String(i)));
+    }));
+    var bytes = 0;
+    chunkSnaps.forEach(function(c){
+      if(!c.exists()) return;
       var cd = c.data();
       bytes += cd.bin ? cd.bin.toUint8Array().length : contentBytes(cd.html || '');
-    }
+    });
     await updateDoc(ref, { ownerUid: uid, bytes: bytes });
     changed = true;
   }
@@ -2116,28 +2124,28 @@ function subjectVisual(s){
 // gruppe: 'haupt' (oben) · 'neben' (Mitte) · 'frei' (Freifächer, zuunterst).
 // full:true = Bildchen bringt seinen eigenen Hintergrund mit (füllt das Feld).
 const SUBJECTS = [
-  {id:'lehrerbereich', name:'Lehrerbereich', color:'#475569', soft:'#E2E6EC', img:'assets/subject-lehrerbereich.png', teacherOnly:true, wide:true},
-  {id:'mathe', name:'Mathe', gruppe:'haupt', color:'#4361EE', soft:'#E4E8FD', img:'assets/subject-mathe.png'},
-  {id:'deutsch', name:'Deutsch', gruppe:'haupt', color:'#E63950', soft:'#FBDEE2', img:'assets/subject-deutsch.png'},
-  {id:'englisch', name:'Englisch', gruppe:'haupt', color:'#9B2C2C', soft:'#F5DADA', img:'assets/subject-englisch.png'},
-  {id:'franzoesisch', name:'Französisch', gruppe:'haupt', color:'#2F3E9E', soft:'#DEE1F5', img:'assets/subject-franzoesisch.png'},
-  {id:'biologie', name:'Biologie', gruppe:'haupt', color:'#17A398', soft:'#D9F1EE', img:'assets/subject-biologie.png'},
-  {id:'chemie', name:'Chemie', gruppe:'haupt', color:'#8B5CF6', soft:'#EAE1FC', img:'assets/subject-chemie.png'},
-  {id:'physik', name:'Physik', gruppe:'haupt', color:'#1E96C8', soft:'#DDEFF8', img:'assets/subject-physik.png'},
-  {id:'geografie', name:'Geografie', gruppe:'haupt', color:'#2E9E5B', soft:'#DDF1E4', img:'assets/subject-geografie.png'},
-  {id:'geschichte', name:'Geschichte', gruppe:'haupt', color:'#C98B1F', soft:'#F6E8CC', img:'assets/subject-geschichte.png'},
-  {id:'informatik', name:'Medien und Informatik', gruppe:'neben', color:'#D6449B', soft:'#FBDFEE', img:'assets/subject-informatik.png'},
-  {id:'isf', name:'ISF', gruppe:'neben', color:'#4D7C0F', soft:'#E6EFD6', img:'assets/subject-isf.png', full:true},
-  {id:'musik', name:'Musik', gruppe:'neben', color:'#0F766E', soft:'#D5EDEA', img:'assets/subject-musik.png', full:true},
-  {id:'sport', name:'Sport', gruppe:'neben', color:'#5FA829', soft:'#E4F3D9', img:'assets/subject-sport.png'},
-  {id:'werken', name:'Werken', gruppe:'neben', color:'#A9642E', soft:'#F1E1D2', img:'assets/subject-werken.png'},
-  {id:'textiles-werken', name:'TTG', gruppe:'neben', color:'#DB6A8F', soft:'#FBE3EB', img:'assets/subject-textiles-werken.png', full:true},
-  {id:'wah', name:'WAH', gruppe:'neben', color:'#D97706', soft:'#FBEBD3', img:'assets/subject-wah.png', full:true},
-  {id:'berufswahl', name:'Berufswahl', gruppe:'neben', color:'#E8752C', soft:'#FBE4D4', img:'assets/subject-berufswahl.png'},
-  {id:'gtz', name:'GTZ', gruppe:'frei', color:'#3D6A8A', soft:'#DCE8EF', img:'assets/subject-gtz.png'},
-  {id:'fotokurs', name:'Fotokurs', gruppe:'frei', color:'#6B7280', soft:'#E7E9EE', img:'assets/subject-fotokurs.png', full:true},
-  {id:'psychologie', name:'ERG', gruppe:'frei', color:'#A16207', soft:'#F3E8D2', img:'assets/subject-psychologie.png', full:true},
-  {id:'freies-schreiben', name:'Zeichnen', gruppe:'frei', color:'#0369A1', soft:'#DCEBF5', img:'assets/subject-freies-schreiben.png', full:true}
+  {id:'lehrerbereich', name:'Lehrerbereich', color:'#475569', soft:'#E2E6EC', img:'assets/subject-lehrerbereich.webp', teacherOnly:true, wide:true},
+  {id:'mathe', name:'Mathe', gruppe:'haupt', color:'#4361EE', soft:'#E4E8FD', img:'assets/subject-mathe.webp'},
+  {id:'deutsch', name:'Deutsch', gruppe:'haupt', color:'#E63950', soft:'#FBDEE2', img:'assets/subject-deutsch.webp'},
+  {id:'englisch', name:'Englisch', gruppe:'haupt', color:'#9B2C2C', soft:'#F5DADA', img:'assets/subject-englisch.webp'},
+  {id:'franzoesisch', name:'Französisch', gruppe:'haupt', color:'#2F3E9E', soft:'#DEE1F5', img:'assets/subject-franzoesisch.webp'},
+  {id:'biologie', name:'Biologie', gruppe:'haupt', color:'#17A398', soft:'#D9F1EE', img:'assets/subject-biologie.webp'},
+  {id:'chemie', name:'Chemie', gruppe:'haupt', color:'#8B5CF6', soft:'#EAE1FC', img:'assets/subject-chemie.webp'},
+  {id:'physik', name:'Physik', gruppe:'haupt', color:'#1E96C8', soft:'#DDEFF8', img:'assets/subject-physik.webp'},
+  {id:'geografie', name:'Geografie', gruppe:'haupt', color:'#2E9E5B', soft:'#DDF1E4', img:'assets/subject-geografie.webp'},
+  {id:'geschichte', name:'Geschichte', gruppe:'haupt', color:'#C98B1F', soft:'#F6E8CC', img:'assets/subject-geschichte.webp'},
+  {id:'informatik', name:'Medien und Informatik', gruppe:'neben', color:'#D6449B', soft:'#FBDFEE', img:'assets/subject-informatik.webp'},
+  {id:'isf', name:'ISF', gruppe:'neben', color:'#4D7C0F', soft:'#E6EFD6', img:'assets/subject-isf.webp', full:true},
+  {id:'musik', name:'Musik', gruppe:'neben', color:'#0F766E', soft:'#D5EDEA', img:'assets/subject-musik.webp', full:true},
+  {id:'sport', name:'Sport', gruppe:'neben', color:'#5FA829', soft:'#E4F3D9', img:'assets/subject-sport.webp'},
+  {id:'werken', name:'Werken', gruppe:'neben', color:'#A9642E', soft:'#F1E1D2', img:'assets/subject-werken.webp'},
+  {id:'textiles-werken', name:'TTG', gruppe:'neben', color:'#DB6A8F', soft:'#FBE3EB', img:'assets/subject-textiles-werken.webp', full:true},
+  {id:'wah', name:'WAH', gruppe:'neben', color:'#D97706', soft:'#FBEBD3', img:'assets/subject-wah.webp', full:true},
+  {id:'berufswahl', name:'Berufswahl', gruppe:'neben', color:'#E8752C', soft:'#FBE4D4', img:'assets/subject-berufswahl.webp'},
+  {id:'gtz', name:'GTZ', gruppe:'frei', color:'#3D6A8A', soft:'#DCE8EF', img:'assets/subject-gtz.webp'},
+  {id:'fotokurs', name:'Fotokurs', gruppe:'frei', color:'#6B7280', soft:'#E7E9EE', img:'assets/subject-fotokurs.webp', full:true},
+  {id:'psychologie', name:'ERG', gruppe:'frei', color:'#A16207', soft:'#F3E8D2', img:'assets/subject-psychologie.webp', full:true},
+  {id:'freies-schreiben', name:'Zeichnen', gruppe:'frei', color:'#0369A1', soft:'#DCEBF5', img:'assets/subject-freies-schreiben.webp', full:true}
 ];
 SUBJECTS.forEach(function(s){ s.icon = subjectVisual(s); });
 function subjectById(id){ return SUBJECTS.find(function(s){return s.id===id;}); }
@@ -13133,6 +13141,8 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-20-schneller-start', datum:'2026-09-20', fuer:'alle', text:'⚡ Die Startseite lädt jetzt viel schneller – die Fächer-Bilder sind zehnmal kleiner geworden, ohne dass man es sieht. Das hilft vor allem auf dem Handy und bei schwachem WLAN.'},
+  {id:'2026-09-20-speicher-schneller', datum:'2026-09-20', fuer:'lehrer', text:'💾 ⚙️ Einstellungen › «💾 Mein Speicher» öffnet schneller, und der Prüfungs-Schnelltest räumt seinen Zwischenspeicher selbst auf.'},
   {id:'2026-09-20-fach-bilder', datum:'2026-09-20', fuer:'alle', text:'🎨 Mathe, Deutsch, Englisch und Französisch haben neue Bilder bekommen.'},
   {id:'2026-09-20-pruefung-art-klasse', datum:'2026-09-20', fuer:'lehrer', text:'📝 Prüfungen: nur noch ein Knopf «➕ Neue Prüfung» – die Art (📄 aus einer Übung, 🧮 SIKORE, ⌨️ Tastaturschreiben) wählst du zuoberst im Dialog. Neu stellst du dort auch die Klasse ein (die Library wechselt dann dorthin) und unter «Für», ob die ganze Klasse oder nur eine deiner 👥 Gruppen die Prüfung schreibt – die übrigen sehen sie gar nicht.'},
   {id:'2026-09-20-tipp-pruefung', datum:'2026-09-20', fuer:'lehrer', text:'⌨️ Prüfungen › «⌨️ Neue Tipp-Prüfung»: klassische Abschreibprüfung im Prüfungsmodus – alle tippen denselben Text auf Zeit (Sätze aus dem Tipptrainer oder dein eigener Text). Bewertet werden die Netto-Anschläge pro Minute (Abzug pro Fehler einstellbar), Notengrenzen für 6 und 4 wählbar; die Note landet im Notenrechner.'},
@@ -16155,9 +16165,42 @@ function pruefExtractImpl(){
 // (die Daten stehen vorne, vor Bildern/Audio). Ergebnis pro contentId im
 // Browser gemerkt — ein Inhalt ändert sich nie (Bearbeiten = neue contentId).
 var PRUEF_SCAN_RE = /\b(?:var|let|const)\s+(?:Q|THEMES|TEXT_PARAGRAPHS)\s*=\s*\[|__GEO_PRUEFUNG/;
-function pruefScanKey(contentId){ return 'libPruefScan_' + contentId; }
+var PRUEF_SCAN_PREFIX = 'libPruefScan_';
+var PRUEF_SCAN_TTL = 90*24*3600*1000;   // nach 90 Tagen ungenutzt: weg
+var PRUEF_SCAN_REFRESH = 7*24*3600*1000;
+function pruefScanKey(contentId){ return PRUEF_SCAN_PREFIX + contentId; }
+// Der Cache waechst sonst unbegrenzt: pro Inhalts-ID bleibt ein Schluessel
+// liegen, auch wenn die Uebung laengst geloescht ist. Darum haengt am Wert ein
+// Zeitstempel ('1:<ms>'), der beim Benutzen aufgefrischt wird - alte Eintraege
+// raeumt pruefScanAufraeumen() weg. Alte Werte ohne Stempel ('1'/'0') bekommen
+// beim Aufraeumen einen, damit niemand unnoetig neu scannen muss.
+var pruefScanGeputzt = false;
+function pruefScanAufraeumen(){
+  if(pruefScanGeputzt) return;
+  pruefScanGeputzt = true;
+  try{
+    var jetzt = Date.now(), weg = [];
+    for(var i=0;i<localStorage.length;i++){
+      var k = localStorage.key(i);
+      if(!k || k.indexOf(PRUEF_SCAN_PREFIX) !== 0) continue;
+      var v = localStorage.getItem(k) || '', p = v.indexOf(':');
+      if(p < 0){ localStorage.setItem(k, v.charAt(0) + ':' + jetzt); continue; }
+      if(jetzt - (parseInt(v.slice(p+1), 10) || 0) > PRUEF_SCAN_TTL) weg.push(k);
+    }
+    weg.forEach(function(k){ localStorage.removeItem(k); });
+  }catch(e){}
+}
 async function pruefScan(contentId){
-  try{ var c = localStorage.getItem(pruefScanKey(contentId)); if(c === '1' || c === '0') return c === '1'; }catch(e){}
+  try{
+    var c = localStorage.getItem(pruefScanKey(contentId));
+    if(c && (c.charAt(0) === '1' || c.charAt(0) === '0')){
+      var sp = c.indexOf(':'), alt = sp < 0 ? 0 : (parseInt(c.slice(sp+1), 10) || 0);
+      if(Date.now() - alt > PRUEF_SCAN_REFRESH){
+        try{ localStorage.setItem(pruefScanKey(contentId), c.charAt(0) + ':' + Date.now()); }catch(e){}
+      }
+      return c.charAt(0) === '1';
+    }
+  }catch(e){}
   var ok = false;
   try{
     var snap = await getContentDoc(doc(db,'resourceContent', contentId));
@@ -16171,10 +16214,11 @@ async function pruefScan(contentId){
       }
     }
   }catch(err){ console.error('Prüfungs-Schnelltest', err); return true; }   // im Zweifel anbieten
-  try{ localStorage.setItem(pruefScanKey(contentId), ok ? '1' : '0'); }catch(e){}
+  try{ localStorage.setItem(pruefScanKey(contentId), (ok ? '1' : '0') + ':' + Date.now()); }catch(e){}
   return ok;
 }
 async function pruefScanAlle(list, onFortschritt){
+  pruefScanAufraeumen();
   var res = {}, i = 0, fertig = 0;
   async function worker(){
     while(i < list.length){
