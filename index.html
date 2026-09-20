@@ -1525,7 +1525,8 @@
   .pr-hinweis{font-size:13px;color:var(--text-muted);}
   .pr-kats{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 12px;font-size:14px;}
   .pr-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 12px;}
-  .pr-grid2 .modal-input,#prTitel,#prUebung{margin-bottom:12px;}
+  .pr-grid2 .modal-input,#prTitel,#prUebung,#prKlasse,#prFuer{margin-bottom:12px;}
+  .pr-art-wahl{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
   .pr-check{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin:0 0 12px;}
   .pr-badge{display:inline-block;vertical-align:middle;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--text-muted);}
   .pr-badge.offen{background:var(--bad-soft);color:var(--bad);}
@@ -4573,8 +4574,14 @@ onAuthStateChanged(auth, async function(user){
       try{ gewaehlt = sessionStorage.getItem(KLASSE_ANSICHT_KEY); }catch(e){}
       if(gewaehlt && KLASSEN.some(function(k){ return k.id === gewaehlt; })) state.klasse = gewaehlt;
     }
-    state.route = {name:'home'};
+    // Klassenwechsel direkt aus «➕ Neue Prüfung»: dort weitermachen.
+    var prNeu = null;
+    if(state.profile.role === 'teacher' && !isLeitung()){
+      try{ prNeu = sessionStorage.getItem(PRUEF_NEU_KEY); sessionStorage.removeItem(PRUEF_NEU_KEY); }catch(e){}
+    }
+    state.route = prNeu ? {name:'pruefungen'} : {name:'home'};
     render();
+    if(prNeu) pruefNeuNachWechsel(prNeu);
     layoutLoad();
     stpVorladen();
     loadPencilEgg();
@@ -13126,6 +13133,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-20-pruefung-art-klasse', datum:'2026-09-20', fuer:'lehrer', text:'📝 Prüfungen: nur noch ein Knopf «➕ Neue Prüfung» – die Art (📄 aus einer Übung, 🧮 SIKORE, ⌨️ Tastaturschreiben) wählst du zuoberst im Dialog. Neu stellst du dort auch die Klasse ein (die Library wechselt dann dorthin) und unter «Für», ob die ganze Klasse oder nur eine deiner 👥 Gruppen die Prüfung schreibt – die übrigen sehen sie gar nicht.'},
   {id:'2026-09-20-tipp-pruefung', datum:'2026-09-20', fuer:'lehrer', text:'⌨️ Prüfungen › «⌨️ Neue Tipp-Prüfung»: klassische Abschreibprüfung im Prüfungsmodus – alle tippen denselben Text auf Zeit (Sätze aus dem Tipptrainer oder dein eigener Text). Bewertet werden die Netto-Anschläge pro Minute (Abzug pro Fehler einstellbar), Notengrenzen für 6 und 4 wählbar; die Note landet im Notenrechner.'},
   {id:'2026-09-20-tipp-pruefung-alle', datum:'2026-09-20', fuer:'alle', text:'⌨️ Neu: Tipp-Prüfungen. Du schreibst einen Text auf Zeit ab – bei einem Fehler wartet der Cursor, bis du die richtige Taste triffst. Üben kannst du in Medien und Informatik im Tipptrainer.'},
   {id:'2026-09-20-sitzplan-raum', datum:'2026-09-20', fuer:'lehrer', text:'🚪 Sitzplan › «🚪 Türen & Fenster»: Türen und Fenster selbst setzen, an jede Wand ziehen, länger/kürzer machen und löschen. Das Fenstersims lässt sich pro Wand ein- und ausschalten – die Möbel bleiben automatisch daneben.'},
@@ -15347,6 +15355,7 @@ var pruef = {
   unsub:null, list:[],
   mineUnsubs:{}, mine:{},     // Schüler:in: eigene Teilnahme je Prüfung
   teilUnsubs:{}, teil:{},     // Lehrperson: alle Teilnahmen je Prüfung
+  geladen:false,              // erster Snapshot der Prüfungsliste ist da
   sess:null,                  // laufende Prüfung auf DIESEM Gerät
   monTimer:null, lockSig:'',
   loes:{}                     // Lehrperson: Lösungen je Bank-Prüfung (intern/loesung)
@@ -15363,6 +15372,10 @@ function pruefMs(ts){ return ts && ts.toMillis ? ts.toMillis() : (typeof ts === 
 function pruefById(id){ return pruef.list.find(function(p){ return p.id === id; }) || null; }
 // Fach der Prüfung (Fach der Übung, sonst Fach im Notenrechner) — für Fach-Gäste.
 function pruefFach(p){ return (p && (p.subject || p.fach)) || ''; }
+// Prüfung nur für eine 👥 Gruppe (p.mitglieder): die anderen sehen sie gar nicht.
+function pruefFuerMich(p){
+  return !Array.isArray(p.mitglieder) || !state.user || p.mitglieder.indexOf(state.user.uid) >= 0;
+}
 // Eigene Teilnahme sofort lokal nachführen: die Prüfungsliste und die eigene
 // Teilnahme sind zwei getrennte Listener — ohne das sähe ein dazwischen
 // feuernder Listen-Snapshot noch den alten Stand («läuft, aktiv») und würde
@@ -15567,7 +15580,10 @@ function startPruefungWatcher(){
     // Fach-Gäste (z.B. nur Mathe) sehen nur Prüfungen ihres Fachs.
     var nurFach = state.profile.role !== 'teacher' && state.profile.nurFach;
     if(nurFach) list = list.filter(function(p){ return pruefFach(p) === nurFach; });
+    // Prüfungen für eine 👥 Gruppe: nur deren Mitglieder sehen sie.
+    if(state.profile.role !== 'teacher') list = list.filter(pruefFuerMich);
     pruef.list = list;
+    pruef.geladen = true;
     syncPruefTeilWatchers();
     updatePruefungBanner();
     if(pruefIstLehrer()) pruefRefreshTeacherView();
@@ -15579,7 +15595,7 @@ function stopPruefungWatcher(){
   if(pruef.unsub){ pruef.unsub(); pruef.unsub = null; }
   Object.keys(pruef.mineUnsubs).forEach(function(k){ pruef.mineUnsubs[k](); });
   Object.keys(pruef.teilUnsubs).forEach(function(k){ pruef.teilUnsubs[k](); });
-  pruef.mineUnsubs = {}; pruef.mine = {}; pruef.teilUnsubs = {}; pruef.teil = {}; pruef.list = [];
+  pruef.mineUnsubs = {}; pruef.mine = {}; pruef.teilUnsubs = {}; pruef.teil = {}; pruef.list = []; pruef.geladen = false;
   pruefSessionStopp();
   pruefLockHide();
 }
@@ -16693,15 +16709,13 @@ function renderPruefungen(){
   var html = '';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
   html += '<h2 class="page-welcome" style="margin-bottom:6px;">📝 Prüfungen</h2>';
-  html += '<p class="kz-intro">Online-Prüfung aus einer Übung. Die Bereiche kommen aus der Übung selbst (z.B. die Themen einer Prüfungsvorbereitung). Wer die Prüfung verlässt, wird gesperrt, bis du entsperrst.</p>';
-  html += '<div class="back-row"><button class="btn btn-primary btn-sm" id="prNeu" type="button">➕ Neue Prüfung</button><button class="btn btn-ghost btn-sm" id="prNeuSikore" type="button">🧮 Neue SIKORE-Prüfung</button><button class="btn btn-ghost btn-sm" id="prSikoreUeb" type="button">📊 SIKORE-Übersicht</button><button class="btn btn-ghost btn-sm" id="prNeuTippen" type="button">⌨️ Neue Tipp-Prüfung</button></div>';
+  html += '<p class="kz-intro">Online-Prüfung aus einer Übung, aus 🧮 SIKORE oder als ⌨️ Abschreibprüfung — die Art wählst du in «➕ Neue Prüfung». Dort stellst du auch ein, für welche Klasse und für wen (ganze Klasse oder eine 👥 Gruppe) die Prüfung ist. Wer die Prüfung verlässt, wird gesperrt, bis du entsperrst.</p>';
+  html += '<div class="back-row"><button class="btn btn-primary btn-sm" id="prNeu" type="button">➕ Neue Prüfung</button><button class="btn btn-ghost btn-sm" id="prSikoreUeb" type="button">📊 SIKORE-Übersicht</button></div>';
   html += '<div id="prListe"><div class="empty-state">Wird geladen …</div></div>';
   renderChrome(html);
   document.getElementById('backBtn').addEventListener('click', function(){ state.route = {name:'klassenzimmer'}; render(); });
   document.getElementById('prNeu').addEventListener('click', function(){ pruefEditor(null); });
-  document.getElementById('prNeuSikore').addEventListener('click', function(){ sikoreEditor(null); });
   document.getElementById('prSikoreUeb').addEventListener('click', sikoreUebersicht);
-  document.getElementById('prNeuTippen').addEventListener('click', function(){ tippPrEditor(null); });
   startPruefungWatcher();
   pruefListeZeichnen();
 }
@@ -16712,8 +16726,9 @@ function pruefStatusBadge(p){
 }
 // Kurzbeschreibung: Übung · Anzahl · Bereiche · (Einstellungen der Übung)
 function pruefBeschreibung(p, lang){
-  if(pruefArt(p) === 'sikore') return sikoreBeschreibung(p);
-  if(pruefArt(p) === 'tippen') return tippPrBeschreibung(p);
+  var fuer = p.gruppeName ? '👥 ' + p.gruppeName + ' · ' : '';
+  if(pruefArt(p) === 'sikore') return fuer + sikoreBeschreibung(p);
+  if(pruefArt(p) === 'tippen') return fuer + tippPrBeschreibung(p);
   var c = p.cfg || {}, teile = [(p.resourceTitel || '') + (c.quellen && c.quellen.length ? ' + ' + c.quellen.map(function(x){ return x.titel; }).join(', ') : '')];
   if(p.diktat) teile.push('✍️ Diktat · ' + (p.woerterInfo || '?') + ' Wörter');
   else teile.push(pruefAnzahl(p) + ' Fragen' + (pruefArt(p) === 'bank' && p.maxPunkte ? ' (' + pruefZahlText(p.maxPunkte) + ' Punkte)' : '') + (c.niveau ? ' · Niveau ' + c.niveau : ''));
@@ -16725,7 +16740,7 @@ function pruefBeschreibung(p, lang){
     if(c.formen && c.formen.length === PRUEF_FORMEN.length) teile.push('Formate ' + PRUEF_FORMEN.map(function(x, i){ return x.icon + c.formen[i]; }).join('/'));
   }
   teile.push('Massstab: ' + pruefSkalaText(p));
-  return teile.filter(Boolean).join(' · ');
+  return fuer + teile.filter(Boolean).join(' · ');
 }
 function pruefListeZeichnen(){
   var el = document.getElementById('prListe');
@@ -16741,12 +16756,129 @@ function pruefListeZeichnen(){
   });
 }
 
+/* ---------- Gemeinsamer Kopf der drei Prüfungs-Editoren ----------
+   Art (📄 Übung · 🧮 SIKORE · ⌨️ Tastaturschreiben), Klasse und «Für».
+   - Art: SIKORE und Tipp-Prüfung sind damit aus dem normalen «➕ Neue
+     Prüfung» heraus erreichbar statt über eigene Knöpfe.
+   - Klasse: eine andere Klasse/Seite direkt im Dialog wählen. Dafür muss die
+     ganze App in jene Klasse wechseln (Übungen, Klassenliste, Noten hängen
+     daran) — die Wahl wird gemerkt (PRUEF_NEU_KEY) und der Dialog nach dem
+     Neuladen wieder geöffnet.
+   - Für: ganze Klasse oder eine meiner 👥 Gruppen. Bei einer Gruppe stehen
+     deren uids in pruefungen/{id}.mitglieder; alle anderen sehen die Prüfung
+     gar nicht (pruefFuerMich) und fehlen in der Live-Übersicht. */
+var prEditorToken = 0;        // nur der zuletzt geöffnete Editor darf noch zeichnen
+var pruefGruppen = [];        // meine 👥 Gruppen für die «Für»-Auswahl
+const PRUEF_NEU_KEY = 'hl_pruefNeu';   // sessionStorage: nach dem Klassenwechsel diesen Editor öffnen
+
+function pruefArtWahlHtml(aktiv){
+  return '<label class="modal-label">Art der Prüfung</label><div class="pr-art-wahl">' +
+    [['uebung','📄 Aus einer Übung'],['sikore','🧮 SIKORE'],['tippen','⌨️ Tastaturschreiben']].map(function(a){
+      return '<button type="button" class="btn btn-sm '+(a[0] === aktiv ? 'btn-primary' : 'btn-ghost')+'" data-prart="'+a[0]+'">'+a[1]+'</button>';
+    }).join('') + '</div>';
+}
+function pruefKlasseWahlHtml(){
+  if(!state.profile || state.profile.role !== 'teacher' || isLeitung()) return '';
+  var gesehen = {}, h = '<label class="modal-label" for="prKlasse">Klasse</label><select class="modal-input" id="prKlasse">';
+  function teil(titel, list){
+    var neue = list.filter(function(k){ return !gesehen[k.id]; });
+    if(!neue.length) return '';
+    var x = '<optgroup label="'+esc(titel)+'">';
+    neue.forEach(function(k){
+      gesehen[k.id] = true;
+      x += '<option value="'+esc(k.id)+'"'+(k.id === state.klasse ? ' selected' : '')+'>'+esc(klasseLabel(k.id))+(k.art === 'klasse' ? ' · '+esc(k.lp) : '')+'</option>';
+    });
+    return x + '</optgroup>';
+  }
+  function art(a){ return KLASSEN.filter(function(k){ return k.art === a; }); }
+  h += teil('⭐ Meine Seiten', meineSeiten());
+  h += teil('Alle Klassen', art('klasse'));
+  h += teil('🎓 FLP & ISF', art('flp').concat(art('isf')));
+  h += teil('🧑‍🎓 Praktikant:innen', art('praktikum'));
+  return h + '</select>';
+}
+// Nach dem Klassenwechsel aus dem Dialog: erst öffnen, wenn die Prüfungsliste
+// der neuen Klasse da ist — sikoreEditor zieht daraus die Level-Vorschläge.
+function pruefNeuNachWechsel(art){
+  var bis = Date.now() + 5000;
+  (function warten(){
+    if(!pruef.geladen && Date.now() < bis){ setTimeout(warten, 150); return; }
+    if(art === 'sikore') sikoreEditor(null);
+    else if(art === 'tippen') tippPrEditor(null);
+    else pruefEditor(null);
+  })();
+}
+function pruefKopfHtml(art, neu){
+  return neu ? pruefArtWahlHtml(art) + pruefKlasseWahlHtml() : '';
+}
+function pruefKopfVerdrahten(art){
+  Array.prototype.forEach.call(modalEl.querySelectorAll('[data-prart]'), function(b){
+    b.addEventListener('click', function(){
+      var a = b.getAttribute('data-prart');
+      if(a === art) return;
+      if(a === 'sikore') sikoreEditor(null);
+      else if(a === 'tippen') tippPrEditor(null);
+      else pruefEditor(null);
+    });
+  });
+  var kl = document.getElementById('prKlasse');
+  if(kl) kl.addEventListener('change', function(){
+    if(kl.value === state.klasse) return;
+    try{ sessionStorage.setItem(PRUEF_NEU_KEY, art); }catch(e){}
+    wechsleKlasse(kl.value);
+  });
+}
+// «Für»: ganze Klasse oder eine meiner Gruppen. Die Gruppen kommen asynchron
+// dazu (pruefFuerLaden), damit der Dialog sofort steht.
+function pruefFuerHtml(p, fix){
+  var h = '<label class="modal-label" for="prFuer">Für</label><select class="modal-input" id="prFuer"'+(fix ? ' disabled' : '')+'>';
+  h += '<option value="">Ganze Klasse '+esc(klasseLabel())+'</option>';
+  if(p && p.gruppeId) h += '<option value="'+esc(p.gruppeId)+'" selected>👥 '+esc(p.gruppeName || 'Gruppe')+'</option>';
+  h += '</select><p class="pr-hinweis">Wählst du eine 👥 Gruppe, sehen nur deren Mitglieder die Prüfung. Gruppenmitglieder aus einer anderen Klasse sind nicht dabei — für die oben die Klasse wechseln.</p>';
+  return h;
+}
+function pruefFuerLaden(onChange){
+  var sel = document.getElementById('prFuer');
+  if(!sel || sel.disabled) return;
+  if(onChange) sel.addEventListener('change', onChange);
+  loadMeineGruppen().then(function(list){
+    var s = document.getElementById('prFuer');
+    if(!s) return;
+    pruefGruppen = list;
+    var cur = s.value, alt = s.options[s.selectedIndex] ? s.options[s.selectedIndex].textContent : '';
+    var h = '<option value="">Ganze Klasse '+esc(klasseLabel())+'</option>';
+    list.forEach(function(g){ h += '<option value="'+esc(g.id)+'">👥 '+esc(g.name)+' ('+esc(gruppeKurz(g))+')</option>'; });
+    if(cur && !list.some(function(g){ return g.id === cur; })) h += '<option value="'+esc(cur)+'">'+esc(alt)+'</option>';
+    s.innerHTML = h;
+    s.value = cur;
+    if(onChange) onChange();
+  }).catch(function(err){ console.error('Gruppen für die Prüfung', err); });
+}
+function pruefFuerGruppe(){
+  var sel = document.getElementById('prFuer');
+  if(!sel || sel.disabled || !sel.value) return null;
+  return pruefGruppen.filter(function(g){ return g.id === sel.value; })[0] || null;
+}
+// Was beim Speichern dazukommt. Bei «ganze Klasse» wird eine bisherige Gruppe
+// wieder entfernt (nur beim update — bei einer neuen Prüfung steht nichts da).
+function pruefFuerDaten(p){
+  var sel = document.getElementById('prFuer');
+  if(!sel || sel.disabled) return {};
+  var g = pruefFuerGruppe();
+  if(g) return {gruppeId:g.id, gruppeName:g.name, mitglieder:(g.mitglieder || []).slice(0, 400)};
+  if(sel.value) return {};    // bisherige Gruppe, noch nicht geladen: unverändert lassen
+  if(p && p.gruppeId) return {gruppeId:deleteField(), gruppeName:deleteField(), mitglieder:deleteField()};
+  return {};
+}
+
 /* ---------- Lehrperson: Prüfung anlegen / bearbeiten ---------- */
 
 async function pruefEditor(p){
   var neu = !p, c = (p && p.cfg) || {};
   var fragenFix = !neu && p.status !== 'entwurf';
-  openModal('<h3>'+(neu ? '➕ Neue Prüfung' : '✏️ Prüfung bearbeiten')+'</h3><p>Übungen werden geladen …</p>', 'pr-modal');
+  var token = ++prEditorToken, kopf = pruefKopfHtml('uebung', neu);
+  openModal('<h3>'+(neu ? '➕ Neue Prüfung' : '✏️ Prüfung bearbeiten')+'</h3>'+kopf+'<p>Übungen werden geladen …</p>', 'pr-modal');
+  if(neu) pruefKopfVerdrahten('uebung');
   var uebungen = [];
   if(!fragenFix){
     try{
@@ -16761,11 +16893,12 @@ async function pruefEditor(p){
       var pruefbar = await pruefScanAlle(uebungen, function(k, n){ var e = document.querySelector('.pr-modal p'); if(e) e.textContent = 'Übungen werden geprüft … ' + k + ' / ' + n; });
       uebungen = uebungen.filter(function(r){ return pruefbar[r.id] || (p && p.resourceId === r.id); });
     }catch(err){ console.error(err); }
+    if(token !== prEditorToken) return;   // inzwischen wurde eine andere Art gewählt
     var fachName = function(r){ var s = subjectById(r.subject); return s ? s.name : (r.subject || ''); };
     uebungen.sort(function(a,b){ return fachName(a).localeCompare(fachName(b), 'de') || (a.title || '').localeCompare(b.title || '', 'de', {numeric:true}); });
     if(!uebungen.length){ uiInfo('Keine passende Übung gefunden', 'Prüfungen gehen mit Prüfungsvorbereitungen (Quiz), Mathe-Übungen, Diktaten und Pöstlergeografie. Lade zuerst so eine Übung hoch.'); return; }
   }
-  var h = '<h3>'+(neu ? '➕ Neue Prüfung' : '✏️ Prüfung bearbeiten')+'</h3>';
+  var h = '<h3>'+(neu ? '➕ Neue Prüfung' : '✏️ Prüfung bearbeiten')+'</h3>' + kopf;
   h += '<label class="modal-label">Titel</label><input type="text" id="prTitel" class="modal-input" maxlength="80" value="'+esc(p ? p.titel : '')+'" placeholder="z.B. Prüfung Industrialisierung">';
   if(fragenFix){
     h += '<p class="pr-hinweis">Die Prüfung wurde schon freigegeben — die Fragen bleiben, wie sie sind. Ändern lassen sich Titel, Notenmassstab und die Punkte (unter «🧮 Aufgaben & Punkte»).</p>';
@@ -16781,6 +16914,7 @@ async function pruefEditor(p){
     h += (fach !== null ? '</optgroup>' : '') + '</select>';
     h += '<div id="prInfo"><p class="pr-hinweis">Wähle eine Übung — die Bereiche werden aus ihr ausgelesen.</p></div>';
   }
+  h += pruefFuerHtml(p, fragenFix);
   var faecherListe = notenFaecher(), fachStd = p && p.fach ? p.fach : '';
   h += '<div class="pr-grid2"><div><label class="modal-label">Fach im Notenrechner</label><select id="prFach" class="modal-input">' + faecherListe.map(function(f){
     return '<option value="'+esc(f.id)+'"'+(f.id === fachStd ? ' selected' : '')+'>'+esc(f.name)+'</option>'; }).join('') + '</select></div>';
@@ -16798,6 +16932,8 @@ async function pruefEditor(p){
   h += '<div id="prSkalaFelder"></div><p class="pr-hinweis" id="prMaxInfo"></p>';
   h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button><button class="btn btn-primary btn-sm" id="modalOk" type="button"'+(fragenFix ? '' : ' disabled')+'>Speichern</button></div>';
   openModal(h, 'pr-modal');
+  if(neu) pruefKopfVerdrahten('uebung');
+  pruefFuerLaden();
   document.getElementById('modalCancel').addEventListener('click', closeModal);
 
   var info = null, resource = null, okBtn = document.getElementById('modalOk');
@@ -17029,6 +17165,7 @@ async function pruefEditor(p){
     var data = {titel:titel, skala:skala, punkteFuer6:null, fehlerAbzug:null, rundung:+document.getElementById('prRund').value || 0.1,
       fach:document.getElementById('prFach').value, gewicht:gewicht,
       zeitMin:Math.min(300, Math.max(0, Math.round(+document.getElementById('prZeit').value || 0))) || null};
+    Object.assign(data, pruefFuerDaten(p));
     var loesung = null;
     if(!fragenFix){
       if(!info || info.art === 'keine' || !resource) return;
@@ -17855,6 +17992,7 @@ function pruefMonitorZeichnen(){
   pruefMonitorVerdrahten(p);
 }
 function pruefMonitorZeilen(p, teil, roster){
+  if(Array.isArray(p.mitglieder)) roster = roster.filter(function(s){ return p.mitglieder.indexOf(s.uid) >= 0; });
   if(pruefArt(p) === 'sikore') roster = roster.filter(function(s){ return p.levels && p.levels[s.uid]; });
   var rows = roster.map(function(s){ return {uid:s.uid, name:s.displayName || s.username || s.uid, t:teil[s.uid] || null}; });
   Object.keys(teil).forEach(function(uid){ if(!rows.some(function(r){ return r.uid === uid; })) rows.push({uid:uid, name:teil[uid].name || uid, t:teil[uid]}); });
@@ -18068,7 +18206,7 @@ function pruefDetailsLehrer(p, uid){
    steht die Quersumme des Ergebnisses als Kontrollhilfe.
    - Mathe › 🧮 SIKORE (virtuelle Übung direkt im Fach, sikoreVirtuell): Trainer zum Üben,
      vorgewählt auf dem eigenen Level (sikoreMeinLevel), frei wechselbar.
-   - Prüfungen › «🧮 Neue SIKORE-Prüfung»: pruefungen/{id} mit art 'sikore',
+   - Prüfungen › «➕ Neue Prüfung» › Art «🧮 SIKORE»: pruefungen/{id} mit art 'sikore',
      levels {uid: level}, cfg {reihen, laenge, folgefehler, quersumme},
      modus online|papier. Online schreibt man im normalen Prüfungsmodus,
      korrigiert wird auf dem Gerät der Lehrperson (sikoreBewerten). Papier:
@@ -18588,12 +18726,15 @@ async function sikoreVorschlaege(ohneId){
 var SIKORE_SKALEN = PRUEF_SKALEN.filter(function(s){ return s[0] !== 'tabelle'; });
 async function sikoreEditor(p){
   var neu = !p, c = sikoreCfg(p), fix = !neu && p.status !== 'entwurf';
-  openModal('<h3>🧮 '+(neu ? 'Neue SIKORE-Prüfung' : 'SIKORE-Prüfung bearbeiten')+'</h3><p>Klasse und bisherige Levels werden geladen …</p>', 'pr-modal pr-modal-breit');
+  var token = ++prEditorToken, kopf = pruefKopfHtml('sikore', neu);
+  openModal('<h3>🧮 '+(neu ? 'Neue SIKORE-Prüfung' : 'SIKORE-Prüfung bearbeiten')+'</h3>'+kopf+'<p>Klasse und bisherige Levels werden geladen …</p>', 'pr-modal pr-modal-breit');
+  if(neu) pruefKopfVerdrahten('sikore');
   var roster = [], vorschlag = {};
   try{
     roster = rosterFuerFach(await loadStudentRoster(), 'mathe');
     vorschlag = await sikoreVorschlaege(p ? p.id : null);
   }catch(err){ console.error(err); }
+  if(token !== prEditorToken) return;   // inzwischen wurde eine andere Art gewählt
   roster.sort(function(a, b){ return (a.displayName || a.username || '').localeCompare(b.displayName || b.username || '', 'de'); });
   var levels = Object.assign({}, (p && p.levels) || {});
   if(neu) roster.forEach(function(s){ if(vorschlag[s.uid]) levels[s.uid] = vorschlag[s.uid].neu; });
@@ -18603,7 +18744,7 @@ async function sikoreEditor(p){
   var levelOpts = function(cur){
     return '<option value="">– nicht dabei –</option>' + SIKORE_LEVELS.map(function(x, i){ var l = i + 1; return '<option value="'+l+'"'+(+cur === l ? ' selected' : '')+'>'+esc(sikoreLevelText(l))+'</option>'; }).join('');
   };
-  var h = '<h3>🧮 '+(neu ? 'Neue SIKORE-Prüfung' : 'SIKORE-Prüfung bearbeiten')+'</h3>';
+  var h = '<h3>🧮 '+(neu ? 'Neue SIKORE-Prüfung' : 'SIKORE-Prüfung bearbeiten')+'</h3>' + kopf;
   h += '<label class="modal-label">Titel</label><input type="text" id="prTitel" class="modal-input" maxlength="80" value="'+esc(p ? p.titel : 'SIKORE ' + datum)+'">';
   if(fix) h += '<p class="pr-hinweis">Die Prüfung wurde schon freigegeben — Levels und Aufgaben bleiben, wie sie sind. Ändern lassen sich Titel, Gewichtung, Folgefehler und Notenmassstab.</p>';
   h += '<div class="pr-grid2"><div><label class="modal-label">Durchführung</label><select id="skModus" class="modal-input"'+(fix ? ' disabled' : '')+'>'+
@@ -18619,6 +18760,7 @@ async function sikoreEditor(p){
   h += '<div><label class="modal-label">Noten runden auf</label><select id="prRund" class="modal-input">' + [['0.1','Zehntel'],['0.25','Viertel'],['0.5','Halbe']].map(function(o){
     return '<option value="'+o[0]+'"'+(String((p && p.rundung) || 0.1) === o[0] ? ' selected' : '')+'>'+o[1]+'</option>'; }).join('') + '</select></div></div>';
   h += '<div id="prSkalaFelder"></div><p class="pr-hinweis" id="prMaxInfo"></p>';
+  h += pruefFuerHtml(p, fix);
   h += '<h4 class="pr-h4">Schüler:innen und Level</h4>';
   h += '<p class="pr-hinweis">Vorschlag aus der letzten SIKORE-Prüfung: Note unter 4 → ein Level tiefer, über 5 → ein Level höher, sonst gleich. Jedes Level lässt sich ändern.</p>';
   if(!fix) h += '<div class="sk-lv-alle"><span>Alle ohne Level auf</span><select id="skAlleLv" class="modal-input">'+levelOpts(1)+'</select><button class="btn btn-ghost btn-sm" id="skAlleBtn" type="button">setzen</button></div>';
@@ -18630,12 +18772,24 @@ async function sikoreEditor(p){
       var pfeil = v.neu > v.alt ? '⬆️' : v.neu < v.alt ? '⬇️' : '➡️';
       info = pfeil + ' zuletzt Level ' + v.alt + (v.note != null ? ', Note ' + fmtNote(v.note) : ', noch keine Note');
     } else info = 'erstes Mal';
-    h += '<div class="sk-lv-row"><div><b>'+esc(s.displayName || s.username || s.uid)+'</b><small>'+esc(info)+'</small></div>'+
+    h += '<div class="sk-lv-row" data-uid="'+esc(s.uid)+'"><div><b>'+esc(s.displayName || s.username || s.uid)+'</b><small>'+esc(info)+'</small></div>'+
       '<select class="modal-input" data-uid="'+esc(s.uid)+'"'+(fix ? ' disabled' : '')+'>'+levelOpts(levels[s.uid])+'</select></div>';
   });
   h += '</div>';
   h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button><button class="btn btn-primary btn-sm" id="modalOk" type="button">Speichern</button></div>';
   openModal(h, 'pr-modal pr-modal-breit');
+  if(neu) pruefKopfVerdrahten('sikore');
+  // «Für» blendet die Nicht-Mitglieder aus der Levelliste aus.
+  function fuerAnwenden(){
+    var g = pruefFuerGruppe();
+    Array.prototype.forEach.call(document.querySelectorAll('.sk-lv-row'), function(row){
+      var drin = !g || (g.mitglieder || []).indexOf(row.getAttribute('data-uid')) >= 0;
+      row.hidden = !drin;
+      var sel = row.querySelector('select');
+      if(!drin && sel && !sel.disabled) sel.value = '';
+    });
+  }
+  pruefFuerLaden(fuerAnwenden);
   document.getElementById('modalCancel').addEventListener('click', closeModal);
   var num = function(id){ var e = document.getElementById(id); return e ? parseFloat(String(e.value).replace(',', '.')) : NaN; };
   function maxP(){ return (+document.getElementById('skReihen').value || 2) * (+document.getElementById('skLaenge').value || 12); }
@@ -18663,7 +18817,10 @@ async function sikoreEditor(p){
   var alleBtn = document.getElementById('skAlleBtn');
   if(alleBtn) alleBtn.addEventListener('click', function(){
     var l = document.getElementById('skAlleLv').value;
-    Array.prototype.forEach.call(document.querySelectorAll('.sk-lv-liste select'), function(s){ if(!s.value) s.value = l; });
+    Array.prototype.forEach.call(document.querySelectorAll('.sk-lv-liste .sk-lv-row'), function(row){
+      var s = row.querySelector('select');
+      if(s && !s.value && !row.hidden) s.value = l;
+    });
   });
   modusZeichnen(); skalaZeichnen();
   document.getElementById('modalOk').addEventListener('click', async function(){
@@ -18679,6 +18836,7 @@ async function sikoreEditor(p){
       gewicht:gew > 0 && gew <= 10 ? gew : 1,
       cfg:{reihen:+document.getElementById('skReihen').value || 2, laenge:+document.getElementById('skLaenge').value || 12,
         folgefehler:document.getElementById('skFF').checked, quersumme:document.getElementById('skQS').checked}};
+    Object.assign(data, pruefFuerDaten(p));
     if(!fix){
       var lv = {};
       Array.prototype.forEach.call(document.querySelectorAll('.sk-lv-liste select'), function(sel){ if(sel.value) lv[sel.getAttribute('data-uid')] = +sel.value; });
@@ -19521,7 +19679,7 @@ async function tippUebersicht(){
   }catch(err){ console.error(err); closeModal(); toast('Übersicht konnte nicht geladen werden.'); }
 }
 
-/* ---------- ⌨️ Tipp-Prüfung (Prüfungen › «⌨️ Neue Tipp-Prüfung») ----------
+/* ---------- ⌨️ Tipp-Prüfung (Prüfungen › «➕ Neue Prüfung» › Art «⌨️ Tastaturschreiben») ----------
    pruefungen/{id} mit art 'tippen', fach 'informatik', zeitMin = Schreibzeit,
    cfg {text, abzug, apm6, apm4}. Alle tippen denselben Text (klassische
    Abschreibprüfung) im Prüfungsmodus; die Zeit läuft ab dem Start. Falsche
@@ -19649,7 +19807,8 @@ function tippPrEditor(p){
   var neu = !p, c = tippPrCfg(p), fix = !neu && p.status !== 'entwurf';
   var datum = new Date().toLocaleDateString('de-CH');
   var eigen = !neu && p.cfg && p.cfg.quelle === 'eigen';
-  var h = '<h3>⌨️ '+(neu ? 'Neue Tipp-Prüfung' : 'Tipp-Prüfung bearbeiten')+'</h3>';
+  prEditorToken++;
+  var h = '<h3>⌨️ '+(neu ? 'Neue Tipp-Prüfung' : 'Tipp-Prüfung bearbeiten')+'</h3>' + pruefKopfHtml('tippen', neu);
   h += '<p class="pr-hinweis">Klassische Abschreibprüfung: Alle tippen denselben Text auf Zeit, im Prüfungsmodus (Vollbild, Sperre beim Verlassen). Bewertet werden die <b>Netto-Anschläge pro Minute</b> = (Anschläge − Abzug × Fehler) ÷ Minuten.</p>';
   h += '<label class="modal-label">Titel</label><input type="text" id="prTitel" class="modal-input" maxlength="80" value="'+esc(p ? p.titel : 'Tastaturschreiben ' + datum)+'">';
   if(fix) h += '<p class="pr-hinweis">Die Prüfung wurde schon freigegeben — Text und Zeit bleiben. Ändern lassen sich Titel, Gewichtung, Fehlerabzug und Notengrenzen.</p>';
@@ -19661,8 +19820,11 @@ function tippPrEditor(p){
   h += '<div class="pr-grid2"><div><label class="modal-label">Netto-Anschläge/Min. für eine 6</label><input type="number" id="ttPr6" class="modal-input" min="10" max="600" step="5" value="'+c.apm6+'"></div>';
   h += '<div><label class="modal-label">… für eine 4</label><input type="number" id="ttPr4" class="modal-input" min="5" max="590" step="5" value="'+c.apm4+'"></div></div>';
   h += '<p class="pr-hinweis">Richtwerte Sek I nach einem Jahr Übung: gut 120–180 Netto-Anschläge pro Minute. Das Tempo aus dem Tipptrainer siehst du in dessen 📊 Klassenübersicht.</p>';
+  h += pruefFuerHtml(p, fix);
   h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button><button class="btn btn-primary btn-sm" id="modalOk" type="button">Speichern</button></div>';
   openModal(h, 'pr-modal pr-modal-breit');
+  if(neu) pruefKopfVerdrahten('tippen');
+  pruefFuerLaden();
   document.getElementById('modalCancel').addEventListener('click', closeModal);
   var q = document.getElementById('ttPrQuelle');
   function quelleZeichnen(){ document.getElementById('ttPrEigenBox').style.display = q.value === 'eigen' ? '' : 'none'; }
@@ -19675,6 +19837,7 @@ function tippPrEditor(p){
     var gew = +String(document.getElementById('prGewicht').value).replace(',', '.');
     var data = {titel:titel.slice(0, 80), art:'tippen', fach:TIPP_SUBJECT, rundung:0.1, gewicht:gew > 0 && gew <= 10 ? gew : 1,
       skala:{typ:'knick', prozent:Math.max(1, Math.min(99, Math.round(100 * a4 / a6)))}};
+    Object.assign(data, pruefFuerDaten(p));
     var cfg = {abzug:ab >= 0 ? Math.min(50, Math.round(ab)) : 10, apm6:Math.round(a6), apm4:Math.round(a4), text:c.text, quelle:(p && p.cfg && p.cfg.quelle) || 'saetze'};
     if(!fix){
       var min = +document.getElementById('ttPrZeit').value || 5;
