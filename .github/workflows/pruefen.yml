@@ -1,0 +1,61 @@
+name: Prüfen
+
+# Läuft bei jedem Push auf die Testseite (dieser Ordner .github/ wird nie live
+# kopiert). Drei unabhängige Prüfungen:
+#  - Leitplanken: admin/check-leitplanken.js (Syntax, keine nativen Dialoge,
+#    kein localStorage.clear/orderBy, delete-Regeln separat, doctype)
+#  - Smoke-Test: admin/smoke-test.js (Seite lädt in Chromium, Login erscheint,
+#    keine JavaScript-Fehler)
+#  - Regeln: admin/rules-test/ im Firestore-Emulator (Löschen geht für
+#    Lehrpersonen, Klassen getrennt, Rückmeldungen/Fehlerlog). Nie gegen die
+#    echte Datenbank.
+# Die nächtliche Freigabe im Live-Repo macht Leitplanken + Smoke-Test nochmals.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  leitplanken:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node admin/check-leitplanken.js .
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Playwright installieren
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y >/dev/null && npm install --no-audit --no-fund playwright@1 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+      - run: NODE_PATH="$RUNNER_TEMP/pw/node_modules" node admin/smoke-test.js .
+
+  regeln:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Emulator-Tests
+        working-directory: admin/rules-test
+        run: |
+          npm install --no-audit --no-fund
+          npx firebase emulators:exec --config ../../firebase.json --only firestore --project demo-library "node --test"
