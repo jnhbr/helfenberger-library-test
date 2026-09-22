@@ -630,6 +630,8 @@
   .sk-pool-item:hover{border-color:var(--good);background:var(--good-soft);}
   .sk-clear{align-self:center;}
   .sk-bulk{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  .sk-wahl-row{display:flex;justify-content:center;}
+  .sk-wahl{font:inherit;font-size:13px;padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);max-width:100%;cursor:pointer;}
 
   /* ---------- Lärmampel ---------- */
   .am-wrap{display:flex;gap:18px;align-items:center;justify-content:center;}
@@ -783,6 +785,25 @@
 
   /* ---------- Klassenzimmer-Sammelseite ---------- */
   .kz-intro{color:var(--text-muted);font-size:14px;margin:0 2px 16px;}
+  .tl-drop{display:flex;flex-direction:column;align-items:center;gap:3px;border:2px dashed var(--border);border-radius:var(--radius);padding:18px 12px;cursor:pointer;text-align:center;background:var(--surface-2);}
+  .tl-drop span{font-weight:700;}
+  .tl-drop small{color:var(--text-muted);font-size:12px;}
+  .tl-drop:hover,.tl-drop-an{border-color:var(--brand);}
+  .tl-liste{display:flex;flex-direction:column;gap:6px;margin-top:10px;}
+  .tl-zeile{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+  .tl-nr{font-weight:800;color:var(--text-muted);min-width:18px;}
+  .tl-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;}
+  .tl-info{font-size:12.5px;color:var(--text-muted);}
+  .tl-seiten{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px;margin-top:10px;max-height:55vh;overflow:auto;padding:2px;}
+  .tl-seite{position:relative;border:2px solid var(--border);border-radius:10px;padding:6px;background:var(--surface-2);display:flex;flex-direction:column;align-items:center;gap:4px;}
+  .tl-seite-an{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand);}
+  .tl-seite-weg{opacity:.35;}
+  .tl-thumb{border:none;background:none;padding:0;cursor:pointer;height:120px;display:flex;align-items:center;justify-content:center;width:100%;}
+  .tl-thumb img{max-width:100%;max-height:112px;box-shadow:0 1px 4px rgba(0,0,0,.25);background:#fff;transition:transform .15s;}
+  .tl-seite-nr{font-size:11px;color:var(--text-muted);font-weight:700;}
+  .tl-seite-knoepfe{display:flex;gap:3px;}
+  .tl-seite-knoepfe button{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:6px;font:inherit;font-size:13px;padding:2px 6px;cursor:pointer;}
+  .tl-seite-knoepfe button:disabled{opacity:.35;cursor:default;}
   .kz-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;}
   .kz-tile{position:relative;display:flex;gap:14px;align-items:flex-start;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;cursor:pointer;font:inherit;color:var(--text);}
   .kz-tile:hover{border-color:var(--brand);transform:translateY(-2px);box-shadow:var(--shadow);}
@@ -5670,6 +5691,7 @@ function renderHome(){
     html += '<button class="btn btn-ghost btn-sm" id="lernstandBtn" type="button">📈 Lernstand-Übersicht (alle Fächer)</button>';
     html += '<button class="btn btn-ghost btn-sm" id="klassenzimmerBtn" type="button">🏫 Klassenzimmer</button>';
   }
+  html += '<button class="btn btn-ghost btn-sm" id="toolsBtn" type="button" title="PDFs und Bilder komprimieren, zusammenführen, Seiten bearbeiten">🧰 Tools</button>';
   html += '<button class="btn btn-ghost btn-sm" id="anordnenBtn" type="button" title="Kacheln und Symbole verschieben (oder lange auf eine Kachel drücken)">✏️ Anordnen</button>';
   html += '</div>';
   html += '<div id="aemtliBanner"></div>';
@@ -5702,6 +5724,7 @@ function renderHome(){
     klassenzimmerBtn.addEventListener('click', function(){ state.route = {name:'klassenzimmer'}; render(); });
   }
   document.getElementById('kalenderBtn').addEventListener('click', function(){ state.route = {name:'kalender'}; render(); });
+  document.getElementById('toolsBtn').addEventListener('click', function(){ state.route = {name:'tools'}; render(); });
   document.getElementById('anordnenBtn').addEventListener('click', function(){ wackelnStart(); });
   initKachelSort();
   renderStpJetzt();
@@ -10001,7 +10024,7 @@ function mountAmpel(host){
    dem Gerät der Lehrperson (hl_-Präfix, wird darum nie in den Übungs-Sync
    gezogen) — es ist eine Momentaufnahme der Lektion, kein Datenbestand. */
 
-var sprecherState = { uids:null, roster:null };
+var sprecherState = { uids:null, rosters:{}, quelle:null, gruppen:null };
 
 function loadSprecher(){
   if(sprecherState.uids) return sprecherState.uids;
@@ -10013,28 +10036,107 @@ function saveSprecher(){
   lsSet(LIB_PREFIX+'speakers', JSON.stringify(sprecherState.uids || []));
 }
 
+// Woher kommen die Namen? '' = offene Klasse/Seite, 'k:G3a' = andere Klasse,
+// 'n:G3' = Niveau eines Jahrgangs (G3a + G3b), 'n:G' / 'n:E' = alle G- bzw.
+// E-Klassen, 'g:<id>' = eine eigene 👥 Gruppe. Gerätelokal gemerkt.
+function sprecherQuelle(){
+  if(sprecherState.quelle === null) sprecherState.quelle = lsGet(LIB_PREFIX+'speak_quelle') || '';
+  return sprecherState.quelle;
+}
+function sprecherKlassenVon(q){
+  if(q.indexOf('k:') === 0) return [q.slice(2)];
+  if(q.indexOf('n:') === 0){
+    var n = q.slice(2);
+    return abstAlleKlassen().filter(function(k){ return k.indexOf(n) === 0; });
+  }
+  return [];
+}
+function sprecherKurzname(n){ return (n.n || '?') + (n.nn ? ' ' + n.nn.charAt(0) + '.' : ''); }
+function sprecherRosterLaden(q){
+  var key = q || ('seite:' + state.klasse);
+  if(sprecherState.rosters[key]) return Promise.resolve(sprecherState.rosters[key]);
+  var p;
+  if(!q){
+    p = loadStudentRoster();
+  } else if(q.indexOf('g:') === 0){
+    p = (sprecherState.gruppen ? Promise.resolve(sprecherState.gruppen) : loadMeineGruppen()).then(function(list){
+      var g = list.filter(function(x){ return 'g:' + x.id === q; })[0];
+      if(!g) return [];
+      var namen = g.namen || {};
+      var kl = {};
+      (g.mitglieder || []).forEach(function(u){ if(namen[u] && namen[u].k) kl[namen[u].k] = 1; });
+      var mehrere = Object.keys(kl).length > 1;
+      return (g.mitglieder || []).map(function(u){
+        var n = namen[u] || {};
+        return { uid:u, displayName: sprecherKurzname(n) + (mehrere && n.k ? ' (' + n.k + ')' : '') };
+      }).sort(function(a, b){ return a.displayName.localeCompare(b.displayName, 'de'); });
+    });
+  } else {
+    var ks = sprecherKlassenVon(q);
+    // Ein einziges where() mit «in» — kein zusammengesetzter Index nötig.
+    p = !ks.length ? Promise.resolve([]) : getDocs(query(collection(db,'students'), where('klasse','in', ks.slice(0, 30)))).then(function(snap){
+      var out = [];
+      snap.forEach(function(d){
+        var data = d.data();
+        if(data.role !== 'student') return;
+        if((data.username||'').toLowerCase() === 'schueler') return;
+        out.push(Object.assign({uid:d.id}, data, {
+          displayName: (data.displayName || data.username || '?') + (ks.length > 1 ? ' (' + data.klasse + ')' : '')
+        }));
+      });
+      out.sort(function(a, b){ return (a.displayName||'').localeCompare(b.displayName||'', 'de'); });
+      return out;
+    });
+  }
+  return p.then(function(list){ sprecherState.rosters[key] = list; return list; });
+}
+function sprecherWahlHtml(q){
+  var alle = abstAlleKlassen();
+  function opt(v, t){ return '<option value="'+esc(v)+'"'+(v === q ? ' selected' : '')+'>'+esc(t)+'</option>'; }
+  var h = '<select class="sk-wahl" id="skQuelle" title="Wessen Namen?">';
+  h += opt('', (istKlasse(state.klasse) ? 'Klasse ' : '') + klasseLabel());
+  h += '<optgroup label="Niveau">';
+  h += opt('n:G', 'Alle G-Klassen') + opt('n:E', 'Alle E-Klassen');
+  ['G1','G2','G3','E1','E2','E3'].forEach(function(n){
+    var ks = alle.filter(function(k){ return k.indexOf(n) === 0; });
+    if(ks.length) h += opt('n:'+n, n + ' (' + ks.join(', ') + ')');
+  });
+  h += '</optgroup><optgroup label="Klasse">';
+  alle.forEach(function(k){ if(k !== state.klasse) h += opt('k:'+k, k); });
+  h += '</optgroup>';
+  if(sprecherState.gruppen && sprecherState.gruppen.length){
+    h += '<optgroup label="👥 Meine Gruppen">';
+    sprecherState.gruppen.forEach(function(g){ h += opt('g:'+g.id, g.name); });
+    h += '</optgroup>';
+  }
+  return h + '</select>';
+}
+
 function mountSprecher(host){
   loadSprecher();
+  var roster = null, laedt = false;
   function paint(){
-    var roster = gaesteOptional(sprecherState.roster || []);
+    var q = sprecherQuelle();
+    var liste = q ? (roster || []) : gaesteOptional(roster || []);
     var byUid = {};
-    roster.forEach(function(s){ byUid[s.uid] = s; });
+    liste.forEach(function(s){ byUid[s.uid] = s; });
     var chosen = sprecherState.uids.filter(function(u){ return byUid[u]; });
-    var rest = roster.filter(function(s){ return sprecherState.uids.indexOf(s.uid) < 0; });
+    var rest = liste.filter(function(s){ return sprecherState.uids.indexOf(s.uid) < 0; });
 
     var h = '';
     h += '<div class="sk-head">🗣 dürfen FLÜSTERN</div>';
     h += '<div class="sk-chosen">';
     if(!chosen.length){
-      h += '<div class="sk-none">'+(roster.length ? 'Niemand — es ist still.' : 'Klassenliste wird geladen …')+'</div>';
+      h += '<div class="sk-none">'+(roster && !laedt ? (liste.length ? 'Niemand — es ist still.' : 'Hier ist niemand eingetragen.') : 'Namen werden geladen …')+'</div>';
     } else {
       h += chosen.map(function(u){
         return '<button class="sk-chip" type="button" data-remove="'+esc(u)+'" title="Entfernen">'+esc(byUid[u].displayName)+'<span>✕</span></button>';
       }).join('');
     }
     h += '</div>';
-    if(roster.length){
-      h += '<div class="sk-add-label">Hinzufügen</div>';
+    h += '<div class="sk-add-label">Hinzufügen aus</div>';
+    h += '<div class="sk-wahl-row">' + sprecherWahlHtml(q) + '</div>';
+    if(liste.length){
       h += '<div class="sk-pool">'+rest.map(function(s){
         return '<button class="sk-pool-item" type="button" data-add="'+esc(s.uid)+'">'+esc(s.displayName)+'</button>';
       }).join('')+'</div>';
@@ -10047,6 +10149,11 @@ function mountSprecher(host){
     }
     host.innerHTML = h;
 
+    host.querySelector('#skQuelle').addEventListener('change', function(e){
+      sprecherState.quelle = e.target.value;
+      lsSet(LIB_PREFIX+'speak_quelle', sprecherState.quelle);
+      laden();
+    });
     Array.prototype.forEach.call(host.querySelectorAll('[data-add]'), function(b){
       b.addEventListener('click', function(){
         sprecherState.uids.push(b.getAttribute('data-add'));
@@ -10069,13 +10176,27 @@ function mountSprecher(host){
       sprecherState.uids = []; saveSprecher(); paint();
     });
   }
+  function laden(){
+    var q = sprecherQuelle();
+    laedt = true; roster = null; paint();
+    sprecherRosterLaden(q).then(function(list){
+      if(q !== sprecherQuelle()) return;
+      roster = list; laedt = false;
+      if(beamer.overlay && beamer.tab === 'ruhe' && host.isConnected) paint();
+    }).catch(function(err){
+      console.error(err); roster = []; laedt = false;
+      toast('Namen konnten nicht geladen werden.');
+      if(host.isConnected) paint();
+    });
+  }
 
-  paint();
-  if(sprecherState.roster) return;
-  loadStudentRoster().then(function(list){
-    sprecherState.roster = list;
-    if(beamer.overlay && beamer.tab === 'ruhe' && host.isConnected) paint();
-  }).catch(function(err){ console.error(err); });
+  laden();
+  if(!sprecherState.gruppen){
+    loadMeineGruppen().then(function(list){
+      sprecherState.gruppen = list || [];
+      if(sprecherState.gruppen.length && beamer.overlay && beamer.tab === 'ruhe' && host.isConnected) paint();
+    }).catch(function(err){ console.error(err); sprecherState.gruppen = []; });
+  }
 }
 
 /* ---------- 🎲 Wer ist dran? ----------
@@ -14091,6 +14212,8 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-22-tools', datum:'2026-09-22', fuer:'alle', text:'🧰 Neu auf der Startseite: «Tools». PDFs und Fotos verkleinern, mehrere PDFs (auch Fotos) zu einem zusammenführen, PDF-Seiten löschen, drehen oder verschieben und PDF-Seiten als Bilder speichern. Alles passiert auf deinem Gerät – nichts wird hochgeladen.'},
+  {id:'2026-09-22-ruhephase-auswahl', datum:'2026-09-22', fuer:'lehrer', text:'⏱ Ruhephase: Bei «dürfen FLÜSTERN» wählst du jetzt, woher die Namen kommen – eigene Klasse, eine andere Klasse, ein Niveau (z. B. G3 oder alle E-Klassen) oder eine deiner 👥 Gruppen.'},
   {id:'2026-09-21-rueckmeldungen', datum:'2026-09-21', fuer:'lehrer', text:'💬 Neu: Rückmeldung an Jan. Unter ⚙️ Einstellungen › «💬 Rückmeldung schreiben» meldest du einen Fehler, einen Verbesserungsvorschlag oder Sonstiges (auf Wunsch mit Fach). Bei «Meine Rückmeldungen» siehst du, ob es geklappt hat ✅ oder nicht ❌ – mit Begründung.'},
   {id:'2026-09-21-abstimmungen', datum:'2026-09-21', fuer:'alle', text:'🗳️ Neu: Abstimmungen. Steht oben «🗳️ Abstimmung», darfst du bei einer Abstimmung für deine Klasse oder die ganze Schule mitmachen. Bis sie geschlossen wird, kannst du deine Stimme noch ändern.'},
   {id:'2026-09-21-abstimmungen-lp', datum:'2026-09-21', fuer:'lehrer', text:'🗳️ Klassenzimmer › Abstimmungen: eine oder mehrere Fragen an beliebige Klassen stellen (Schnellwahl: alle, 1./2./3. Jahrgang, alle G, alle E), anonym oder mit Namen, auf Wunsch mit Schlussdatum. Auswertung live nach Klasse oder Jahrgang und als sauber formatierte Excel-Datei (Übersicht, nach Klassen, Beteiligung, Einzelstimmen).'},
@@ -16024,6 +16147,466 @@ function renderKlassenzimmer(){
       else if(id === 'aemtli'){ aemtliUi.view = 'plan'; aemtliUi.scrollTo = 'now'; state.route = {name:'aemtliplan'}; render(); }
       else if(id === 'vergessen'){ state.route = {name:'vergessen'}; render(); }
     });
+  });
+}
+
+/* ===================== 🧰 TOOLS (PDF & Bilder) =====================
+   Kleine Datei-Werkzeuge für alle. Alles läuft im Browser: die Dateien werden
+   nie hochgeladen, nichts landet in Firestore. pdf-lib (Schreiben) und pdf.js
+   (Seiten als Bild rendern) werden erst beim ersten Gebrauch von jsdelivr
+   geladen — die Legacy-Fassung von pdf.js, damit auch ältere iPads mitmachen.
+   PDF komprimieren = jede Seite als JPEG neu setzen: viel kleiner, aber der
+   Text lässt sich danach nicht mehr markieren (steht im Dialog). */
+var PDFLIB_URL = 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+var PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.min.mjs';
+var PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.mjs';
+var pdfLibLaden = null, pdfJsLaden = null;
+function ladePdfLib(){
+  if(window.PDFLib) return Promise.resolve(window.PDFLib);
+  if(pdfLibLaden) return pdfLibLaden;
+  pdfLibLaden = new Promise(function(res, rej){
+    var s = document.createElement('script');
+    s.src = PDFLIB_URL;
+    s.onload = function(){ window.PDFLib ? res(window.PDFLib) : rej(new Error('pdf-lib fehlt')); };
+    s.onerror = function(){ pdfLibLaden = null; s.remove(); rej(new Error('pdf-lib konnte nicht geladen werden')); };
+    document.head.appendChild(s);
+  });
+  return pdfLibLaden;
+}
+function ladePdfJs(){
+  if(pdfJsLaden) return pdfJsLaden;
+  pdfJsLaden = import(PDFJS_URL).then(function(m){
+    m.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+    return m;
+  }).catch(function(err){ pdfJsLaden = null; throw err; });
+  return pdfJsLaden;
+}
+
+var TOOLS_TILES = [
+  { id:'komprimieren', icon:'🗜️', name:'PDF & Bild komprimieren', desc:'Grosse PDFs und Fotos verkleinern — z. B. fürs Hochladen oder Mailen.' },
+  { id:'zusammen',     icon:'📎', name:'PDF zusammenführen',      desc:'Mehrere PDFs (und Fotos) in der gewünschten Reihenfolge zu einem PDF.' },
+  { id:'seiten',       icon:'📑', name:'PDF-Seiten bearbeiten',   desc:'Seiten löschen, drehen, verschieben oder einzelne Seiten herausziehen.' },
+  { id:'bilder',       icon:'🖼️', name:'PDF in Bilder',           desc:'Jede Seite eines PDFs als JPG — z. B. für eine Präsentation.' }
+];
+
+function renderTools(){
+  clearSubjectWatchers(); clearOverviewWatchers();
+  var html = '';
+  html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Startseite</button></div>';
+  html += '<h2 class="page-welcome" style="margin-bottom:6px;">🧰 Tools</h2>';
+  html += '<p class="kz-intro">Alles passiert direkt auf deinem Gerät — deine Dateien werden nirgends hochgeladen.</p>';
+  html += '<div class="kz-tiles">';
+  TOOLS_TILES.forEach(function(t){
+    html += '<button class="kz-tile" data-tlt="'+t.id+'" type="button">';
+    html += '<div class="kz-tile-icon">'+t.icon+'</div>';
+    html += '<div><h3>'+esc(t.name)+'</h3><p>'+esc(t.desc)+'</p></div></button>';
+  });
+  html += '</div>';
+  renderChrome(html);
+  document.getElementById('backBtn').addEventListener('click', goHome);
+  Array.prototype.forEach.call(document.querySelectorAll('[data-tlt]'), function(b){
+    b.addEventListener('click', function(){
+      var id = b.getAttribute('data-tlt');
+      if(id === 'komprimieren') tlKomprimieren();
+      else if(id === 'zusammen') tlZusammen();
+      else if(id === 'seiten') tlSeiten();
+      else if(id === 'bilder') tlBilder();
+    });
+  });
+}
+
+/* ---------- Helfer ---------- */
+function tlGroesse(b){
+  if(b < 1024) return b + ' B';
+  if(b < 1024*1024) return Math.round(b/1024) + ' KB';
+  return (b/1024/1024).toFixed(b < 10*1024*1024 ? 1 : 0).replace('.', ',') + ' MB';
+}
+function tlIstPdf(f){ return f.type === 'application/pdf' || /\.pdf$/i.test(f.name); }
+function tlIstBild(f){ return /^image\//.test(f.type) || /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(f.name); }
+function tlBasis(name){ return String(name || 'datei').replace(/\.[^.]+$/, ''); }
+function tlDownload(blob, name){
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+}
+function tlCanvasBlob(canvas, typ, q){
+  return new Promise(function(res, rej){
+    canvas.toBlob(function(b){ b ? res(b) : rej(new Error('Bild konnte nicht erstellt werden')); }, typ, q);
+  });
+}
+function tlBildLaden(file){
+  return new Promise(function(res, rej){
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onload = function(){ res(img); setTimeout(function(){ URL.revokeObjectURL(url); }, 0); };
+    img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error('Bild nicht lesbar: ' + file.name)); };
+    img.src = url;
+  });
+}
+// Bild auf maxSeite verkleinern, weisser Hintergrund (für transparente PNGs), als JPEG.
+async function tlBildAlsJpeg(file, maxSeite, q){
+  var img = await tlBildLaden(file);
+  var w = img.naturalWidth, h = img.naturalHeight, f = Math.min(1, maxSeite / Math.max(w, h));
+  var c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w*f)); c.height = Math.max(1, Math.round(h*f));
+  var ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  var blob = await tlCanvasBlob(c, 'image/jpeg', q);
+  c.width = c.height = 0;
+  return blob;
+}
+async function tlPdfJsOeffnen(buf){
+  var pdfjs = await ladePdfJs();
+  // pdf.js übernimmt den Puffer — darum eine Kopie, damit er für pdf-lib bleibt.
+  return pdfjs.getDocument({data: new Uint8Array(buf.slice(0))}).promise;
+}
+async function tlSeiteRendern(src, nr, dpi, maxPx){
+  var page = await src.getPage(nr);
+  var vp1 = page.getViewport({scale:1});
+  var scale = dpi / 72;
+  var gross = Math.max(vp1.width, vp1.height) * scale;
+  if(gross > maxPx) scale = scale * maxPx / gross;
+  var vp = page.getViewport({scale:scale});
+  var c = document.createElement('canvas');
+  c.width = Math.max(1, Math.floor(vp.width)); c.height = Math.max(1, Math.floor(vp.height));
+  var ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  await page.render({canvasContext:ctx, viewport:vp}).promise;
+  page.cleanup();
+  return { canvas:c, breite:vp1.width, hoehe:vp1.height };
+}
+function tlFehlerText(err){
+  var m = String(err && (err.message || err.name) || '');
+  if(/password|encrypt/i.test(m)) return 'Das PDF ist mit einem Passwort geschützt.';
+  if(/konnte nicht geladen|import|fetch|dynamically/i.test(m)) return 'Werkzeug konnte nicht geladen werden — bist du online?';
+  return 'Das hat nicht geklappt' + (m ? ' (' + m + ')' : '') + '.';
+}
+function tlDateiFeld(id, accept, mehrere, text){
+  return '<label class="tl-drop" for="'+id+'"><input type="file" id="'+id+'" accept="'+accept+'"'+(mehrere ? ' multiple' : '')+' hidden>'+
+    '<span>📂 '+esc(text)+'</span><small>oder hierher ziehen</small></label>';
+}
+// Klick und Drag & Drop auf das Dateifeld.
+function tlDateiFeldVerdrahten(id, onFiles){
+  var input = document.getElementById(id), zone = input.closest('.tl-drop');
+  input.addEventListener('change', function(){ if(input.files.length) onFiles(Array.prototype.slice.call(input.files)); input.value = ''; });
+  zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.classList.add('tl-drop-an'); });
+  zone.addEventListener('dragleave', function(){ zone.classList.remove('tl-drop-an'); });
+  zone.addEventListener('drop', function(e){
+    e.preventDefault(); zone.classList.remove('tl-drop-an');
+    if(e.dataTransfer && e.dataTransfer.files.length) onFiles(Array.prototype.slice.call(e.dataTransfer.files));
+  });
+}
+
+/* ---------- 🗜️ Komprimieren ---------- */
+var TL_STUFEN = {
+  leicht: { label:'Leicht', bildPx:2400, bildQ:0.85, pdfDpi:150, pdfQ:0.8 },
+  mittel: { label:'Mittel', bildPx:1800, bildQ:0.75, pdfDpi:120, pdfQ:0.68 },
+  stark:  { label:'Stark',  bildPx:1280, bildQ:0.62, pdfDpi:90,  pdfQ:0.55 }
+};
+function tlKomprimieren(){
+  var dateien = [], stufe = lsGet(LIB_PREFIX+'tl_stufe') || 'mittel', laeuft = false;
+  if(!TL_STUFEN[stufe]) stufe = 'mittel';
+  openModal('<h3>🗜️ PDF & Bild komprimieren</h3>'+
+    tlDateiFeld('tlKmIn', 'application/pdf,image/*', true, 'PDFs oder Bilder wählen')+
+    '<label class="modal-label" style="margin-top:14px;">Wie stark?</label>'+
+    '<div class="uf-setup-modi" id="tlKmStufe">'+Object.keys(TL_STUFEN).map(function(k){
+      return '<button class="kz-tab'+(k === stufe ? ' kz-tab-on' : '')+'" data-st="'+k+'" type="button">'+TL_STUFEN[k].label+'</button>';
+    }).join('')+'</div>'+
+    '<p class="pr-hinweis">Bilder werden zu JPG. Bei PDFs wird jede Seite als Bild neu gesetzt — Text lässt sich danach nicht mehr markieren. Wird eine Datei nicht kleiner, bekommst du das Original zurück.</p>'+
+    '<div class="tl-liste" id="tlKmListe"></div>'+
+    '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button>'+
+    '<button class="btn btn-primary btn-sm" id="tlKmGo" type="button" disabled>Komprimieren</button></div>', 'modal-wide');
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  var liste = document.getElementById('tlKmListe'), go = document.getElementById('tlKmGo');
+  function paint(){
+    if(!liste.isConnected) return;
+    liste.innerHTML = dateien.map(function(d, i){
+      var r = d.ergebnis;
+      return '<div class="tl-zeile"><span class="tl-name">'+(tlIstPdf(d.file) ? '📄 ' : '🖼️ ')+esc(d.file.name)+'</span>'+
+        '<span class="tl-info">'+tlGroesse(d.file.size)+
+        (d.status ? ' · '+esc(d.status) : '')+
+        (r ? ' → <b>'+tlGroesse(r.blob.size)+'</b>'+(r.original ? ' (Original behalten)' : ' (−'+Math.round(100 - r.blob.size/d.file.size*100)+' %)') : '')+'</span>'+
+        (r ? '<button class="btn btn-primary btn-sm" data-dl="'+i+'" type="button">⬇︎</button>' : '<button class="btn btn-ghost btn-sm" data-weg="'+i+'" type="button"'+(laeuft ? ' disabled' : '')+'>✕</button>')+
+        '</div>';
+    }).join('');
+    go.disabled = laeuft || !dateien.some(function(d){ return !d.ergebnis; });
+    Array.prototype.forEach.call(liste.querySelectorAll('[data-weg]'), function(b){
+      b.addEventListener('click', function(){ dateien.splice(+b.getAttribute('data-weg'), 1); paint(); });
+    });
+    Array.prototype.forEach.call(liste.querySelectorAll('[data-dl]'), function(b){
+      b.addEventListener('click', function(){ var d = dateien[+b.getAttribute('data-dl')]; tlDownload(d.ergebnis.blob, d.ergebnis.name); });
+    });
+  }
+  tlDateiFeldVerdrahten('tlKmIn', function(files){
+    files.forEach(function(f){
+      if(tlIstPdf(f) || tlIstBild(f)) dateien.push({file:f});
+      else toast('«' + f.name + '» ist kein PDF und kein Bild.');
+    });
+    paint();
+  });
+  Array.prototype.forEach.call(modalEl.querySelectorAll('[data-st]'), function(b){
+    b.addEventListener('click', function(){
+      stufe = b.getAttribute('data-st'); lsSet(LIB_PREFIX+'tl_stufe', stufe);
+      Array.prototype.forEach.call(modalEl.querySelectorAll('[data-st]'), function(x){ x.classList.toggle('kz-tab-on', x === b); });
+      // Neue Stufe = alles nochmals rechnen.
+      dateien.forEach(function(d){ d.ergebnis = null; d.status = ''; });
+      paint();
+    });
+  });
+  go.addEventListener('click', async function(){
+    laeuft = true; paint();
+    var st = TL_STUFEN[stufe];
+    for(var i = 0; i < dateien.length; i++){
+      var d = dateien[i];
+      if(d.ergebnis) continue;
+      try{
+        var blob, name;
+        if(tlIstPdf(d.file)){
+          var src = await tlPdfJsOeffnen(await d.file.arrayBuffer());
+          var PDFLib = await ladePdfLib(), out = await PDFLib.PDFDocument.create();
+          for(var n = 1; n <= src.numPages; n++){
+            d.status = 'Seite ' + n + '/' + src.numPages; paint();
+            var s = await tlSeiteRendern(src, n, st.pdfDpi, 3500);
+            var jpg = await tlCanvasBlob(s.canvas, 'image/jpeg', st.pdfQ);
+            s.canvas.width = s.canvas.height = 0;
+            var bild = await out.embedJpg(await jpg.arrayBuffer());
+            out.addPage([s.breite, s.hoehe]).drawImage(bild, {x:0, y:0, width:s.breite, height:s.hoehe});
+          }
+          src.destroy();
+          blob = new Blob([await out.save()], {type:'application/pdf'});
+          name = tlBasis(d.file.name) + '_klein.pdf';
+        } else {
+          d.status = 'läuft …'; paint();
+          blob = await tlBildAlsJpeg(d.file, st.bildPx, st.bildQ);
+          name = tlBasis(d.file.name) + '_klein.jpg';
+        }
+        d.status = '';
+        d.ergebnis = blob.size < d.file.size ? {blob:blob, name:name} : {blob:d.file, name:d.file.name, original:true};
+      }catch(err){
+        console.error(err);
+        d.status = '⚠️ ' + tlFehlerText(err);
+      }
+      paint();
+    }
+    laeuft = false; paint();
+    var fertig = dateien.filter(function(d){ return d.ergebnis; });
+    if(fertig.length === 1) tlDownload(fertig[0].ergebnis.blob, fertig[0].ergebnis.name);
+    else if(fertig.length) toast('Fertig — mit ⬇︎ herunterladen.');
+  });
+}
+
+/* ---------- 📎 Zusammenführen ---------- */
+var TL_A4 = [595.28, 841.89];
+function tlZusammen(){
+  var dateien = [], laeuft = false;
+  openModal('<h3>📎 PDF zusammenführen</h3>'+
+    tlDateiFeld('tlZfIn', 'application/pdf,image/*', true, 'PDFs oder Fotos wählen')+
+    '<p class="pr-hinweis">Reihenfolge mit ↑ ↓ ändern. Fotos werden je als eigene A4-Seite eingefügt.</p>'+
+    '<div class="tl-liste" id="tlZfListe"></div>'+
+    '<label class="modal-label" for="tlZfName" style="margin-top:12px;">Dateiname</label>'+
+    '<input class="modal-input" id="tlZfName" maxlength="80" value="zusammengefuehrt">'+
+    '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button>'+
+    '<button class="btn btn-primary btn-sm" id="tlZfGo" type="button" disabled>Zusammenführen</button></div>', 'modal-wide');
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  var liste = document.getElementById('tlZfListe'), go = document.getElementById('tlZfGo');
+  function paint(){
+    if(!liste.isConnected) return;
+    liste.innerHTML = dateien.map(function(f, i){
+      return '<div class="tl-zeile"><span class="tl-nr">'+(i+1)+'</span><span class="tl-name">'+(tlIstPdf(f) ? '📄 ' : '🖼️ ')+esc(f.name)+'</span>'+
+        '<span class="tl-info">'+tlGroesse(f.size)+'</span>'+
+        '<button class="btn btn-ghost btn-sm" data-hoch="'+i+'" type="button"'+(i === 0 || laeuft ? ' disabled' : '')+'>↑</button>'+
+        '<button class="btn btn-ghost btn-sm" data-runter="'+i+'" type="button"'+(i === dateien.length-1 || laeuft ? ' disabled' : '')+'>↓</button>'+
+        '<button class="btn btn-ghost btn-sm" data-weg="'+i+'" type="button"'+(laeuft ? ' disabled' : '')+'>✕</button></div>';
+    }).join('');
+    go.disabled = laeuft || dateien.length < 1 || (dateien.length < 2 && tlIstPdf(dateien[0]));
+    go.textContent = laeuft ? 'Läuft …' : 'Zusammenführen';
+    Array.prototype.forEach.call(liste.querySelectorAll('[data-hoch],[data-runter],[data-weg]'), function(b){
+      b.addEventListener('click', function(){
+        var i;
+        if(b.hasAttribute('data-weg')){ dateien.splice(+b.getAttribute('data-weg'), 1); }
+        else if(b.hasAttribute('data-hoch')){ i = +b.getAttribute('data-hoch'); dateien.splice(i-1, 0, dateien.splice(i, 1)[0]); }
+        else { i = +b.getAttribute('data-runter'); dateien.splice(i+1, 0, dateien.splice(i, 1)[0]); }
+        paint();
+      });
+    });
+  }
+  tlDateiFeldVerdrahten('tlZfIn', function(files){
+    files.forEach(function(f){
+      if(tlIstPdf(f) || tlIstBild(f)) dateien.push(f);
+      else toast('«' + f.name + '» ist kein PDF und kein Bild.');
+    });
+    paint();
+  });
+  go.addEventListener('click', async function(){
+    laeuft = true; paint();
+    try{
+      var PDFLib = await ladePdfLib(), out = await PDFLib.PDFDocument.create();
+      for(var i = 0; i < dateien.length; i++){
+        var f = dateien[i];
+        if(tlIstPdf(f)){
+          var src = await PDFLib.PDFDocument.load(await f.arrayBuffer(), {ignoreEncryption:true});
+          (await out.copyPages(src, src.getPageIndices())).forEach(function(p){ out.addPage(p); });
+        } else {
+          var jpg = await tlBildAlsJpeg(f, 2400, 0.85);
+          var bild = await out.embedJpg(await jpg.arrayBuffer());
+          var quer = bild.width > bild.height;
+          var pw = quer ? TL_A4[1] : TL_A4[0], ph = quer ? TL_A4[0] : TL_A4[1], rand = 20;
+          var f2 = Math.min((pw - 2*rand) / bild.width, (ph - 2*rand) / bild.height);
+          var w = bild.width * f2, h = bild.height * f2;
+          out.addPage([pw, ph]).drawImage(bild, {x:(pw-w)/2, y:(ph-h)/2, width:w, height:h});
+        }
+      }
+      var name = (document.getElementById('tlZfName') || {}).value || 'zusammengefuehrt';
+      tlDownload(new Blob([await out.save()], {type:'application/pdf'}), tlBasis(name.trim() || 'zusammengefuehrt') + '.pdf');
+      toast('📎 ' + out.getPageCount() + ' Seiten zusammengeführt.');
+    }catch(err){
+      console.error(err);
+      toast(tlFehlerText(err));
+    }
+    laeuft = false; paint();
+  });
+}
+
+/* ---------- 📑 Seiten bearbeiten ---------- */
+function tlSeiten(){
+  var datei = null, buf = null, seiten = [], laeuft = false;
+  openModal('<h3>📑 PDF-Seiten bearbeiten</h3>'+
+    '<div id="tlSeWahl">'+tlDateiFeld('tlSeIn', 'application/pdf', false, 'Ein PDF wählen')+'</div>'+
+    '<p class="pr-hinweis" id="tlSeHinweis" hidden>Seite antippen = auswählen. ↻ dreht, ← → verschiebt, ✕ löscht. «Nur Auswahl» speichert nur die angetippten Seiten als neues PDF.</p>'+
+    '<div class="tl-seiten" id="tlSeGrid"></div>'+
+    '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button>'+
+    '<button class="btn btn-ghost btn-sm" id="tlSeAusw" type="button" hidden>⬇︎ Nur Auswahl</button>'+
+    '<button class="btn btn-primary btn-sm" id="tlSeGo" type="button" hidden>⬇︎ Speichern</button></div>', 'modal-wide');
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  var grid = document.getElementById('tlSeGrid'), go = document.getElementById('tlSeGo'), ausw = document.getElementById('tlSeAusw');
+  function paint(){
+    if(!grid.isConnected) return;
+    var da = seiten.filter(function(s){ return !s.weg; });
+    grid.innerHTML = seiten.map(function(s, i){
+      return '<div class="tl-seite'+(s.weg ? ' tl-seite-weg' : '')+(s.an ? ' tl-seite-an' : '')+'" data-i="'+i+'">'+
+        '<button class="tl-thumb" data-an="'+i+'" type="button" title="Auswählen"><img alt="" src="'+s.bild+'" style="transform:rotate('+s.rot+'deg)"></button>'+
+        '<div class="tl-seite-nr">'+(s.idx+1)+'</div>'+
+        '<div class="tl-seite-knoepfe">'+
+          '<button type="button" data-links="'+i+'" title="Nach vorne"'+(i === 0 ? ' disabled' : '')+'>←</button>'+
+          '<button type="button" data-rot="'+i+'" title="Drehen">↻</button>'+
+          '<button type="button" data-weg="'+i+'" title="'+(s.weg ? 'Zurückholen' : 'Löschen')+'">'+(s.weg ? '↩' : '✕')+'</button>'+
+          '<button type="button" data-rechts="'+i+'" title="Nach hinten"'+(i === seiten.length-1 ? ' disabled' : '')+'>→</button>'+
+        '</div></div>';
+    }).join('');
+    var nAn = seiten.filter(function(s){ return s.an && !s.weg; }).length;
+    go.disabled = laeuft || !da.length;
+    ausw.disabled = laeuft || !nAn;
+    ausw.textContent = '⬇︎ Nur Auswahl' + (nAn ? ' (' + nAn + ')' : '');
+    Array.prototype.forEach.call(grid.querySelectorAll('button'), function(b){
+      b.addEventListener('click', function(){
+        var i;
+        if(b.hasAttribute('data-an')){ i = +b.getAttribute('data-an'); seiten[i].an = !seiten[i].an; }
+        else if(b.hasAttribute('data-rot')){ i = +b.getAttribute('data-rot'); seiten[i].rot = (seiten[i].rot + 90) % 360; }
+        else if(b.hasAttribute('data-weg')){ i = +b.getAttribute('data-weg'); seiten[i].weg = !seiten[i].weg; }
+        else if(b.hasAttribute('data-links')){ i = +b.getAttribute('data-links'); seiten.splice(i-1, 0, seiten.splice(i, 1)[0]); }
+        else if(b.hasAttribute('data-rechts')){ i = +b.getAttribute('data-rechts'); seiten.splice(i+1, 0, seiten.splice(i, 1)[0]); }
+        paint();
+      });
+    });
+  }
+  async function speichern(nurAuswahl){
+    var liste = seiten.filter(function(s){ return !s.weg && (!nurAuswahl || s.an); });
+    if(!liste.length) return;
+    laeuft = true; paint();
+    try{
+      var PDFLib = await ladePdfLib();
+      var src = await PDFLib.PDFDocument.load(buf, {ignoreEncryption:true}), out = await PDFLib.PDFDocument.create();
+      var kopien = await out.copyPages(src, liste.map(function(s){ return s.idx; }));
+      kopien.forEach(function(p, k){
+        var alt = p.getRotation().angle || 0;
+        p.setRotation(PDFLib.degrees((alt + liste[k].rot) % 360));
+        out.addPage(p);
+      });
+      tlDownload(new Blob([await out.save()], {type:'application/pdf'}), tlBasis(datei.name) + (nurAuswahl ? '_auswahl' : '_bearbeitet') + '.pdf');
+    }catch(err){ console.error(err); toast(tlFehlerText(err)); }
+    laeuft = false; paint();
+  }
+  go.addEventListener('click', function(){ speichern(false); });
+  ausw.addEventListener('click', function(){ speichern(true); });
+  tlDateiFeldVerdrahten('tlSeIn', async function(files){
+    var f = files.filter(tlIstPdf)[0];
+    if(!f){ toast('Bitte ein PDF wählen.'); return; }
+    datei = f;
+    document.getElementById('tlSeWahl').innerHTML = '<p class="tl-info" id="tlSeLaedt">📄 '+esc(f.name)+' · Vorschau wird erstellt …</p>';
+    try{
+      buf = await f.arrayBuffer();
+      var src = await tlPdfJsOeffnen(buf);
+      for(var n = 1; n <= src.numPages; n++){
+        if(!grid.isConnected){ src.destroy(); return; }
+        var s = await tlSeiteRendern(src, n, 30, 260);
+        seiten.push({ idx:n-1, rot:0, weg:false, an:false, bild:s.canvas.toDataURL('image/jpeg', 0.7) });
+        s.canvas.width = s.canvas.height = 0;
+        if(n === 1 || n % 4 === 0 || n === src.numPages){
+          document.getElementById('tlSeHinweis').hidden = false; go.hidden = false; ausw.hidden = false;
+          paint();
+        }
+      }
+      src.destroy();
+      var l = document.getElementById('tlSeLaedt');
+      if(l) l.textContent = '📄 ' + f.name + ' · ' + seiten.length + ' Seiten';
+    }catch(err){
+      console.error(err);
+      var w = document.getElementById('tlSeWahl');
+      if(w) w.innerHTML = '<p class="tl-info">⚠️ '+esc(tlFehlerText(err))+'</p>';
+    }
+  });
+}
+
+/* ---------- 🖼️ PDF in Bilder ---------- */
+function tlBilder(){
+  var laeuft = false, bilder = [];
+  openModal('<h3>🖼️ PDF in Bilder</h3>'+
+    tlDateiFeld('tlBiIn', 'application/pdf', false, 'Ein PDF wählen')+
+    '<p class="pr-hinweis">Jede Seite wird ein JPG (gute Qualität, 150 dpi).</p>'+
+    '<div class="tl-liste" id="tlBiListe"></div>'+
+    '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button>'+
+    '<button class="btn btn-primary btn-sm" id="tlBiAlle" type="button" hidden>⬇︎ Alle herunterladen</button></div>', 'modal-wide');
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  var liste = document.getElementById('tlBiListe'), alle = document.getElementById('tlBiAlle');
+  function paint(status){
+    if(!liste.isConnected) return;
+    liste.innerHTML = (status ? '<div class="tl-info">'+esc(status)+'</div>' : '') + bilder.map(function(b, i){
+      return '<div class="tl-zeile"><span class="tl-name">🖼️ '+esc(b.name)+'</span><span class="tl-info">'+tlGroesse(b.blob.size)+'</span>'+
+        '<button class="btn btn-primary btn-sm" data-dl="'+i+'" type="button">⬇︎</button></div>';
+    }).join('');
+    alle.hidden = bilder.length < 2 || laeuft;
+    Array.prototype.forEach.call(liste.querySelectorAll('[data-dl]'), function(b){
+      b.addEventListener('click', function(){ var x = bilder[+b.getAttribute('data-dl')]; tlDownload(x.blob, x.name); });
+    });
+  }
+  alle.addEventListener('click', function(){
+    // Kurz nacheinander, sonst lässt der Browser nur den ersten Download zu.
+    bilder.forEach(function(b, i){ setTimeout(function(){ tlDownload(b.blob, b.name); }, i * 400); });
+  });
+  tlDateiFeldVerdrahten('tlBiIn', async function(files){
+    var f = files.filter(tlIstPdf)[0];
+    if(!f){ toast('Bitte ein PDF wählen.'); return; }
+    if(laeuft) return;
+    laeuft = true; bilder = [];
+    try{
+      var src = await tlPdfJsOeffnen(await f.arrayBuffer());
+      var stellen = String(src.numPages).length;
+      for(var n = 1; n <= src.numPages; n++){
+        if(!liste.isConnected){ src.destroy(); return; }
+        paint('Seite ' + n + '/' + src.numPages + ' …');
+        var s = await tlSeiteRendern(src, n, 150, 4000);
+        var blob = await tlCanvasBlob(s.canvas, 'image/jpeg', 0.85);
+        s.canvas.width = s.canvas.height = 0;
+        bilder.push({ blob:blob, name:tlBasis(f.name) + '_' + String(n).padStart(stellen, '0') + '.jpg' });
+      }
+      src.destroy();
+      laeuft = false; paint();
+      if(bilder.length === 1) tlDownload(bilder[0].blob, bilder[0].name);
+    }catch(err){
+      console.error(err); laeuft = false; paint('⚠️ ' + tlFehlerText(err));
+    }
   });
 }
 
@@ -26267,6 +26850,7 @@ function render(){
   if(state.route.name === 'kalender'){ renderKalender(); return; }
   if(state.route.name === 'stundenplan'){ renderStundenplan(); return; }
   if(state.route.name === 'klassenzimmer'){ renderKlassenzimmer(); return; }
+  if(state.route.name === 'tools'){ renderTools(); return; }
   if(state.route.name === 'sitzplan'){ renderSitzplan(); return; }
   if(state.route.name === 'quiz'){ renderQuizVerwaltung(); return; }
   if(state.route.name === 'quizplay'){ renderQuizPlay(); return; }
