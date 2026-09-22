@@ -5704,7 +5704,6 @@ function renderChrome(innerHtml){
   html += '<div class="topbar-spacer"></div>';
   html += '<div class="topbar-user">';
   if(isTeacher || isLeitung()){ html += '<button class="btn btn-ghost btn-sm topbar-klasse'+(isFremdeKlasse()?' fremd':'')+'" id="klasseBtn" type="button" title="Klasse wechseln">🏫 '+esc(klasseLabel())+' ▾</button>'; }
-  html += '<span>Hallo, <b>'+esc(state.profile.displayName)+'</b></span>';
   html += '<span class="topbar-offline" id="offlineBadge" hidden>📶 Offline</span>';
   if(IS_TEST_SITE){ html += '<span class="topbar-offline">🧪 Testseite</span>'; }
   if(IS_TEST_SITE && isTeacher && !isLeitung()){ html += '<button class="btn btn-primary btn-sm" id="goLiveBtn" type="button" title="Stand der Testseite sofort auf die Live-Seite übernehmen">🚀 Jetzt live</button>'; }
@@ -14613,6 +14612,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-22-kein-hallo', datum:'2026-09-22', fuer:'alle', text:'🧹 Die obere Leiste ist aufgeräumt: Das «Hallo, …» mit deinem Namen ist weg – so hat es mehr Platz.'},
   {id:'2026-09-22-werkstatt-uebersicht', datum:'2026-09-22', fuer:'lehrer', text:'🧩 Neu in der 📈 Lernstand-Übersicht: «Werkstatt-Übersicht» für die Rechtschreib-Werkstatt – pro Klasse, Niveau oder 👥 Gruppe siehst du, wer bei welchem Posten wie weit ist (Stempel, offene Fehlerwörter), die häufigsten Fehlerwörter und per Klick alle Details einer Schülerin / eines Schülers.'},
   {id:'2026-09-22-laermampel-mikro', datum:'2026-09-22', fuer:'lehrer', text:'🔊 Lärmampel: klarere Meldung, warum das Mikrofon nicht geht (blockiert, keins gefunden, belegt) und neuer Knopf «Mikrofon erneut versuchen» — Werkzeug muss nicht mehr neu geöffnet werden.'},
   {id:'2026-09-22-tools', datum:'2026-09-22', fuer:'alle', text:'🧰 Neu auf der Startseite: «Tools». PDFs und Fotos verkleinern, PDFs (auch Fotos) zusammenführen, PDF-Seiten löschen, drehen oder verschieben, PDF in Bilder, 📷 Foto-Scanner (Handyfoto eines Blatts gerade ziehen – wie gescannt), 🔳 QR-Code, 🔢 Seitenzahlen & Wasserzeichen, 🗞️ mehrere Seiten pro Blatt, ✂️ Bild zuschneiden und 🎙️ Ton aufnehmen. Alles passiert auf deinem Gerät – nichts wird hochgeladen.'},
