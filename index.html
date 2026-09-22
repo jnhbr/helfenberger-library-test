@@ -3893,7 +3893,7 @@ var EARLYBIRD_DATEN = [
   '2027-04-28','2027-05-19','2027-06-02','2027-06-16'
 ];
 var EARLYBIRD_ZEIT = '06:30–07:30';
-var eb = { datum:null, tab:'eintragen', klasse:null };
+var ebState = { datum:null, tab:'eintragen', klasse:null };
 
 function earlybirdKommende(n){
   var heute = todayStr();
@@ -3952,12 +3952,12 @@ function earlybirdKalenderHtml(t){
 }
 function earlybirdKalenderVerdrahten(host){
   host.querySelectorAll('.eb-kal-btn').forEach(function(b){
-    b.addEventListener('click', function(){ eb.datum = b.getAttribute('data-eb-datum'); state.route = {name:'earlybird'}; render(); });
+    b.addEventListener('click', function(){ ebState.datum = b.getAttribute('data-eb-datum'); state.route = {name:'earlybird'}; render(); });
   });
 }
 
 function earlybirdStartKlasse(){
-  if(eb.klasse) return eb.klasse;
+  if(ebState.klasse) return ebState.klasse;
   if(istKlasse(state.klasse)) return state.klasse;
   if(state.profile.klasse && istKlasse(state.profile.klasse)) return state.profile.klasse;
   return KLASSEN[0].id;
@@ -3967,26 +3967,26 @@ function renderEarlybird(){
   clearSubjectWatchers(); unwatchAllProgress();
   if(state.profile.role !== 'teacher'){ goHome(); return; }
   var kommend = earlybirdKommende();
-  if(!eb.datum || EARLYBIRD_DATEN.indexOf(eb.datum) < 0) eb.datum = kommend[0] || EARLYBIRD_DATEN[EARLYBIRD_DATEN.length-1];
-  eb.klasse = earlybirdStartKlasse();
+  if(!ebState.datum || EARLYBIRD_DATEN.indexOf(ebState.datum) < 0) ebState.datum = kommend[0] || EARLYBIRD_DATEN[EARLYBIRD_DATEN.length-1];
+  ebState.klasse = earlybirdStartKlasse();
   var heute = todayStr();
   var html = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn">&larr; Start</button></div>';
   html += '<h2>🐦 Earlybird</h2>';
   html += '<p class="eb-sub">Mittwochmorgen, '+EARLYBIRD_ZEIT+' Uhr – für Schüler:innen mit zu vielen Einträgen.</p>';
   html += '<div class="eb-leiste"><label class="eb-feld"><span>Termin</span><select id="ebDatum">'+EARLYBIRD_DATEN.map(function(d){
     var nr = kommend.indexOf(d);
-    return '<option value="'+d+'"'+(d === eb.datum ? ' selected' : '')+'>'+esc(earlybirdDatumLang(d))+(d < heute ? ' (vorbei)' : nr === 0 ? ' – nächster' : '')+'</option>';
+    return '<option value="'+d+'"'+(d === ebState.datum ? ' selected' : '')+'>'+esc(earlybirdDatumLang(d))+(d < heute ? ' (vorbei)' : nr === 0 ? ' – nächster' : '')+'</option>';
   }).join('')+'</select></label>';
   html += '<div class="stp-tabs">'+
-    '<button type="button" class="stp-tab'+(eb.tab==='eintragen'?' on':'')+'" data-eb-tab="eintragen">✏️ Eintragen</button>'+
-    '<button type="button" class="stp-tab'+(eb.tab==='schule'?' on':'')+'" data-eb-tab="schule">🏫 Ganze Schule</button></div></div>';
+    '<button type="button" class="stp-tab'+(ebState.tab==='eintragen'?' on':'')+'" data-eb-tab="eintragen">✏️ Eintragen</button>'+
+    '<button type="button" class="stp-tab'+(ebState.tab==='schule'?' on':'')+'" data-eb-tab="schule">🏫 Ganze Schule</button></div></div>';
   html += '<div id="ebBody"><div class="empty-state">Wird geladen …</div></div>';
   renderChrome(html);
   document.getElementById('backBtn').addEventListener('click', goHome);
-  document.getElementById('ebDatum').addEventListener('change', function(){ eb.datum = this.value; earlybirdBody(); });
+  document.getElementById('ebDatum').addEventListener('change', function(){ ebState.datum = this.value; earlybirdBody(); });
   document.querySelectorAll('[data-eb-tab]').forEach(function(b){
     b.addEventListener('click', function(){
-      eb.tab = b.getAttribute('data-eb-tab');
+      ebState.tab = b.getAttribute('data-eb-tab');
       document.querySelectorAll('[data-eb-tab]').forEach(function(x){ x.classList.toggle('on', x === b); });
       earlybirdBody();
     });
@@ -3998,11 +3998,11 @@ function earlybirdBody(){
   var body = document.getElementById('ebBody');
   if(!body) return;
   body.innerHTML = '<div class="empty-state">Wird geladen …</div>';
-  var datum = eb.datum, tab = eb.tab;
+  var datum = ebState.datum, tab = ebState.tab;
   var jobs = [earlybirdLadenDatum(datum)];
-  if(tab === 'eintragen') jobs.push(klassenListeFuerGruppe(eb.klasse));
+  if(tab === 'eintragen') jobs.push(klassenListeFuerGruppe(ebState.klasse));
   Promise.all(jobs).then(function(res){
-    if(eb.datum !== datum || eb.tab !== tab || !document.getElementById('ebBody')) return;
+    if(ebState.datum !== datum || ebState.tab !== tab || !document.getElementById('ebBody')) return;
     if(tab === 'eintragen') earlybirdEintragenZeigen(body, res[0], res[1]);
     else earlybirdSchuleZeigen(body, res[0]);
   }).catch(function(err){
@@ -4017,7 +4017,7 @@ function earlybirdEintragenZeigen(body, alle, schueler){
   var klassen = KLASSEN.filter(function(k){ return k.art === 'klasse'; });
   var h = '<div class="card eb-card"><div class="eb-leiste"><label class="eb-feld"><span>Klasse</span><select id="ebKlasse">'+klassen.map(function(k){
     var n = alle.filter(function(x){ return x.klasse === k.id; }).length;
-    return '<option value="'+esc(k.id)+'"'+(k.id === eb.klasse ? ' selected' : '')+'>'+esc(k.id)+' · '+esc(k.lp)+(n ? ' ('+n+')' : '')+'</option>';
+    return '<option value="'+esc(k.id)+'"'+(k.id === ebState.klasse ? ' selected' : '')+'>'+esc(k.id)+' · '+esc(k.lp)+(n ? ' ('+n+')' : '')+'</option>';
   }).join('')+'</select></label>';
   var inKlasse = schueler.filter(function(s){ return drin[s.uid]; }).length;
   h += '<span class="eb-zahl">'+inKlasse+' von '+schueler.length+' eingetragen</span></div>';
@@ -4029,12 +4029,12 @@ function earlybirdEintragenZeigen(body, alle, schueler){
   }).join('')+'</div>';
   h += '</div>';
   body.innerHTML = h;
-  document.getElementById('ebKlasse').addEventListener('change', function(){ eb.klasse = this.value; earlybirdBody(); });
+  document.getElementById('ebKlasse').addEventListener('change', function(){ ebState.klasse = this.value; earlybirdBody(); });
   var byUid = {};
   schueler.forEach(function(s){ byUid[s.uid] = s; });
   body.querySelectorAll('.eb-check').forEach(function(cb){
     cb.addEventListener('change', function(){
-      var s = byUid[cb.value], datum = eb.datum;
+      var s = byUid[cb.value], datum = ebState.datum;
       cb.disabled = true;
       var job = cb.checked
         ? setDoc(earlybirdRef(datum, s.uid), {
@@ -4075,7 +4075,7 @@ function earlybirdSchuleZeigen(body, alle){
   var byId = {};
   alle.forEach(function(x){ byId[x.id] = x; });
   var druck = document.getElementById('ebDruck');
-  if(druck) druck.addEventListener('click', function(){ earlybirdDrucken(eb.datum, alle); });
+  if(druck) druck.addEventListener('click', function(){ earlybirdDrucken(ebState.datum, alle); });
   body.querySelectorAll('.eb-anw').forEach(function(cb){
     cb.addEventListener('change', function(){
       var x = byId[cb.getAttribute('data-id')];
@@ -6075,7 +6075,7 @@ function renderChrome(innerHtml){
   document.getElementById('fragenBtn').addEventListener('click', openFragebox);
   document.getElementById('neuBtn').addEventListener('click', function(){ state.route = {name:'neu'}; render(); });
   var earlybirdBtn = document.getElementById('earlybirdBtn');
-  if(earlybirdBtn){ earlybirdBtn.addEventListener('click', function(){ eb.datum = null; state.route = {name:'earlybird'}; render(); }); }
+  if(earlybirdBtn){ earlybirdBtn.addEventListener('click', function(){ ebState.datum = null; state.route = {name:'earlybird'}; render(); }); }
   updateNeuButton();
   var goLiveBtn = document.getElementById('goLiveBtn');
   if(goLiveBtn){ goLiveBtn.addEventListener('click', confirmGoLive); }
