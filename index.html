@@ -1377,6 +1377,8 @@
   .kk-tipp{text-align:center;color:var(--text-muted);font-size:12.5px;margin:4px 0 0;}
   .kk-fertig-combo,.kk-fertig-serie{font-weight:700;font-size:16px;}
   .kk-fertig-serie .kk-flamme{font-size:24px;}
+  .voc-ueb-row{grid-template-columns:minmax(110px,1.6fr) .7fr .9fr .7fr .7fr .7fr;}
+  @media (max-width:640px){ .voc-ueb-row{grid-template-columns:1fr 1fr;} }
   .kk-schwer{display:flex;flex-direction:column;gap:6px;margin:6px 0 10px;}
   .kk-schwer-zeile{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--surface-2);border-radius:var(--radius-sm);padding:7px 12px;}
   .kk-schwer-zeile span:first-child{flex:1;min-width:160px;}
@@ -4546,6 +4548,163 @@ function lsFachSetzen(subjId, offen){
   }catch(e){}
 }
 
+/* ===================== 🗣️ VOCI-ÜBERSICHT (Lehrperson) =====================
+   Für die Voci-Trainer «Vocabulaire dis donc!» (Französisch) und «Vocabulary
+   Open World» (Englisch). Sie speichern ihren Lernstand im localStorage
+   (frvoc_/envoc_ + stand, serie); der Übungsstand-Sync legt das automatisch in
+   progress/{uid}/resources/{rid}.storeJson. Diese Ansicht liest das für die
+   Klasse aus: pro Schüler:in 🔥 Serie, geübte und sichere Wörter, diese Woche,
+   zuletzt — dazu die schwierigsten Wörter der Klasse, filterbar nach Unit.
+   Unit-Namen und deutsche Bedeutungen kommen aus der Trainer-Datei selbst
+   (var VOC). Welche Übung ein Voci-Trainer ist, zeigt der Dateiname/Titel
+   (VOCI_RE) und der Stand selbst (Schlüssel frvoc_stand/envoc_stand).
+   Keine neuen Regeln: progress/{uid}/resources darf die Lehrperson lesen. */
+var VOCI_PRE = {franzoesisch:'frvoc_', englisch:'envoc_'};
+var VOCI_RE = /vocabula|voci|vokab/i;
+
+// Wörter und Units aus der Trainer-Datei: {woerter:{buch|unit|wort: {d, unit}}, units:[{id, name}]}
+function vociDaten(html){
+  var i = html.indexOf('\nvar VOC = ');
+  if(i < 0) return null;
+  var s = i + 11, e = html.indexOf(';\n', s);
+  var V;
+  try{ V = JSON.parse(html.slice(s, e)); }catch(err){ return null; }
+  var out = {woerter:{}, units:[]};
+  (V.buecher || []).forEach(function(b){
+    (b.unites || b.units || []).forEach(function(u){
+      var uid = b.id + '|' + u.id, gruppen = [];
+      if(u.niveaus) ['g', 'e'].forEach(function(n){ gruppen = gruppen.concat(u.niveaus[n] || []); });
+      else gruppen = u.gruppen || [];
+      out.units.push({id:uid, name:(b.name || b.id) + ' · ' + (u.name || u.id)});
+      gruppen.forEach(function(g){ (g.w || []).forEach(function(w){
+        if(w && w.f) out.woerter[uid + '|' + w.f] = {d:w.d || '', unit:uid};
+      }); });
+    });
+  });
+  return out;
+}
+// Stand eines Schülers aus seinen progress-Dokumenten: pro Wort (ohne Niveau) zusammengefasst.
+function vociAusDocs(docs, pre){
+  var woerter = {}, serie = {};
+  docs.forEach(function(data){
+    if(!data || !data.storeJson) return;
+    var store;
+    try{ store = JSON.parse(data.storeJson) || {}; }catch(e){ return; }
+    var st = {}, se = {};
+    try{ st = JSON.parse(store[pre + 'stand'] || '{}') || {}; }catch(e){}
+    try{ se = JSON.parse(store[pre + 'serie'] || '{}') || {}; }catch(e){}
+    Object.keys(se).forEach(function(t){ serie[t] = Math.max(serie[t] || 0, +se[t] || 0); });
+    Object.keys(st).forEach(function(k){
+      var p = k.split('|'), e = st[k] || {};
+      if(p.length < 3) return;
+      // Französisch: buch|unite|niveau|wort, Englisch: buch|unit|wort
+      var id = p[0] + '|' + p[1] + '|' + p.slice(pre === 'frvoc_' ? 3 : 2).join('|');
+      var w = woerter[id] || (woerter[id] = {r:0, f:0, box:0, z:0, unit:p[0] + '|' + p[1]});
+      w.r += +e.r || 0; w.f += +e.f || 0;
+      w.box = Math.max(w.box, +e.box || 0); w.z = Math.max(w.z, +e.z || 0);
+    });
+  });
+  return {woerter:woerter, serie:serie};
+}
+
+async function vociUebersicht(fach){
+  var pre = VOCI_PRE[fach], titel = '🗣️ Voci-Übersicht ' + subjectName(fach);
+  openModal('<h3>'+esc(titel)+'</h3><p>Wird geladen …</p>', 'pr-modal pr-modal-breit');
+  try{
+    var res = [];
+    (await getDocs(query(kcol('resources'), where('subject', '==', fach)))).forEach(function(d){
+      var r = Object.assign({id:d.id}, d.data());
+      if(!r.linkUrl && !r.externalUrl && !r.pdf && VOCI_RE.test((r.fileName || '') + ' ' + (r.title || ''))) res.push(r);
+    });
+    if(!res.length){
+      openModal('<h3>'+esc(titel)+'</h3><p class="pr-hinweis">In diesem Fach gibt es auf dieser Seite keinen Voci-Trainer (Datei «vocabulaire.html» bzw. «vocabulary.html»).</p>'+
+        '<div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>', 'pr-modal');
+      document.getElementById('modalOk').addEventListener('click', closeModal);
+      return;
+    }
+    var voc = null;
+    for(var i=0;i<res.length && !voc;i++){
+      try{ voc = vociDaten(await loadResourceHtml(resourceContentId(res[i]))); }catch(err){ console.error(err); }
+    }
+    voc = voc || {woerter:{}, units:[]};
+    var roster = rosterFuerFach(await loadStudentRoster(), fach);
+    var rows = await Promise.all(roster.map(function(s){
+      return Promise.all(res.map(function(r){
+        return getDoc(doc(db, 'progress', s.uid, 'resources', r.id)).then(function(d){ return d.exists() ? d.data() : null; }).catch(function(){ return null; });
+      })).then(function(docs){ return Object.assign({s:s}, vociAusDocs(docs, pre)); });
+    }));
+    rows.sort(function(a, b){ return (a.s.displayName || a.s.username || '').localeCompare(b.s.displayName || b.s.username || '', 'de'); });
+    // Units zur Auswahl: die, in denen jemand geübt hat (in der Reihenfolge der Datei)
+    var geuebtIn = {};
+    rows.forEach(function(r){ Object.keys(r.woerter).forEach(function(id){ geuebtIn[r.woerter[id].unit] = 1; }); });
+    var units = voc.units.filter(function(u){ return geuebtIn[u.id]; });
+    Object.keys(geuebtIn).forEach(function(u){ if(!units.some(function(x){ return x.id === u; })) units.push({id:u, name:u.replace('|', ' · ')}); });
+    var filter = lsGet(LIB_PREFIX + 'voci_unit_' + fach) || '';
+    if(filter && !geuebtIn[filter]) filter = '';
+
+    function zeichnen(){
+      var woche = {}, h = '<h3>'+esc(titel)+'</h3>';
+      for(var t=0;t<7;t++){ var d = new Date(); d.setDate(d.getDate() - t); woche[localDateStr(d)] = 1; }
+      var zeilen = rows.map(function(r){
+        var ids = Object.keys(r.woerter).filter(function(id){ return !filter || r.woerter[id].unit === filter; });
+        var z = {geuebt:0, sitzt:0, zuletzt:0};
+        ids.forEach(function(id){ var w = r.woerter[id]; if(w.r + w.f) z.geuebt++; if(w.box >= 4) z.sitzt++; if(w.z > z.zuletzt) z.zuletzt = w.z; });
+        z.woche = Object.keys(r.serie).reduce(function(n, t){ return n + (woche[t] ? r.serie[t] : 0); }, 0);
+        z.serie = kkSerieAktuell(r.serie);
+        return {r:r, z:z};
+      });
+      var aktiv = zeilen.filter(function(x){ return x.z.woche > 0; }).length, brennt = zeilen.filter(function(x){ return x.z.serie > 0; }).length;
+      h += '<div class="pr-zahlen"><div><b>'+aktiv+' / '+zeilen.length+'</b><span>haben diese Woche geübt</span></div>'+
+        '<div><b>🔥 '+brennt+'</b><span>mit laufender Serie</span></div></div>';
+      h += '<div class="pr-grid2"><div><label class="modal-label" for="vociUnit">Unit</label><select class="modal-input" id="vociUnit"><option value="">Alle Units</option>'+
+        units.map(function(u){ return '<option value="'+esc(u.id)+'"'+(u.id === filter ? ' selected' : '')+'>'+esc(u.name)+'</option>'; }).join('')+'</select></div><div></div></div>';
+      h += '<p class="pr-hinweis">«Sitzen» = Box 4 oder 5 im Trainer. 🔥 = Tage am Stück mit mindestens '+KK_SERIE_MIN+' Antworten, «Woche» = Antworten der letzten 7 Tage (beides über alle Units). Der Stand kommt beim nächsten Speichern im Trainer an (höchstens ca. 20 s Verzögerung).</p>';
+      h += '<div class="sk-ueb"><div class="sk-ueb-row voc-ueb-row sk-ueb-kopf"><span>Name</span><span>🔥 Serie</span><span>Geübt</span><span>Sitzen</span><span>Woche</span><span>Zuletzt</span></div>';
+      zeilen.forEach(function(x){
+        var z = x.z;
+        h += '<div class="sk-ueb-row voc-ueb-row"><span><b>'+esc(x.r.s.displayName || x.r.s.username || x.r.s.uid)+'</b></span>'+
+          '<span>'+(z.serie ? '🔥 '+z.serie : '–')+'</span>'+
+          '<span>'+(z.geuebt ? z.geuebt+(z.geuebt === 1 ? ' Wort' : ' Wörter') : '<small>noch nicht</small>')+'</span>'+
+          '<span>'+(z.geuebt ? z.sitzt : '–')+'</span>'+
+          '<span>'+(z.woche || '–')+'</span>'+
+          '<span>'+(z.zuletzt ? new Date(z.zuletzt).toLocaleDateString('de-CH', {day:'numeric', month:'numeric'}) : '–')+'</span></div>';
+      });
+      h += '</div>';
+      // Schwierigste Wörter: bei wie vielen «wackelt» es (mehr Fehler als Treffer oder Box 1), wie oft falsch insgesamt
+      var agg = {};
+      rows.forEach(function(r){
+        Object.keys(r.woerter).forEach(function(id){
+          var w = r.woerter[id];
+          if(filter && w.unit !== filter) return;
+          if(!w.f) return;
+          var a = agg[id] || (agg[id] = {id:id, wer:0, x:0});
+          a.x += w.f;
+          if(w.f >= w.r || w.box <= 1) a.wer++;
+        });
+      });
+      var schwer = Object.keys(agg).map(function(id){ return agg[id]; }).filter(function(a){ return a.wer; })
+        .sort(function(a, b){ return b.wer - a.wer || b.x - a.x; }).slice(0, 20);
+      h += '<h4 class="pr-h4">🧗 Schwierigste Wörter der Klasse</h4>';
+      if(!schwer.length) h += '<p class="pr-hinweis">Noch keine Fehler gesammelt'+(filter ? ' in dieser Unit' : '')+'.</p>';
+      else h += '<div class="kk-schwer">' + schwer.map(function(a){
+        var p = a.id.split('|'), wort = p.slice(2).join('|'), info = voc.woerter[a.id], u = voc.units.filter(function(x){ return x.id === p[0] + '|' + p[1]; })[0];
+        return '<div class="kk-schwer-zeile"><span><b>'+esc(wort)+'</b>'+(info && info.d ? ' → '+esc(info.d) : '')+
+          (!filter && u ? ' <small>· '+esc(u.name)+'</small>' : '')+'</span>'+
+          '<small>'+a.wer+' Schüler:in'+(a.wer === 1 ? '' : 'nen')+' · '+a.x+'× falsch</small></div>';
+      }).join('') + '</div>';
+      h += '<div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
+      openModal(h, 'pr-modal pr-modal-breit');
+      document.getElementById('modalOk').addEventListener('click', closeModal);
+      document.getElementById('vociUnit').addEventListener('change', function(){
+        filter = this.value;
+        lsSet(LIB_PREFIX + 'voci_unit_' + fach, filter);
+        zeichnen();
+      });
+    }
+    zeichnen();
+  }catch(err){ console.error(err); closeModal(); toast('Voci-Übersicht konnte nicht geladen werden.'); }
+}
+
 /* ===================== 🧩 WERKSTATT-ÜBERSICHT (Lehrperson) =====================
    Für Werkstatt-Übungen, die aus mehreren Dateien bestehen (zurzeit die
    Rechtschreib-Werkstatt, 4 Teile à 5 Posten). Jede Datei speichert ihren
@@ -4870,7 +5029,11 @@ var LS_SPEZIAL = {
   mathe: {icon:'📊', kurz:'SIKORE', titel:'SIKORE-Übersicht', text:'Level mit Auf-/Abstieg, Üben diese Woche, Wochenziel und Bestzeiten pro Schüler:in',
     oeffnen:function(){ sikoreUebersicht(); }},
   deutsch: {icon:'🧩', kurz:'Werkstatt', titel:'Werkstatt-Übersicht', text:'Rechtschreib-Werkstatt: wer bei welchem Posten wie weit ist, Stempel und offene Fehlerwörter',
-    oeffnen:function(){ wsState.detailUid = null; state.route = {name:'werkstatt'}; render(); }}
+    oeffnen:function(){ wsState.detailUid = null; state.route = {name:'werkstatt'}; render(); }},
+  englisch: {icon:'🗣️', kurz:'Voci', titel:'Voci-Übersicht', text:'Voci-Trainer Open World: 🔥 Serie, wer wie viele Wörter kann und die schwierigsten Wörter der Klasse',
+    oeffnen:function(){ vociUebersicht('englisch'); }},
+  franzoesisch: {icon:'🗣️', kurz:'Voci', titel:'Voci-Übersicht', text:'Voci-Trainer dis donc!: 🔥 Serie, wer wie viele Wörter kann und die schwierigsten Wörter der Klasse',
+    oeffnen:function(){ vociUebersicht('franzoesisch'); }}
 };
 
 function renderLernstandUebersicht(){
@@ -15157,6 +15320,8 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-25-voci-trainer-serie', datum:'2026-09-25', fuer:'alle', text:'🔥 Voci-Trainer (Vocabulaire dis donc! und Vocabulary Open World): Übst du pro Tag mindestens 10 Wörter, wächst deine Serie – mit Flammen für jeden Tag. Viele richtige Antworten am Stück zeigen deine 🔥-Glückssträhne. Neu: Richtung «🔀 gemischt», und ist beim Schreiben nur ein Akzent oder Buchstabe falsch, darfst du nochmals versuchen.'},
+  {id:'2026-09-25-voci-trainer-lp', datum:'2026-09-25', fuer:'lehrer', text:'🗣️ Voci-Trainer: In der 📈 Lernstand-Übersicht gibt es bei Englisch und Französisch neu die «Voci-Übersicht» – 🔥 Serie, geübte und sichere Wörter pro Person und die schwierigsten Wörter der Klasse, filterbar nach Unit. Und im 📝 Prüfungsmodus («📄 Aus einer Übung») lässt sich aus dem Voci-Trainer ein Voci-Test ziehen: Units wählen, Richtung, Anzahl – automatisch korrigiert, mit Akzent-Tasten.'},
   {id:'2026-09-25-karteikarten-spiele', datum:'2026-09-25', fuer:'alle', text:'🗂️ Karteikarten können mehr: Unter «Art» gibt es jetzt «Auswählen» (4 Antworten), «Paare finden» und die ⏱️ Tempo-Runde mit Rekord – und bei «Richtung» 🔀 gemischt. Beim Selber-Schreiben helfen Akzent-Tasten (é, è, ç …), und fehlt nur ein Akzent oder ein Buchstabe, darfst du es nochmals versuchen.'},
   {id:'2026-09-25-voci-serie', datum:'2026-09-25', fuer:'alle', text:'🔥 Neu: die Voci-Serie! Beantworte pro Tag mindestens 10 Karteikarten in einem Fach, dann brennt deine Flamme weiter. Und wer viele Karten am Stück richtig hat, sieht beim Üben die 🔥-Glückssträhne wachsen.'},
   {id:'2026-09-25-voci-test', datum:'2026-09-25', fuer:'lehrer', text:'📝 Voci-Test: Im Prüfungsmodus («📄 Aus einer Übung») stehen jetzt auch die 🗂️ Karteikarten-Sets zur Wahl – oder direkt im Set «📝 Voci-Test». Richtung(en) wählen, Anzahl, Mischung aus Selbst-Hinschreiben und Auswählen; jedes Wort kommt nur einmal vor, Akzent-Tasten gibt es auch in der Prüfung. Korrigiert wird automatisch (mit oder ohne Artikel, Varianten mit «/»), 🧩 Baukasten wie immer. Neu in der 📊 Klassenübersicht: «Schwierigste Wörter der Klasse», beide Richtungen und die 🔥 Serie jeder Person.'},
@@ -20312,6 +20477,66 @@ function pruefExtractImpl(){
     out.diktat = true;
     kat('diktat', '✍️ Diktat');
     add('diktat', {typ:'diktat', frage:'Diktat', text:text, alt:alt, woerter:woerter});
+  } else if(window.__libVOC && Array.isArray(window.__libVOC.buecher)){
+    // 🗣️ Voci-Trainer (dis donc! / Open World): pro Unit (Französisch: und Niveau G/E)
+    // ein Bereich, vorausgewählt ist nichts. Pro Wort und Richtung eine Kurzantwort
+    // und eine Auswahlfrage; f.gruppe = das Wort (kommt pro Prüfung nur einmal),
+    // f.ri = Richtung (der Editor kann auf eine Richtung beschränken).
+    var V = window.__libVOC, franz = V.buecher.some(function(b){ return b.unites; });
+    var sprache = franz ? 'Französisch' : 'Englisch', woerterVon = {};
+    var norm = function(x){ return String(x || '').toLowerCase().replace(/\s+/g, ' ').trim(); };
+    var varianten = function(x, sp){
+      var o = [];
+      var dazu = function(y){ y = String(y || '').replace(/\s+/g, ' ').trim(); if(y && o.indexOf(y) < 0) o.push(y); };
+      var ganz = plain(x);
+      dazu(ganz);
+      ganz.split(/\s*[,;]\s*|\s+\/\s+/).forEach(function(t){
+        [t, t.replace(/\([^)]*\)/g, ' '), t.replace(/[()]/g, '')].forEach(function(y){
+          dazu(y);
+          if(sp === 'de') dazu(String(y).trim().replace(/^(der|die|das|ein|eine|einen)\s+/i, ''));
+          if(sp === 'en') dazu(String(y).trim().replace(/^(to|a|an|the)\s+/i, ''));
+        });
+      });
+      return o;
+    };
+    V.buecher.forEach(function(b){
+      (b.unites || b.units || []).forEach(function(u){
+        (franz ? [['g', ' · Niveau G'], ['e', ' · Niveau E']] : [['', '']]).forEach(function(n){
+          var ws = [];
+          (franz ? ((u.niveaus || {})[n[0]] || []) : (u.gruppen || [])).forEach(function(g){
+            (g.w || []).forEach(function(w){ if(w && w.f && w.d) ws.push(w); });
+          });
+          if(ws.length < 4) return;
+          var k = b.id + '|' + u.id + (n[0] ? '|' + n[0] : '');
+          kat(k, plain(b.name) + ' · ' + plain(u.name) + n[1]);
+          woerterVon[k] = ws.length;
+          ws.forEach(function(w){
+            [['fd', w.f, w.d, 'Deutsch', 'de'], ['df', w.d, w.f, sprache, franz ? 'fr' : 'en']].forEach(function(r){
+              var frage = '«' + plain(r[1]) + '» → ' + r[3], ziel = plain(r[2]), gr = b.id + '|' + u.id + '|' + w.f;
+              // Französisch: der Artikel gehört dazu (zeigt das Geschlecht) — so steht es auch in der Frage.
+              if(r[4] === 'fr' && /^(le|la|les|un|une)\s|^l['’]/i.test(ziel)) frage += ' (mit Artikel)';
+              add(k, {typ:'text', ri:r[0], gruppe:gr, bloom:'erinnern', frage:frage, loesung:varianten(r[2], r[4])});
+              var andere = [], gesehen = {};
+              gesehen[norm(ziel)] = 1;
+              for(var v=0; v<40 && andere.length<3; v++){
+                var x = ws[Math.floor(Math.random() * ws.length)], a = plain(r[0] === 'fd' ? x.d : x.f);
+                if(!gesehen[norm(a)]){ gesehen[norm(a)] = 1; andere.push(a); }
+              }
+              if(andere.length < 3) return;
+              var opts = andere.concat([ziel]).sort(function(){ return Math.random() - 0.5; });
+              add(k, {typ:'mc', ri:r[0], gruppe:gr, bloom:'erinnern', keinUmwandeln:true, frage:frage, optionen:opts, loesung:opts.indexOf(ziel)});
+            });
+          });
+        });
+      });
+    });
+    out.kategorien.forEach(function(x){ x.anzahl = woerterVon[x.id] || 0; });
+    out.voci = true;
+    out.standardKats = [];
+    out.richtungen = [['fd', sprache + ' → Deutsch'], ['df', 'Deutsch → ' + sprache]];
+    out.formenStd = [0, 70, 30, 0];
+    out.bloomStd = [100, 0, 0];
+    if(franz) out.akzente = ['à', 'â', 'ç', 'é', 'è', 'ê', 'ë', 'î', 'ï', 'ô', 'ù', 'û', 'œ'];
   } else {
     return {art:'keine'};
   }
@@ -20323,7 +20548,7 @@ function pruefExtractImpl(){
 // pruefProbe auswerten kann. Chunk für Chunk, bricht beim ersten Treffer ab
 // (die Daten stehen vorne, vor Bildern/Audio). Ergebnis pro contentId im
 // Browser gemerkt — ein Inhalt ändert sich nie (Bearbeiten = neue contentId).
-var PRUEF_SCAN_RE = /\b(?:var|let|const)\s+(?:Q|THEMES|TEXT_PARAGRAPHS)\s*=\s*\[|__GEO_PRUEFUNG/;
+var PRUEF_SCAN_RE = /\b(?:var|let|const)\s+(?:Q|THEMES|TEXT_PARAGRAPHS)\s*=\s*\[|__GEO_PRUEFUNG|\bvar\s+VOC\s*=\s*\{/;
 var PRUEF_SCAN_PREFIX = 'libPruefScan_';
 var PRUEF_SCAN_TTL = 90*24*3600*1000;   // nach 90 Tagen ungenutzt: weg
 var PRUEF_SCAN_REFRESH = 7*24*3600*1000;
@@ -20337,6 +20562,19 @@ var pruefScanGeputzt = false;
 function pruefScanAufraeumen(){
   if(pruefScanGeputzt) return;
   pruefScanGeputzt = true;
+  // 25.09.2026: Voci-Trainer (var VOC) sind neu prüfbar — früher als «nicht
+  // prüfbar» gemerkte Übungen einmal neu testen lassen.
+  if(lsGet(LIB_PREFIX + 'pruefScanV') !== '2'){
+    try{
+      var nein = [];
+      for(var j=0;j<localStorage.length;j++){
+        var kj = localStorage.key(j);
+        if(kj && kj.indexOf(PRUEF_SCAN_PREFIX) === 0 && (localStorage.getItem(kj) || '').charAt(0) === '0') nein.push(kj);
+      }
+      nein.forEach(function(k){ localStorage.removeItem(k); });
+    }catch(e){}
+    lsSet(LIB_PREFIX + 'pruefScanV', '2');
+  }
   try{
     var jetzt = Date.now(), weg = [];
     for(var i=0;i<localStorage.length;i++){
@@ -20406,6 +20644,7 @@ function pruefProbe(contentId){
       .replace(/\b(?:var|let|const)\s+TOPICS\s*=\s*\{/, 'var TOPICS = window.__libTOPICS = {')
       .replace(/\b(?:var|let|const)\s+THEMES\s*=\s*\[/, 'var THEMES = window.__libTHEMES = [')
       .replace(/\b(?:var|let|const)\s+CARDS\s*=\s*\[/, 'var CARDS = window.__libCARDS = [')
+      .replace(/\bvar\s+VOC\s*=\s*\{/, 'var VOC = window.__libVOC = {')
       .replace(/\b(?:var|let|const)\s+TEXT_PARAGRAPHS\s*=\s*\[/, 'var TEXT_PARAGRAPHS = window.__libDiktatText = [')
       .replace(/\b(?:var|let|const)\s+ACCEPTED_ALTERNATES\s*=\s*/, 'var ACCEPTED_ALTERNATES = window.__libDiktatAlt = ');
     var inject = '<script>window.__LIB_PRUEFUNG_PROBE = true;' +
@@ -20517,6 +20756,7 @@ function pruefBankPool(info, kats, mitUmwandeln){
   var pool = [], gruppen = {};
   info.fragen.forEach(function(f, i){
     if(kats.indexOf(f.kat) < 0) return;
+    if(info.ri && f.ri && f.ri !== info.ri) return;   // Voci-Trainer: nur eine Richtung
     // Fragen mit derselben f.gruppe (z.B. dieselbe Karteikarte als Kurzantwort
     // und als Auswahl, in beiden Richtungen) kommen höchstens einmal dran.
     var g = f.gruppe ? (gruppen[f.gruppe] = gruppen[f.gruppe] || {}) : {};
@@ -21138,7 +21378,7 @@ async function pruefEditor(p, vorwahl){
     if(!uebungen.length){
       // Im Dialog bleiben, damit man oben noch eine andere Art (⚡, ✍️ …) wählen kann.
       openModal('<h3>'+(neu ? '➕ Neue Prüfung' : '✏️ Prüfung bearbeiten')+'</h3>'+kopf+
-        '<p class="pr-hinweis pr-warn">Keine passende Übung gefunden. Prüfungen «aus einer Übung» gehen mit Prüfungsvorbereitungen (Quiz), Mathe-Übungen, Diktaten, Pöstlergeografie und 🗂️ Karteikarten-Sets (ab 4 Karten) — oder wähle oben eine andere Art.</p>'+
+        '<p class="pr-hinweis pr-warn">Keine passende Übung gefunden. Prüfungen «aus einer Übung» gehen mit Prüfungsvorbereitungen (Quiz), Mathe-Übungen, Diktaten, Pöstlergeografie, 🗣️ Voci-Trainern und 🗂️ Karteikarten-Sets (ab 4 Karten) — oder wähle oben eine andere Art.</p>'+
         '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button></div>', 'pr-modal');
       if(neu) pruefKopfVerdrahten('uebung');
       document.getElementById('modalCancel').addEventListener('click', closeModal);
@@ -21194,6 +21434,7 @@ async function pruefEditor(p, vorwahl){
   function zugEinstellungen(){
     var box = document.getElementById('prInfo');
     if(!box || !info || info.art !== 'bank') return null;
+    if(info.richtungen){ var riEl = document.getElementById('prRichtung'); info.ri = riEl ? riEl.value : ''; }
     var kats = Array.prototype.map.call(box.querySelectorAll('.pr-kats input:checked'), function(i){ return i.value; });
     var bl = Array.prototype.map.call(box.querySelectorAll('[data-bloom]'), function(i){ return Math.max(0, +i.value || 0); });
     var fm = Array.prototype.map.call(box.querySelectorAll('[data-form]'), function(i){ return Math.max(0, +i.value || 0); });
@@ -21298,6 +21539,8 @@ async function pruefEditor(p, vorwahl){
       return '<label><input type="checkbox" value="'+esc(k.id)+'" data-n="'+(k.anzahl || 0)+'"'+(kats.indexOf(k.id) >= 0 ? ' checked' : '')+'> '+esc(k.name)+(k.anzahl ? ' <small>('+k.anzahl+')</small>' : '')+'</label>';
     }).join('') + '</div>';
     var opts = info.optionen || [];
+    if(info.richtungen) b += '<div class="pr-grid2"><div><label class="modal-label" for="prRichtung">Richtung</label><select id="prRichtung" class="modal-input"><option value="">Beide Richtungen gemischt</option>' +
+      info.richtungen.map(function(r){ return '<option value="'+esc(r[0])+'"'+(gleich && c.richtung === r[0] ? ' selected' : '')+'>'+esc(r[1])+'</option>'; }).join('') + '</select></div><div></div></div>';
     b += '<div class="pr-grid2">';
     opts.forEach(function(o){
       var cur = gleich && c.optionen && c.optionen[o.id] != null ? String(c.optionen[o.id]) : (gleich && c[o.id] != null ? String(c[o.id]) : String(o.standard));
@@ -21435,12 +21678,13 @@ async function pruefEditor(p, vorwahl){
         data.diktat = !!info.diktat;
         if(info.diktat && info.fragen[0]) data.woerterInfo = info.fragen[0].woerter || null;
         data.resourceId = resource.id; data.subject = resource.subject || ''; data.resourceTitel = resource.title || resource.fileName || ''; data.contentId = resourceContentId(resource);
-        data.akzente = resource.kkSet && resource.kkAkzente.length ? resource.kkAkzente : null;
+        data.akzente = resource.kkSet ? (resource.kkAkzente.length ? resource.kkAkzente : null) : (info.akzente || null);
         data.cfg = {kats:kats, katNamen:katEls.map(function(i){ return i.parentNode.textContent.replace(/\s*\(\d+\)\s*$/, '').trim(); }),
           optionen:optionen, optNamen:optNamen, anzahl:anzahl, mischen:mischenEl.checked};
         var nivEl = document.getElementById('prNiveau');
         if(nivEl && e && e.bloom){ data.cfg.niveau = nivEl.value; data.cfg.bloom = e.bloom; }
         if(e && e.formen) data.cfg.formen = e.formen;
+        if(info.richtungen) data.cfg.richtung = info.ri || '';
         data.seed = seed;
         if(info.art === 'bank'){
           var zug = pruefBankZiehen(info, kats, anzahl, seed, e && e.bloom, e && e.formen);
