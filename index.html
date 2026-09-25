@@ -768,6 +768,17 @@
   .ls-fach[open] > summary::before{transform:rotate(90deg);}
   .ls-fach > summary .ls-fach-count{margin-left:auto;font-family:inherit;font-size:12px;font-weight:500;color:var(--text-muted);}
   .ls-fach-body{padding:0 16px 16px;}
+  .ls-fach > summary .ls-fach-tag{font-family:system-ui,sans-serif;font-size:11.5px;font-weight:600;color:var(--text-muted);background:var(--surface-2);border-radius:999px;padding:2px 9px;}
+  /* Eigene Übersichten eines Fachs (SIKORE in Mathe, Werkstatt in Deutsch) —
+     als Karte zuoberst im Klappfach. */
+  .ls-spezial{display:flex;align-items:center;gap:14px;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin:2px 0 14px;transition:border-color .15s,box-shadow .15s;}
+  .ls-spezial:hover{border-color:var(--brand);box-shadow:0 0 0 2px color-mix(in srgb, var(--brand) 18%, transparent);}
+  .ls-spezial-icon{font-size:26px;line-height:1;}
+  .ls-spezial-text{flex:1;min-width:0;}
+  .ls-spezial-text b{display:block;font-size:15px;}
+  .ls-spezial-text span{display:block;font-size:12.5px;color:var(--text-muted);margin-top:2px;}
+  .ls-spezial-pfeil{font-size:18px;color:var(--text-muted);}
+  @media print{ .ls-spezial,.ls-fach-tag{display:none !important;} }
 
 
   /* ---------- Stadt Land Fluss ---------- */
@@ -4790,21 +4801,32 @@ function wsCsv(){
   downloadTextFile('werkstatt-'+todayStr()+'.csv', rows.map(function(r){ return r.map(csvField).join(','); }).join('\r\n'), 'text/csv');
 }
 
+// Fächer mit einer eigenen, ausführlicheren Übersicht: erscheinen als Karte
+// zuoberst im jeweiligen Klappfach der Lernstand-Übersicht.
+var LS_SPEZIAL = {
+  mathe: {icon:'📊', kurz:'SIKORE', titel:'SIKORE-Übersicht', text:'Level mit Auf-/Abstieg, Üben diese Woche, Wochenziel und Bestzeiten pro Schüler:in',
+    oeffnen:function(){ sikoreUebersicht(); }},
+  deutsch: {icon:'🧩', kurz:'Werkstatt', titel:'Werkstatt-Übersicht', text:'Rechtschreib-Werkstatt: wer bei welchem Posten wie weit ist, Stempel und offene Fehlerwörter',
+    oeffnen:function(){ wsState.detailUid = null; state.route = {name:'werkstatt'}; render(); }}
+};
+
 function renderLernstandUebersicht(){
   clearSubjectWatchers(); clearOverviewWatchers(); unwatchAllProgress();
   var html = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn">&larr; Start</button></div>';
   html += '<h2>📈 Lernstand-Übersicht</h2>';
   html += '<p class="muted" style="margin:-6px 0 14px;">Aktueller Stand pro Schüler:in und Übung, über alle Fächer. „↺" = wie oft zurückgesetzt, mit dem jeweiligen Stand unmittelbar davor. „⏱" = wie lange die Übung schon offen war (nur aktive Zeit, kein Hintergrund-Tab). Nur für dich sichtbar.</p>';
-  html += '<div class="da-toolbar" style="justify-content:flex-start;"><button class="btn btn-primary btn-sm" id="werkstattBtn" type="button">🧩 Werkstatt-Übersicht</button></div>';
   html += '<div id="lernstandBody"><div class="empty-state">Wird geladen …</div></div>';
   renderChrome(html);
   document.getElementById('backBtn').addEventListener('click', goHome);
-  document.getElementById('werkstattBtn').addEventListener('click', function(){ wsState.detailUid = null; state.route = {name:'werkstatt'}; render(); });
 
   loadLernstandUebersicht().then(function(result){
     var body = document.getElementById('lernstandBody');
     if(!body) return;
     var subjectIds = Object.keys(result.bySubject).filter(function(id){ return result.bySubject[id].resources.length>0; });
+    // Fächer mit eigener Übersicht erscheinen auch ohne gewöhnliche Übungen.
+    Object.keys(LS_SPEZIAL).forEach(function(id){
+      if(subjectIds.indexOf(id) === -1 && subjectById(id)) subjectIds.push(id);
+    });
     subjectIds.sort(function(a,b){
       var sa = subjectById(a), sb = subjectById(b);
       return (sa?sa.name:a).localeCompare(sb?sb.name:b, 'de');
@@ -4815,11 +4837,18 @@ function renderLernstandUebersicht(){
       '<button class="btn btn-ghost btn-sm" id="lsCsvBtn" type="button">⬇️ CSV</button>'+
       '<button class="btn btn-ghost btn-sm" id="lsReloadBtn" type="button">↻ Neu laden</button></div>';
     subjectIds.forEach(function(subjId){
-      var sub = result.bySubject[subjId];
+      var sub = result.bySubject[subjId] || {resources:[], cell:{}};
       var s = subjectById(subjId);
+      var sp = LS_SPEZIAL[subjId];
       h += '<details class="ls-fach" data-subj="'+esc(subjId)+'"'+(lsFachOffen(subjId)?' open':'')+'>';
-      h += '<summary>'+esc(s?s.name:subjId)+'<span class="ls-fach-count">'+sub.resources.length+' '+(sub.resources.length===1?'Übung':'Übungen')+'</span></summary>';
+      h += '<summary>'+esc(s?s.name:subjId)+(sp ? '<span class="ls-fach-tag">'+sp.icon+' '+esc(sp.kurz)+'</span>' : '')+
+        '<span class="ls-fach-count">'+sub.resources.length+' '+(sub.resources.length===1?'Übung':'Übungen')+'</span></summary>';
       h += '<div class="ls-fach-body">';
+      if(sp){
+        h += '<button class="ls-spezial" type="button" data-ls-spezial="'+esc(subjId)+'"><span class="ls-spezial-icon">'+sp.icon+'</span>'+
+          '<span class="ls-spezial-text"><b>'+esc(sp.titel)+'</b><span>'+esc(sp.text)+'</span></span><span class="ls-spezial-pfeil">›</span></button>';
+      }
+      if(!sub.resources.length){ h += '</div></details>'; return; }
       h += '<div class="table-scroll"><table class="da-table"><thead><tr><th>Schüler:in</th>';
       sub.resources.forEach(function(res){ h += '<th>'+esc(res.title||res.fileName)+'</th>'; });
       h += '</tr></thead><tbody>';
@@ -4860,6 +4889,9 @@ function renderLernstandUebersicht(){
     });
 
     body.innerHTML = h;
+    Array.prototype.forEach.call(body.querySelectorAll('[data-ls-spezial]'), function(b){
+      b.addEventListener('click', LS_SPEZIAL[b.getAttribute('data-ls-spezial')].oeffnen);
+    });
     // Offen/zu je Fach merken.
     Array.prototype.forEach.call(body.querySelectorAll('.ls-fach'), function(d){
       d.addEventListener('toggle', function(){ lsFachSetzen(d.getAttribute('data-subj'), d.open); });
@@ -4874,6 +4906,7 @@ function renderLernstandUebersicht(){
       var rows = [['Fach','Schüler:in','Übung','Stand','Anzahl Reset','Lernzeit (Std.)']];
       subjectIds.forEach(function(subjId){
         var sub = result.bySubject[subjId];
+        if(!sub) return;
         var s = subjectById(subjId);
         rosterFuerFach(result.students, subjId).forEach(function(stu){
           sub.resources.forEach(function(res){
@@ -15066,6 +15099,7 @@ const NEUIGKEITEN = [
   {id:'2026-09-24-echte-koerperbilder', datum:'2026-09-24', fuer:'alle', text:'🦴🫀 Die Übungstrainer «Das Skelett» und «Organe im Körper» zeigen jetzt echte anatomische Zeichnungen statt Skizzen. Mit 🔍 oben rechts im Bild kannst du es vergrössern.'},
   {id:'2026-09-24-rsw-pruefung', datum:'2026-09-24', fuer:'lehrer', text:'✍️ Neu im 📝 Prüfungsmodus: «Rechtschreib-Werkstatt». Posten wählen (z. B. nur Teil 1), Anzahl Aufgaben und Aufgabentypen – die Library zieht eine Mischung aus Lückentexten, Auswahl-Aufgaben und kurzen Hördiktaten (einzelne Sätze oder Wörter aus den Audios) und korrigiert automatisch. Wählst du «Im Werkstatt-Pass: Prüfung Teil 1–4», sehen die Schüler:innen im Pass, ob sie die Prüfung geschrieben haben, und ihre Note. Für die Hördiktate die neuen Werkstatt-Dateien per «Datei ersetzen» hochladen (Stände bleiben).'},
   {id:'2026-09-24-rsw-tempo', datum:'2026-09-24', fuer:'alle', text:'🎧 Rechtschreib-Werkstatt: Die Audios kannst du jetzt auch mit 1,5× oder 2× abspielen (oder langsamer mit 0,75×). Im Werkstatt-Pass steht nach je fünf Posten die Prüfung zu diesem Teil – mit deiner Note, sobald sie da ist.'},
+  {id:'2026-09-25-lernstand-spezial', datum:'2026-09-25', fuer:'lehrer', text:'📈 Lernstand-Übersicht aufgeräumt: Die 📊 SIKORE-Übersicht steht jetzt direkt im Fach Mathe, die 🧩 Werkstatt-Übersicht direkt im Fach Deutsch (jeweils zuoberst im aufgeklappten Fach).'},
   {id:'2026-09-24-werkstatt-klasse', datum:'2026-09-24', fuer:'lehrer', text:'🧩 Werkstatt-Übersicht: Wählst du eine einzelne Klasse, kommt jetzt wirklich nur diese Klasse (vorher konnte eine langsamer ladende frühere Auswahl, z. B. der ganze Jahrgang, sie überschreiben). Die eigene Klasse steht jetzt auch unter «Klasse».'},
   {id:'2026-09-24-sparsamer', datum:'2026-09-24', fuer:'lehrer', text:'⚙️ Die Library speichert Übungsstände jetzt gebündelt (höchstens alle 20 Sekunden und beim Verlassen der Übung) statt bei jeder Tipp-Pause. Das schont das Tageskontingent der Datenbank, das am 23.09. aufgebraucht war (darum fehlten die Erinnerungen und die Lernphase zeigte alle als weg). Ist das Kontingent doch einmal voll, erscheint oben ein gelber Hinweis.'},
   {id:'2026-09-23-ferienhinweis-weg', datum:'2026-09-23', fuer:'lehrer', text:'🧳 Der Ferienhinweis «Diese Pflanzen halten nicht durch» lässt sich jetzt mit × wegklicken, sobald du ihn gelesen hast. Er kommt erst wieder, wenn sich etwas daran ändert (andere Ferien, andere Pflanzen oder Tage).'},
@@ -20824,12 +20858,11 @@ function renderPruefungen(){
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
   html += '<h2 class="page-welcome" style="margin-bottom:6px;">📝 Prüfungen</h2>';
   html += '<p class="kz-intro">Online-Prüfung aus einer Übung, aus einem ⚡ Übungstrainer, aus 🧮 SIKORE, als ⌨️ Abschreibprüfung oder aus der ✍️ Rechtschreib-Werkstatt — die Art wählst du in «➕ Neue Prüfung». Dort stellst du auch ein, für welche Klasse und für wen (ganze Klasse oder eine 👥 Gruppe) die Prüfung ist. Wer die Prüfung verlässt, wird gesperrt, bis du entsperrst.</p>';
-  html += '<div class="back-row"><button class="btn btn-primary btn-sm" id="prNeu" type="button">➕ Neue Prüfung</button><button class="btn btn-ghost btn-sm" id="prSikoreUeb" type="button">📊 SIKORE-Übersicht</button></div>';
+  html += '<div class="back-row"><button class="btn btn-primary btn-sm" id="prNeu" type="button">➕ Neue Prüfung</button></div>';
   html += '<div id="prListe"><div class="empty-state">Wird geladen …</div></div>';
   renderChrome(html);
   document.getElementById('backBtn').addEventListener('click', function(){ state.route = {name:'klassenzimmer'}; render(); });
   document.getElementById('prNeu').addEventListener('click', function(){ pruefEditor(null); });
-  document.getElementById('prSikoreUeb').addEventListener('click', sikoreUebersicht);
   startPruefungWatcher();
   pruefListeZeichnen();
 }
