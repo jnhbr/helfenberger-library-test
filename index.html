@@ -15061,6 +15061,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-25-gehirn-latein', datum:'2026-09-25', fuer:'alle', text:'🔥 Für Profis: Im Übungstrainer «🧠 Das Gehirn» gibt es das Level «Extrem: Latein» – Lobus frontalis, Corpus callosum, Medulla oblongata & Co. antippen, übersetzen und selbst richtig schreiben.'},
   {id:'2026-09-25-gehirn', datum:'2026-09-25', fuer:'alle', text:'🧠 Neuer Übungstrainer in Biologie: «Das Gehirn». Finde die vier Hirnlappen, Kleinhirn und Hirnstamm im Bild, schau dir das Gehirn im Längsschnitt an (Balken, Zwischenhirn, Hirnanhangdrüse, Rückenmark) und lerne, was welcher Teil macht – dazu Fachbegriffe wie Synapse und Reflex.'},
   {id:'2026-09-24-echte-koerperbilder', datum:'2026-09-24', fuer:'alle', text:'🦴🫀 Die Übungstrainer «Das Skelett» und «Organe im Körper» zeigen jetzt echte anatomische Zeichnungen statt Skizzen. Mit 🔍 oben rechts im Bild kannst du es vergrössern.'},
   {id:'2026-09-24-rsw-pruefung', datum:'2026-09-24', fuer:'lehrer', text:'✍️ Neu im 📝 Prüfungsmodus: «Rechtschreib-Werkstatt». Posten wählen (z. B. nur Teil 1), Anzahl Aufgaben und Aufgabentypen – die Library zieht eine Mischung aus Lückentexten, Auswahl-Aufgaben und kurzen Hördiktaten (einzelne Sätze oder Wörter aus den Audios) und korrigiert automatisch. Wählst du «Im Werkstatt-Pass: Prüfung Teil 1–4», sehen die Schüler:innen im Pass, ob sie die Prüfung geschrieben haben, und ihre Note. Für die Hördiktate die neuen Werkstatt-Dateien per «Datei ersetzen» hochladen (Stände bleiben).'},
@@ -25462,7 +25463,45 @@ var MT_B_NERVEN = [
   ['Hirnhälfte','die linke steuert die rechte Körperseite – und umgekehrt'],
   ['Gedächtnis','speichert, was wir gelernt und erlebt haben']
 ];
+// 🔥 Level 7: lateinische Fachbegriffe. [Latein, Deutsch, weitere richtige Schreibweisen]
+// Die ersten elf entsprechen den Figuren in den beiden Zeichnungen (Deutsch = Figurname).
+var MT_B_HIRN_LATEIN = [
+  ['Lobus frontalis','Stirnlappen'], ['Lobus parietalis','Scheitellappen'], ['Lobus temporalis','Schläfenlappen'],
+  ['Lobus occipitalis','Hinterhauptslappen'], ['Cerebellum','Kleinhirn'], ['Truncus cerebri','Hirnstamm',['Truncus encephali']],
+  ['Cerebrum','Grosshirn',['Telencephalon']], ['Corpus callosum','Balken'], ['Diencephalon','Zwischenhirn'],
+  ['Hypophysis','Hirnanhangdrüse',['Hypophyse','Glandula pituitaria']], ['Medulla spinalis','Rückenmark'],
+  ['Encephalon','Gehirn'], ['Cortex cerebri','Grosshirnrinde'], ['Gyrus','Hirnwindung'], ['Sulcus','Hirnfurche'],
+  ['Hemisphaerium','Hirnhälfte',['Hemisphaerium cerebri','Hemispherium','Hemisphäre','Hemisphaere']], ['Mesencephalon','Mittelhirn'], ['Pons','Brücke'],
+  ['Medulla oblongata','verlängertes Mark'], ['Thalamus','Sehhügel'], ['Ventriculus','Hirnkammer',['Ventrikel']],
+  ['Liquor cerebrospinalis','Hirnwasser (Nervenwasser)',['Liquor']], ['Meninges','Hirnhäute'], ['Dura mater','harte Hirnhaut'],
+  ['Arachnoidea','Spinnengewebshaut',['Arachnoidea mater']], ['Pia mater','weiche Hirnhaut'], ['Fornix','Hirngewölbe'],
+  ['Hippocampus','Ammonshorn'], ['Corpus amygdaloideum','Mandelkern',['Amygdala']], ['Glandula pinealis','Zirbeldrüse',['Corpus pineale','Epiphyse','Epiphysis']],
+  ['Insula','Inselrinde',['Lobus insularis']], ['Nervus opticus','Sehnerv'], ['Chiasma opticum','Sehnervenkreuzung'],
+  ['Neuron','Nervenzelle'], ['Axon','Nervenfaser (Neurit)',['Neurit']], ['Substantia grisea','graue Substanz'], ['Substantia alba','weisse Substanz'],
+  ['Cranium','Schädel'], ['Columna vertebralis','Wirbelsäule'], ['Systema nervosum centrale','Zentralnervensystem',['ZNS']]
+];
+function mtHirnLat(deutsch){ return MT_B_HIRN_LATEIN.filter(function(x){ return x[1] === deutsch; })[0]; }
+function mtGenBHirnLatein(){
+  var art = mtZuf(1, 4), schnitt = mtZufall() < 0.5;
+  var bild = schnitt ? MT_B_HIRN_SCHNITT_BILD : MT_B_HIRN_SEITE_BILD, figs = schnitt ? MT_B_HIRN_SCHNITT_FIG : MT_B_HIRN_SEITE_FIG;
+  var f = mtAus(figs), lat = mtHirnLat(f.v);
+  var loes = function(x){ return [x[0]].concat(x[2] || []); };
+  var merk = function(x){ return x[0] + ' = ' + x[1] + ((x[2] || []).length ? ' (auch: ' + x[2].join(', ') + ')' : '') + '.'; };
+  if(art === 1) return {frage:'Wo liegt: ' + lat[0] + '? Tippe die Stelle im Bild an.',
+    felder:[{typ:'bild', bild:mtKoerperBild(figs, bild, f.v, figs.length, false), loesung:f.v}], tipp:merk(lat)};
+  if(art === 2) return {frage:'Wie heisst der markierte Teil auf Latein? (genaue Schreibweise)', svg:mtEchtBildHtml(bild, f),
+    felder:[{loesung:loes(lat), text:true}], tipp:merk(lat)};
+  var x = mtAus(MT_B_HIRN_LATEIN), rest = mtMisch(MT_B_HIRN_LATEIN.filter(function(y){ return y[0] !== x[0]; })).slice(0, 4);
+  if(art === 3){
+    if(mtZufall() < 0.5) return {frage:'Was heisst «' + x[0] + '» auf Deutsch?',
+      felder:[{typ:'wahl', optionen:mtMisch([x[1]].concat(rest.map(function(y){ return y[1]; }))), loesung:x[1]}], tipp:merk(x)};
+    return {frage:'Wie heisst «' + x[1] + '» auf Latein?',
+      felder:[{typ:'wahl', optionen:mtMisch([x[0]].concat(rest.map(function(y){ return y[0]; }))), loesung:x[0]}], tipp:merk(x)};
+  }
+  return {frage:'Schreib den lateinischen Fachbegriff: «' + x[1] + '»', felder:[{loesung:loes(x), text:true}], tipp:merk(x)};
+}
 function mtGenBGehirn(l){
+  if(l === 7) return mtGenBHirnLatein();
   if(l === 6) l = mtZuf(1, 5);
   if(l === 5){
     var p = mtAus(MT_B_NERVEN), rest = mtMisch(MT_B_NERVEN.filter(function(x){ return x[0] !== p[0]; }));
@@ -25712,7 +25751,7 @@ var MT_TRAINER = [
    levels:['Knochen im Bild finden','Welcher Knochen ist markiert?','Aufgabe → Knochen antippen','Alles gemischt'], gen:mtGenBSkelett},
   {id:'mt_b_gehirn', fach:'biologie', icon:'🧠', name:'Das Gehirn', kurz:'Am Bild lernen: Hirnlappen, Kleinhirn, Hirnstamm – auch im Längsschnitt.',
    deko:['🧠','⚡','👁️','🦴'], grad:'linear-gradient(135deg,#4A1260 0%,#7B2C9E 55%,#B04FD6 100%)',
-   levels:['Hirnlappen finden','Gehirn im Längsschnitt','Welcher Teil ist markiert?','Aufgabe → Teil antippen','Nerven-Fachbegriffe','Alles gemischt'], gen:mtGenBGehirn},
+   levels:['Hirnlappen finden','Gehirn im Längsschnitt','Welcher Teil ist markiert?','Aufgabe → Teil antippen','Nerven-Fachbegriffe','Alles gemischt','🔥 Extrem: Latein'], gen:mtGenBGehirn},
 
   /* ⚗️ Chemie */
   {id:'mt_c_pse', fach:'chemie', icon:'⚗️', name:'Periodensystem', kurz:'Symbol, Name und Ordnungszahl.',
