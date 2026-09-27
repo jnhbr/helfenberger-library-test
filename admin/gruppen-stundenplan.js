@@ -176,6 +176,9 @@ function leseGanzklassen() {
 }
 
 (async function () {
+  // Erst die (langsamen) PDFs und die Excel lesen, dann Firestore: eine lange ruhende
+  // REST-Verbindung brach sonst beim Schreiben mit EPIPE ab.
+  const excelGruppen = leseExcel(), ganzklassen = leseGanzklassen();
   const { admin, db } = starten();
   const ts = admin.firestore.FieldValue.serverTimestamp();
 
@@ -217,7 +220,7 @@ function leseGanzklassen() {
 
   const plan = [];   // {key, fach, name, lk, mitglieder:[konto]}
   const fehlendeLp = {};
-  leseExcel().forEach(function (g) {
+  excelGruppen.forEach(function (g) {
     if (g.sem && g.sem !== SEMESTER) return;
     let lks = (ERSATZ[SEMESTER] || {})[g.key] || [g.lk];
     lks = lks.concat(DAZU[g.key] || []);
@@ -227,7 +230,7 @@ function leseGanzklassen() {
     const name = FACHNAME[g.fach] + ' (' + g.code + ') · ' + (klassen.length === 1 ? klassen[0] : g.jg + '. Kl.');
     lks.forEach(function (lk) { plan.push({ key: g.jg + '|' + g.code + '|' + lk, fach: g.fach, name: name, lk: lk, mitglieder: konten }); });
   });
-  leseGanzklassen().forEach(function (g) {
+  ganzklassen.forEach(function (g) {
     const konten = schueler.filter(function (s) { return s.k === g.klasse; });
     if (!konten.length) return;
     plan.push({ key: g.key, fach: g.fach, name: FACHNAME[g.fach] + ' · ' + g.klasse, lk: g.lk, mitglieder: konten });
@@ -279,7 +282,9 @@ function leseGanzklassen() {
 
   // ---------- Schreiben ----------
   const seiten = {};
-  const w = db.bulkWriter();
+  // Normale Batches statt bulkWriter: der brach über REST mit EPIPE ab (27.09.2026).
+  const ops = [];
+  const w = { set: function (ref, d, o) { ops.push(function (b) { b.set(ref, d, o); }); }, delete: function (ref) { ops.push(function (b) { b.delete(ref); }); } };
   neu.concat(geaendert.map(function (g) { return g.s; })).forEach(function (s) {
     const namen = {};
     s.mitglieder.forEach(function (m) { namen[m.uid] = { n: m.vn, nn: m.nn, u: m.u, k: m.k }; });
@@ -294,7 +299,12 @@ function leseGanzklassen() {
     seiten[s.lp.klasse] = true;
   });
   weg.forEach(function (a) { w.delete(db.collection('gruppen').doc(a.id)); if (a.ownerKlasse) seiten[a.ownerKlasse] = true; });
-  await w.close();
+  for (let i = 0; i < ops.length; i += 100) {
+    const b = db.batch();
+    ops.slice(i, i + 100).forEach(function (op) { op(b); });
+    await b.commit();
+  }
+  console.log(ops.length + ' Gruppen geschrieben/gelöscht');
 
   // Kalender-Einträge der geänderten Gruppen nachführen.
   for (const g of geaendert) {
