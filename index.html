@@ -15745,6 +15745,7 @@ const NEUIGKEITEN = [
   {id:'2026-09-27-gruppen-pruefung', datum:'2026-09-27', fuer:'lehrer', text:'👥 Prüfung für eine Gruppe: Die Übersicht zeigt jetzt alle Mitglieder – auch die aus anderen Klassen – und diese sehen die Prüfung bei sich oben unter «📝 Prüfung». (Braucht die neuen Datenbank-Regeln.)'},
   {id:'2026-09-27-material-paket', datum:'2026-09-27', fuer:'lehrer', text:'📥 Unterrichtsmaterial › «Paket importieren»: Quizze, Blitzumfragen, Wortwolken und Karteikarten aus einer vorbereiteten .json-Datei auf einmal in einen Ordner legen (z. B. zur Lesereise).'},
   {id:'2026-09-27-unterrichtsmaterial', datum:'2026-09-27', fuer:'lehrer', text:'🗃️ Klassenzimmer › Unterrichtsmaterial: Klassen-Quiz, Karteikarten, Wortwolken und Blitzumfragen nach Fach und Ordner ablegen – es sind dieselben Ordner wie bei den Übungen. Wortwolken und Blitzumfragen lassen sich jetzt mit «💾 Speichern» vorbereiten. Was in einem Ordner liegt, steht auch direkt im Fach (z. B. Geschichte › Imperialismus) mit ▶︎ Starten – im Fach holst du mit «🏫 Aus dem Klassenzimmer» Neues oder Vorhandenes in den offenen Ordner.'},
+  {id:'2026-09-27-seb-fokus', datum:'2026-09-27', fuer:'lehrer', text:'🛡️ Safe Exam Browser: Schüler:innen wurden dort nach wenigen Sekunden gesperrt («Anderes Fenster oder Programm geöffnet»), obwohl sie die Prüfung nicht verlassen hatten. Behoben – im SEB prüft die Library den Fensterfokus nicht mehr (SEB sperrt andere Programme selbst). Tab-Wechsel und Neuladen werden weiter erkannt.'},
   {id:'2026-09-27-seb', datum:'2026-09-27', fuer:'lehrer', text:'🛡️ Prüfungen mit Safe Exam Browser: in der Prüfung auf «🛡️ Safe Exam Browser: aus» tippen, dann lässt sie sich nur noch im SEB schreiben. Die Schüler:innen bekommen den Knopf «Im Safe Exam Browser öffnen», SEB startet direkt in der Library (dort anmelden). In der Übersicht zeigt 🛡️, wer im SEB schreibt. Der SEB muss auf den Geräten installiert sein.'},
   {id:'2026-09-27-karteikarten-ordner', datum:'2026-09-27', fuer:'alle', text:'🗂️ Karteikarten stehen jetzt auch direkt im passenden Ordner eines Fachs – nicht nur zuoberst unter «Karteikarten».'},
   {id:'2026-09-27-handy-symbole', datum:'2026-09-27', fuer:'alle', text:'📱 Auf dem Handy stehen die Symbole oben jetzt alle in einer Zeile.'},
@@ -21379,6 +21380,10 @@ function pruefWaechterAn(){
   window.addEventListener('pagehide', pruefOnHide);
   s.poll = setInterval(function(){
     if(pruef.sess !== s) return;
+    // Im Safe Exam Browser meldet hasFocus() dauernd false (Fiona wurde am
+    // 27.09.2026 nach 4 s gesperrt, ohne rauszugehen) — SEB sperrt andere
+    // Fenster und Programme ohnehin, darum dort nicht auf den Fokus prüfen.
+    if(sebAktiv()){ s.missed = 0; return; }
     // hasFocus() ist auch true, solange der Fokus im Prüfungs-iframe liegt.
     if(document.hasFocus()){ s.missed = 0; return; }
     if(++s.missed >= 2) pruefVerstoss('Anderes Fenster oder Programm geöffnet');
