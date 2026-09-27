@@ -1955,6 +1955,27 @@
   .pr-mix-g{font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--text-muted);margin:8px 0 3px;}
   .pr-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 12px;}
   .pr-grid2 .modal-input,#prTitel,#prUebung,#prKlasse,#prFuer{margin-bottom:12px;}
+  .uom-knopf{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 13px;border:1px solid var(--border);border-radius:10px;font:inherit;background:var(--surface-2);color:var(--text);cursor:pointer;margin-bottom:12px;min-height:44px;}
+  .uom-knopf:hover,.uom-knopf.offen{border-color:var(--brand);}
+  .uom-knopf:focus-visible{outline:2px solid var(--brand);outline-offset:1px;}
+  .uom-knopf .uom-pfeil{margin-left:auto;color:var(--text-muted);}
+  .uom-leer{color:var(--text-muted);}
+  .uom-wahl{display:flex;flex-direction:column;min-width:0;line-height:1.3;}
+  .uom-wahl b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .uom-pfad{font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .uom-sep{opacity:.6;}
+  .uom-panel{position:fixed;z-index:2100;display:flex;overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 18px 44px rgba(0,0,0,.25);}
+  .uom-spalte{flex:0 0 250px;width:250px;max-height:var(--uom-h,420px);overflow-y:auto;padding:6px;border-left:1px solid var(--border);}
+  .uom-spalte:first-child{border-left:0;flex-basis:200px;width:200px;}
+  .uom-eintrag{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 10px;border:0;border-radius:8px;background:none;color:var(--text);font:inherit;font-size:14px;cursor:pointer;}
+  .uom-eintrag:hover,.uom-eintrag:focus-visible{background:var(--surface-2);outline:none;}
+  .uom-eintrag.aktiv{background:var(--brand);color:#fff;}
+  .uom-eintrag.aktiv .uom-zahl,.uom-eintrag.aktiv .uom-pfeil{color:#fff;}
+  .uom-eintrag.gewaehlt{font-weight:700;box-shadow:inset 3px 0 0 var(--brand);}
+  .uom-name{flex:1;min-width:0;overflow-wrap:anywhere;}
+  .uom-zahl{font-size:12px;color:var(--text-muted);}
+  .uom-eintrag .uom-pfeil{color:var(--text-muted);}
+  .uom-trenn{height:1px;background:var(--border);margin:5px 6px;}
   .pr-art-wahl{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
   .pr-check{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin:0 0 12px;}
   .pr-badge{display:inline-block;vertical-align:middle;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--text-muted);}
@@ -15820,6 +15841,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-27-uebung-ordnermenu', datum:'2026-09-27', fuer:'lehrer', text:'📁 «➕ Neue Prüfung»: Die Übung wählst du jetzt in einem Ordner-Menü statt in einer langen Liste – Fach › Ordner › Übung, die Ordner gehen beim Darüberfahren auf (Tippen geht auch).'},
   {id:'2026-09-27-pruefung-verraet-nichts', datum:'2026-09-27', fuer:'lehrer', text:'🕵️ Prüfungen: Keine Aufgabe verrät mehr die Antwort einer anderen (z. B. «Welcher Kanton ist markiert?» und «Hauptort von Aargau?» mit demselben Kanton). Beim Zusammenstellen wird so eine Aufgabe weggelassen; im 🧩 Baukasten steht eine ⚠️-Warnung. Pöstlergeografie und Bildtrainer brauchen dafür die neue Fassung der Übung.'},
   {id:'2026-09-27-pruefung-zusatzmaterial', datum:'2026-09-27', fuer:'alle', text:'📝 Prüfungen im Fach-Ordner stehen jetzt unten beim Zusatzmaterial – ab zwei Stück in einem eigenen Ordner «📝 Prüfungen».'},
   {id:'2026-09-27-pruefung-ganze-klasse', datum:'2026-09-27', fuer:'lehrer', text:'📝 Prüfung für «Ganze Klasse»: In der Übersicht erscheinen nur noch die Schüler:innen dieser Klasse – keine Gruppen-Mitglieder aus anderen Klassen mehr (die sind nur dabei, wenn du unter «Für» die 👥 Gruppe wählst).'},
@@ -22743,6 +22765,166 @@ function pruefFuerDaten(p){
   return {};
 }
 
+/* ---------- 📁 Übungswahl als Ordner-Menü ----------
+   Statt einer langen <select>-Liste: Knopf → Spalten wie im Finder
+   (Fach › Ordner › Unterordner › Übung), die beim Darüberfahren aufgehen
+   (Tippen geht auch). Das <select> bleibt versteckt im Dialog und ist die
+   einzige Quelle für den gewählten Wert — der bestehende Code liest weiter
+   sel.value und hört auf 'change'. ordner = alle folders der Klasse. */
+function uebungOrdnerMenu(sel, uebungen, ordner, extras){
+  if(!sel) return;
+  var fMap = {};
+  (ordner || []).forEach(function(f){ fMap[f.id] = f; });
+  var fachName = function(r){ var s = subjectById(r.subject); return s ? s.name : (r.subject || 'Ohne Fach'); };
+  var knoten = function(name, icon){ return {name:name, icon:icon, kinder:{}, ordnerListe:[], items:[], order:0}; };
+  var wurzel = knoten('', '');
+  function fachKnoten(fn){ return wurzel.kinder[fn] || (wurzel.kinder[fn] = knoten(fn, '📚')); }
+  function ordnerKnoten(fk, fid){
+    // Pfad aus parentId-Kette; fehlende Ordner (gelöscht, anderes Fach) → Fach-Hauptebene
+    var kette = [], f = fMap[fid], guard = 0;
+    while(f && guard++ < 20){ kette.unshift(f); f = f.parentId ? fMap[f.parentId] : null; }
+    var k = fk;
+    kette.forEach(function(o){
+      var key = 'f:' + o.id;
+      if(!k.kinder[key]){ k.kinder[key] = knoten(o.name || 'Ordner', '📁'); k.kinder[key].order = o.order || 0; }
+      k = k.kinder[key];
+    });
+    return k;
+  }
+  var alle = uebungen.slice();
+  (extras || []).forEach(function(x){ alle.push(x); });
+  alle.forEach(function(r){
+    var fk = fachKnoten(r.fachName || fachName(r)), k = fk;
+    if(r.kkSet){ k = fk.kinder['kk'] || (fk.kinder['kk'] = knoten('Karteikarten-Sets', '🗂️')); k.order = 1e9; }
+    else if(r.folderId) k = ordnerKnoten(fk, r.folderId);
+    k.items.push(r);
+  });
+  function sortieren(k){
+    var keys = Object.keys(k.kinder);
+    keys.forEach(function(key){ sortieren(k.kinder[key]); });
+    k.ordnerListe = keys.map(function(key){ return k.kinder[key]; }).sort(function(a, b){
+      return k === wurzel ? a.name.localeCompare(b.name, 'de') : (a.order - b.order) || a.name.localeCompare(b.name, 'de', {numeric:true});
+    });
+  }
+  sortieren(wurzel);
+  function titel(r){ return r.title || r.fileName || r.id; }
+  function pfadZu(id){
+    var weg = [];
+    (function such(k){
+      if(k.items.some(function(r){ return r.id === id; })) return true;
+      for(var i = 0; i < k.ordnerListe.length; i++){ weg.push(k.ordnerListe[i]); if(such(k.ordnerListe[i])) return true; weg.pop(); }
+      return false;
+    })(wurzel);
+    return weg;
+  }
+  function anzahl(k){ return k.items.length + k.ordnerListe.reduce(function(s, c){ return s + anzahl(c); }, 0); }
+
+  var knopf = document.createElement('button');
+  knopf.type = 'button'; knopf.className = 'uom-knopf modal-input'; knopf.setAttribute('aria-haspopup', 'true');
+  sel.hidden = true;
+  sel.parentNode.insertBefore(knopf, sel);
+  function beschriften(){
+    var r = alle.find(function(x){ return x.id === sel.value; });
+    if(!r){ knopf.innerHTML = '<span class="uom-leer">– Übung wählen –</span><span class="uom-pfeil">▾</span>'; return; }
+    var weg = pfadZu(r.id).map(function(k){ return esc(k.name); }).join(' <span class="uom-sep">›</span> ');
+    knopf.innerHTML = '<span class="uom-wahl"><span class="uom-pfad">'+weg+'</span><b>'+esc(titel(r))+'</b></span><span class="uom-pfeil">▾</span>';
+  }
+  beschriften();
+  sel.addEventListener('change', beschriften);
+
+  var panel = null, offen = [], timer = 0;
+  function schliessen(){
+    clearTimeout(timer);
+    if(panel && panel.parentNode) panel.parentNode.removeChild(panel);
+    panel = null; offen = [];
+    knopf.classList.remove('offen');
+    document.removeEventListener('mousedown', aussen, true);
+    window.removeEventListener('resize', platzieren);
+    var m = knopf.closest('.modal'); if(m) m.removeEventListener('scroll', platzieren);
+  }
+  function aussen(e){
+    if(!document.body.contains(knopf)){ schliessen(); return; }
+    if(panel && !panel.contains(e.target) && !knopf.contains(e.target)) schliessen();
+  }
+  function platzieren(){
+    if(!panel) return;
+    if(!document.body.contains(knopf)){ schliessen(); return; }
+    var b = knopf.getBoundingClientRect(), vh = window.innerHeight, vw = window.innerWidth;
+    var unten = vh - b.bottom - 12, oben = b.top - 12, nachOben = unten < 260 && oben > unten;
+    var h = Math.max(160, Math.min(440, nachOben ? oben : unten));
+    panel.style.setProperty('--uom-h', h + 'px');
+    panel.style.maxWidth = (vw - 16) + 'px';
+    var w = panel.offsetWidth, x = Math.min(b.left, vw - 8 - w);
+    panel.style.left = Math.max(8, x) + 'px';
+    panel.style.top = nachOben ? '' : (b.bottom + 4) + 'px';
+    panel.style.bottom = nachOben ? (vh - b.top + 4) + 'px' : '';
+  }
+  function spalteHtml(k, tiefe){
+    var h = '<div class="uom-spalte" data-tiefe="'+tiefe+'">';
+    k.ordnerListe.forEach(function(c, i){
+      var aktiv = offen[tiefe] === c;
+      h += '<button type="button" class="uom-eintrag uom-ordner'+(aktiv ? ' aktiv' : '')+'" data-o="'+i+'"><span>'+c.icon+'</span><span class="uom-name">'+esc(c.name)+'</span><span class="uom-zahl">'+anzahl(c)+'</span><span class="uom-pfeil">›</span></button>';
+    });
+    if(k.ordnerListe.length && k.items.length) h += '<div class="uom-trenn"></div>';
+    k.items.forEach(function(r){
+      h += '<button type="button" class="uom-eintrag uom-uebung'+(r.id === sel.value ? ' gewaehlt' : '')+'" data-id="'+esc(r.id)+'"><span class="uom-name">'+esc(titel(r))+'</span></button>';
+    });
+    return h + '</div>';
+  }
+  function zeichnen(){
+    if(!panel) return;
+    var h = spalteHtml(wurzel, 0);
+    offen.forEach(function(k, i){ h += spalteHtml(k, i + 1); });
+    var alt = Array.prototype.map.call(panel.querySelectorAll('.uom-spalte'), function(s){ return s.scrollTop; });
+    panel.innerHTML = h;
+    Array.prototype.forEach.call(panel.querySelectorAll('.uom-spalte'), function(s, i){ if(alt[i]) s.scrollTop = alt[i]; });
+    platzieren();
+    panel.scrollLeft = panel.scrollWidth;   // schmaler Bildschirm: neueste Spalte zeigen
+  }
+  function oeffneOrdner(tiefe, i){
+    var eltern = tiefe === 0 ? wurzel : offen[tiefe - 1], k = eltern && eltern.ordnerListe[i];
+    if(!k || offen[tiefe] === k && offen.length === tiefe + 1) return;
+    offen = offen.slice(0, tiefe); offen[tiefe] = k;
+    zeichnen();
+  }
+  function oeffnen(){
+    schliessen();
+    panel = document.createElement('div');
+    panel.className = 'uom-panel'; panel.setAttribute('role', 'menu');
+    (knopf.closest('.modal-overlay') || document.body).appendChild(panel);
+    offen = sel.value ? pfadZu(sel.value) : [];
+    knopf.classList.add('offen');
+    zeichnen();
+    var g = panel.querySelector('.gewaehlt'); if(g) g.scrollIntoView({block:'nearest'});
+    panel.addEventListener('mouseover', function(e){
+      var o = e.target.closest('.uom-ordner'), sp = e.target.closest('.uom-spalte');
+      clearTimeout(timer);
+      if(!sp) return;
+      var tiefe = +sp.getAttribute('data-tiefe');
+      if(o){ var i = +o.getAttribute('data-o'); timer = setTimeout(function(){ oeffneOrdner(tiefe, i); }, 140); }
+      else if(e.target.closest('.uom-uebung') && offen.length > tiefe){
+        // auf eine Übung in einer linken Spalte gezeigt → rechte Spalten zu
+        timer = setTimeout(function(){ offen = offen.slice(0, tiefe); zeichnen(); }, 220);
+      }
+    });
+    panel.addEventListener('click', function(e){
+      var o = e.target.closest('.uom-ordner'), u = e.target.closest('.uom-uebung');
+      if(o){ clearTimeout(timer); oeffneOrdner(+o.closest('.uom-spalte').getAttribute('data-tiefe'), +o.getAttribute('data-o')); return; }
+      if(u){
+        sel.value = u.getAttribute('data-id');
+        schliessen();
+        sel.dispatchEvent(new Event('change'));
+        knopf.focus();
+      }
+    });
+    panel.addEventListener('keydown', function(e){ if(e.key === 'Escape'){ e.stopPropagation(); schliessen(); knopf.focus(); } });
+    document.addEventListener('mousedown', aussen, true);
+    window.addEventListener('resize', platzieren);
+    var m = knopf.closest('.modal'); if(m) m.addEventListener('scroll', platzieren);
+  }
+  knopf.addEventListener('click', function(){ if(panel) schliessen(); else oeffnen(); });
+}
+
 /* ---------- Lehrperson: Prüfung anlegen / bearbeiten ---------- */
 
 async function pruefEditor(p, vorwahl){
@@ -22751,8 +22933,9 @@ async function pruefEditor(p, vorwahl){
   var token = ++prEditorToken, kopf = pruefKopfHtml('uebung', neu);
   openModal('<h3>'+(neu ? '➕ Neue Prüfung' : '✏️ Prüfung bearbeiten')+'</h3>'+kopf+'<p>Übungen werden geladen …</p>', 'pr-modal');
   if(neu) pruefKopfVerdrahten('uebung');
-  var uebungen = [];
+  var uebungen = [], ordner = [];
   if(!fragenFix){
+    try{ (await getDocs(kcol('folders'))).forEach(function(d){ ordner.push(Object.assign({id:d.id}, d.data())); }); }catch(err){ console.error(err); }
     try{
       var snap = await getDocs(kcol('resources'));
       snap.forEach(function(d){
@@ -23042,6 +23225,7 @@ async function pruefEditor(p, vorwahl){
     });
   }
   if(sel && vorwahl && !p && !sel.value && uebungen.some(function(u){ return u.id === vorwahl; })) sel.value = vorwahl;
+  if(sel) uebungOrdnerMenu(sel, uebungen, ordner, neu ? [{id:'__rsw', title:'✍️ Rechtschreib-Werkstatt (Posten wählen)', fachName:'Deutsch'}] : []);
   if(sel){ sel.addEventListener('change', function(){ if(sel.value === '__rsw'){ rswPrEditor(null); return; } uebungGewaehlt(false); }); if(sel.value) uebungGewaehlt(true); }
 
   okBtn.addEventListener('click', async function(){
@@ -23180,7 +23364,8 @@ async function pruefImportEditor(){
   var token = ++prEditorToken, kopf = pruefKopfHtml('import', true);
   openModal('<h3>➕ Neue Prüfung</h3>'+kopf+'<p>Übungen werden geladen …</p>', 'pr-modal');
   pruefKopfVerdrahten('import');
-  var uebungen = [];
+  var uebungen = [], ordner = [];
+  try{ (await getDocs(kcol('folders'))).forEach(function(d){ ordner.push(Object.assign({id:d.id}, d.data())); }); }catch(err){ console.error(err); }
   try{
     (await getDocs(kcol('resources'))).forEach(function(d){
       var r = Object.assign({id:d.id}, d.data()), s = subjectById(r.subject);
@@ -23218,6 +23403,7 @@ async function pruefImportEditor(){
   pruefFuerLaden();
   document.getElementById('modalCancel').addEventListener('click', closeModal);
   var okBtn = document.getElementById('modalOk'), cfg = null, dateiName = '', seed = Math.floor(Math.random() * 2147483646) + 1;
+  uebungOrdnerMenu(document.getElementById('prUebung'), uebungen, ordner);
   function bereit(){ okBtn.disabled = !(cfg && document.getElementById('prUebung').value); }
   document.getElementById('prUebung').addEventListener('change', function(){
     var r = uebungen.find(function(u){ return u.id === this.value; }, this), fEl = document.getElementById('prFach');
