@@ -310,6 +310,9 @@
 
   /* Fehleranalyse Diktate (Lehrperson) */
   .da-toolbar{display:flex;justify-content:flex-end;margin-bottom:10px;}
+  .ueb-klassen{display:flex;align-items:center;gap:8px;margin:0 0 10px;flex-wrap:wrap;}
+  .ueb-klassen .modal-label{margin:0;}
+  .da-toolbar .ueb-klassen{margin:0;}
   .da-table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;font-size:13.5px;}
   .da-table th,.da-table td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;}
   .da-table th{background:var(--surface-2);font-weight:600;font-size:12.5px;color:var(--text-muted);}
@@ -3259,43 +3262,65 @@ function gastImFach(s, subject){
 function rosterFuerFach(list, subject){
   return (list||[]).filter(function(s){ return gastImFach(s, subject); });
 }
-// 📊 Klassenübersichten/Lernstand: nur die eigene Klasse (inkl. Fach-Gäste wie
-// Mathe). Mitglieder aus 👥 Gruppen anderer Klassen erst mit dem Knopf
-// «👥 Andere Klassen» (gerätelokal gemerkt).
-function andereKlassenDabei(){ return lsGet(LIB_PREFIX+'andere_klassen') === '1'; }
-function uebersichtRoster(list, subject){
-  var alle = rosterFuerFach(list, subject);
-  return andereKlassenDabei() ? alle : alle.filter(function(s){ return !s.gruppenGast; });
+// 📊 Klassenübersichten/Lernstand: standardmässig nur die eigene Klasse (inkl.
+// Fach-Gäste wie Mathe, ohne 👥 Gruppen-Mitglieder anderer Klassen). Über die
+// Auswahl «Klasse» (gerätelokal gemerkt) eine andere Klasse ansehen oder
+// «Alle Klassen»: eigene Klasse + alle aus anderen Klassen, die das schon
+// geübt haben. Geht, weil gespiegelte Übungen/Sets überall dieselbe ID haben
+// und progress/{uid} nach Person statt nach Klasse abgelegt ist.
+var UEB_KLASSEN_KEY = LIB_PREFIX+'ueb_klassen';
+function uebKlassenWahl(ohneAlle){
+  var w = lsGet(UEB_KLASSEN_KEY) || '';
+  if(w === '*') return ohneAlle ? '' : w;
+  return w !== state.klasse && abstAlleKlassen().indexOf(w) >= 0 ? w : '';
 }
-function andereKlassenKnopf(list, subject){
-  var kl = [];
-  rosterFuerFach(list, subject).forEach(function(s){ if(s.gruppenGast && s.klasse && kl.indexOf(s.klasse) < 0) kl.push(s.klasse); });
-  if(!kl.length) return '';
-  kl.sort();
-  return '<button class="btn btn-ghost btn-sm" id="uebAndereKl" type="button" title="Schüler:innen aus Gruppen mit anderen Klassen">'+
-    (andereKlassenDabei() ? '🏠 Nur meine Klasse' : '👥 Auch '+esc(kl.join(', '))+' zeigen')+'</button>';
+var uebKlasseCache = {};
+function uebKlasseLaden(k){
+  var c = uebKlasseCache[k];
+  if(c && Date.now() - c.at < 5*60*1000) return c.p;
+  var p = getDocs(query(collection(db,'students'), where('klasse','==',k))).then(function(snap){
+    var out = [];
+    snap.forEach(function(d){
+      var data = d.data();
+      if(data.role !== 'student' || (data.username||'').toLowerCase() === 'schueler') return;
+      out.push(Object.assign({uid:d.id}, data, {displayName:(data.displayName || data.username || '?')+' ('+k+')', fremd:true}));
+    });
+    return out;
+  }).catch(function(err){ console.error('Klasse '+k+' nicht lesbar', err); delete uebKlasseCache[k]; return []; });
+  uebKlasseCache[k] = {at:Date.now(), p:p};
+  return p;
 }
-function andereKlassenVerdrahten(neuLaden){
-  var b = document.getElementById('uebAndereKl'); if(!b) return;
-  b.addEventListener('click', function(){ lsSet(LIB_PREFIX+'andere_klassen', andereKlassenDabei() ? '0' : '1'); neuLaden(); });
+async function uebRoster(fach, ohneAlle){
+  var w = uebKlassenWahl(ohneAlle);
+  var eig = (await loadStudentRoster()).filter(function(s){ return !s.gruppenGast; });
+  if(fach) eig = rosterFuerFach(eig, fach);
+  if(!w) return eig;
+  var klassen = w === '*' ? abstAlleKlassen().filter(function(k){ return k !== state.klasse; }) : [w];
+  var listen = await Promise.all(klassen.map(uebKlasseLaden)), da = {};
+  eig.forEach(function(s){ da[s.uid] = 1; });
+  var fremd = [].concat.apply([], listen).filter(function(s){
+    if(da[s.uid] || (fach && !gastImFach(s, fach))) return false;
+    da[s.uid] = 1; return true;
+  }).map(function(s){ return Object.assign({}, s); });
+  return w === '*' ? eig.concat(fremd) : fremd;
 }
-function gaesteDabei(){ return lsGet(LIB_PREFIX+'gaeste_an') === '1'; }
-function gaesteOptional(list){ return gaesteDabei() ? (list||[]) : ohneGaeste(list); }
-function gaesteToggleHtml(id){
-  var an = gaesteDabei();
-  return '<button class="kz-tab'+(an?' kz-tab-on':'')+'" id="'+id+'" type="button" hidden title="Fach-Gäste (z.B. Mathe) in Namen-Spielen mitnehmen">👭 Gäste '+(an?'dabei':'aus')+'</button>';
+// «Alle Klassen»: aus anderen Klassen nur, wer schon geübt hat.
+function uebNurMitStand(rows, hat){
+  return rows.filter(function(r){ return !r.s.fremd || hat(r); });
 }
-// Knopf erst zeigen, wenn die Klasse überhaupt Gäste hat.
-function wireGaesteToggle(btn, onChange){
-  if(!btn) return;
-  klasseRosterLoad().then(function(list){ btn.hidden = !hatGaeste(list); }).catch(function(){});
-  btn.addEventListener('click', function(){
-    var an = !gaesteDabei();
-    lsSet(LIB_PREFIX+'gaeste_an', an ? '1' : '0');
-    btn.classList.toggle('kz-tab-on', an);
-    btn.textContent = '👭 Gäste '+(an ? 'dabei' : 'aus');
-    onChange();
-  });
+function uebKlassenFeld(ohneAlle){
+  var w = uebKlassenWahl(ohneAlle);
+  var opt = '<option value="">🏠 Meine Klasse ('+esc(state.klasse)+')</option>'+
+    (ohneAlle ? '' : '<option value="*"'+(w === '*' ? ' selected' : '')+'>🌍 Alle Klassen (wer schon geübt hat)</option>')+
+    abstAlleKlassen().filter(function(k){ return k !== state.klasse; }).map(function(k){
+      return '<option value="'+esc(k)+'"'+(w === k ? ' selected' : '')+'>'+esc(k)+'</option>';
+    }).join('');
+  return '<div class="ueb-klassen"><label class="modal-label" for="uebKlassen">Klasse</label>'+
+    '<select class="modal-input" id="uebKlassen" style="width:auto;max-width:100%;">'+opt+'</select></div>';
+}
+function uebKlassenVerdrahten(neuLaden){
+  var el = document.getElementById('uebKlassen'); if(!el) return;
+  el.addEventListener('change', function(){ lsSet(UEB_KLASSEN_KEY, this.value); neuLaden(); });
 }
 
 /* ===================== 👥 GRUPPEN =====================
@@ -4598,7 +4623,7 @@ async function loadLernstandUebersicht(){
     return (a.title||a.fileName||'').localeCompare(b.title||b.fileName||'', 'de');
   });
 
-  var students = await loadStudentRoster();
+  var students = await uebRoster(null, true);
 
   var reads = [];
   students.forEach(function(stu){
@@ -4722,12 +4747,13 @@ async function vociUebersicht(fach){
       try{ voc = vociDaten(await loadResourceHtml(resourceContentId(res[i]))); }catch(err){ console.error(err); }
     }
     voc = voc || {woerter:{}, units:[]};
-    var alle = await loadStudentRoster(), roster = uebersichtRoster(alle, fach);
+    var roster = await uebRoster(fach);
     var rows = await Promise.all(roster.map(function(s){
       return Promise.all(res.map(function(r){
         return getDoc(doc(db, 'progress', s.uid, 'resources', r.id)).then(function(d){ return d.exists() ? d.data() : null; }).catch(function(){ return null; });
       })).then(function(docs){ return Object.assign({s:s}, vociAusDocs(docs, pre)); });
     }));
+    rows = uebNurMitStand(rows, function(r){ return Object.keys(r.woerter).length; });
     rows.sort(function(a, b){ return (a.s.displayName || a.s.username || '').localeCompare(b.s.displayName || b.s.username || '', 'de'); });
     // Units zur Auswahl: die, in denen jemand geübt hat (in der Reihenfolge der Datei)
     var geuebtIn = {};
@@ -4738,7 +4764,7 @@ async function vociUebersicht(fach){
     if(filter && !geuebtIn[filter]) filter = '';
 
     function zeichnen(){
-      var woche = {}, h = '<h3>'+esc(titel)+'</h3>';
+      var woche = {}, h = '<h3>'+esc(titel)+'</h3>' + uebKlassenFeld();
       for(var t=0;t<7;t++){ var d = new Date(); d.setDate(d.getDate() - t); woche[localDateStr(d)] = 1; }
       var zeilen = rows.map(function(r){
         var ids = Object.keys(r.woerter).filter(function(id){ return !filter || r.woerter[id].unit === filter; });
@@ -4787,10 +4813,10 @@ async function vociUebersicht(fach){
           (!filter && u ? ' <small>· '+esc(u.name)+'</small>' : '')+'</span>'+
           '<small>'+a.wer+' Schüler:in'+(a.wer === 1 ? '' : 'nen')+' · '+a.x+'× falsch</small></div>';
       }).join('') + '</div>';
-      h += '<div class="modal-actions">'+andereKlassenKnopf(alle, fach)+'<button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
+      h += '<div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
       openModal(h, 'pr-modal pr-modal-breit');
       document.getElementById('modalOk').addEventListener('click', closeModal);
-      andereKlassenVerdrahten(function(){ vociUebersicht(fach); });
+      uebKlassenVerdrahten(function(){ vociUebersicht(fach); });
       document.getElementById('vociUnit').addEventListener('change', function(){
         filter = this.value;
         lsSet(LIB_PREFIX + 'voci_unit_' + fach, filter);
@@ -5456,8 +5482,7 @@ function renderLernstandUebersicht(){
 
     var h = '<div class="da-toolbar" style="gap:8px;"><button class="btn btn-ghost btn-sm" id="lsPrintBtn" type="button">🖨️ Drucken</button>'+
       '<button class="btn btn-ghost btn-sm" id="lsCsvBtn" type="button">⬇️ CSV</button>'+
-      '<button class="btn btn-ghost btn-sm" id="lsReloadBtn" type="button">↻ Neu laden</button>'+
-      (subjectIds.map(function(id){ return andereKlassenKnopf(result.students, id); }).filter(Boolean)[0] || '')+'</div>';
+      '<button class="btn btn-ghost btn-sm" id="lsReloadBtn" type="button">↻ Neu laden</button>'+uebKlassenFeld(true)+'</div>';
     subjectIds.forEach(function(subjId){
       var sub = result.bySubject[subjId] || {resources:[], cell:{}};
       var s = subjectById(subjId);
@@ -5474,7 +5499,7 @@ function renderLernstandUebersicht(){
       h += '<div class="table-scroll"><table class="da-table"><thead><tr><th>Schüler:in</th>';
       sub.resources.forEach(function(res){ h += '<th>'+esc(res.title||res.fileName)+'</th>'; });
       h += '</tr></thead><tbody>';
-      uebersichtRoster(result.students, subjId).forEach(function(stu){
+      rosterFuerFach(result.students, subjId).forEach(function(stu){
         h += '<tr><td>'+esc(stu.displayName)+'</td>';
         sub.resources.forEach(function(res){
           var cell = sub.cell[stu.uid+'|'+res.id];
@@ -5490,7 +5515,7 @@ function renderLernstandUebersicht(){
 
       // Ausführliche Historie nur für Zellen mit mindestens einem Reset anzeigen.
       var histLines = [];
-      uebersichtRoster(result.students, subjId).forEach(function(stu){
+      rosterFuerFach(result.students, subjId).forEach(function(stu){
         sub.resources.forEach(function(res){
           var cell = sub.cell[stu.uid+'|'+res.id];
           if(cell && cell.history.length){
@@ -5519,7 +5544,7 @@ function renderLernstandUebersicht(){
       d.addEventListener('toggle', function(){ lsFachSetzen(d.getAttribute('data-subj'), d.open); });
     });
     document.getElementById('lsReloadBtn').addEventListener('click', renderLernstandUebersicht);
-    andereKlassenVerdrahten(renderLernstandUebersicht);
+    uebKlassenVerdrahten(renderLernstandUebersicht);
     document.getElementById('lsPrintBtn').addEventListener('click', function(){
       // Zugeklappte Fächer stehen nicht im Ausdruck — vorher alle öffnen.
       Array.prototype.forEach.call(body.querySelectorAll('.ls-fach'), function(d){ d.open = true; });
@@ -5531,7 +5556,7 @@ function renderLernstandUebersicht(){
         var sub = result.bySubject[subjId];
         if(!sub) return;
         var s = subjectById(subjId);
-        uebersichtRoster(result.students, subjId).forEach(function(stu){
+        rosterFuerFach(result.students, subjId).forEach(function(stu){
           sub.resources.forEach(function(res){
             var cell = sub.cell[stu.uid+'|'+res.id];
             var h = cell ? Math.round((cell.timeSpentSec||0)/360)/10 : 0;
@@ -15864,7 +15889,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-09-27-uebersicht-nur-klasse', datum:'2026-09-27', fuer:'lehrer', text:'📊 Klassenübersichten (Karteikarten, Trainer, SIKORE, Tipptrainer, Voci) und 📈 Lernstand zeigen nur noch deine Klasse – Schüler:innen aus 👥 Gruppen mit anderen Klassen (z. B. G3a) blendest du mit «👥 Auch … zeigen» dazu, «🏠 Nur meine Klasse» wieder weg.'},
+  {id:'2026-09-27-uebersicht-klassenwahl', datum:'2026-09-27', fuer:'lehrer', text:'📊 Klassenübersichten (Karteikarten, Trainer, SIKORE, Tipptrainer, Voci) und 📈 Lernstand zeigen zuerst nur deine Klasse. Oben bei «Klasse» kannst du eine andere Klasse wählen oder «🌍 Alle Klassen» – dann kommen alle aus anderen Klassen dazu, die das schon geübt haben (im Lernstand eine Klasse aufs Mal).'},
   {id:'2026-09-27-uebung-ordnermenu', datum:'2026-09-27', fuer:'lehrer', text:'📁 «➕ Neue Prüfung»: Die Übung wählst du jetzt in einem Ordner-Menü statt in einer langen Liste – Fach › Ordner › Übung, die Ordner gehen beim Darüberfahren auf (Tippen geht auch).'},
   {id:'2026-09-27-pruefung-verraet-nichts', datum:'2026-09-27', fuer:'lehrer', text:'🕵️ Prüfungen: Keine Aufgabe verrät mehr die Antwort einer anderen (z. B. «Welcher Kanton ist markiert?» und «Hauptort von Aargau?» mit demselben Kanton). Beim Zusammenstellen wird so eine Aufgabe weggelassen; im 🧩 Baukasten steht eine ⚠️-Warnung. Pöstlergeografie und Bildtrainer brauchen dafür die neue Fassung der Übung.'},
   {id:'2026-09-27-pruefung-zusatzmaterial', datum:'2026-09-27', fuer:'alle', text:'📝 Prüfungen im Fach-Ordner stehen jetzt unten beim Zusatzmaterial – ab zwei Stück in einem eigenen Ordner «📝 Prüfungen».'},
@@ -25799,17 +25824,18 @@ function sikoreAufstiegFeiern(pid, alt, neu){
 async function sikoreUebersicht(){
   openModal('<h3>📊 SIKORE – Klassenübersicht</h3><p>Wird geladen …</p>', 'pr-modal pr-modal-breit');
   try{
-    var alle = await loadStudentRoster(), roster = uebersichtRoster(alle, 'mathe');
+    var roster = await uebRoster('mathe');
     var vorschlag = await sikoreVorschlaege(null), zug = {};
     pruef.list.filter(function(p){ return p.art === 'sikore'; }).sort(function(a, b){ return pruefMs(a.createdAt) - pruefMs(b.createdAt); })
       .forEach(function(p){ Object.keys(p.levels || {}).forEach(function(u){ zug[u] = +p.levels[u]; }); });
     var stats = await Promise.all(roster.map(function(s){
       return getDoc(sikoreStatsRef(s.uid)).then(function(d){ return d.exists() && d.data().sikore ? sikoreStatsNorm(d.data().sikore) : null; }).catch(function(){ return null; });
     }));
-    var rows = roster.map(function(s, i){ return {s:s, st:stats[i], v:vorschlag[s.uid], lv:vorschlag[s.uid] ? vorschlag[s.uid].neu : zug[s.uid] || null}; });
+    var rows = uebNurMitStand(roster.map(function(s, i){ return {s:s, st:stats[i], v:vorschlag[s.uid], lv:vorschlag[s.uid] ? vorschlag[s.uid].neu : zug[s.uid] || null}; }), function(r){ return r.st; });
     rows.sort(function(a, b){ return (a.s.displayName || a.s.username || '').localeCompare(b.s.displayName || b.s.username || '', 'de'); });
     var aktiv = rows.filter(function(r){ return r.st && r.st.wReihen; }).length, ziel = rows.filter(function(r){ return r.st && r.st.wFehlerfrei >= r.st.ziel; }).length;
     var h = '<h3>📊 SIKORE – Klassenübersicht</h3>';
+    h += uebKlassenFeld();
     h += '<div class="pr-zahlen"><div><b>'+aktiv+' / '+rows.length+'</b><span>haben diese Woche geübt</span></div><div><b>'+ziel+'</b><span>Wochenziel erreicht</span></div></div>';
     h += '<p class="pr-hinweis">«Level» = aktuelles Level aus den SIKORE-Prüfungen (mit Auf-/Abstieg). «Übt auf» = zuletzt im Trainer geübt. Bestzeit = Tempo-Modus, eine fehlerfreie Reihe auf dem Übungslevel.</p>';
     h += '<div class="sk-ueb"><div class="sk-ueb-row sk-ueb-kopf"><span>Name</span><span>Level</span><span>Übt auf</span><span>Diese Woche</span><span>Total</span><span>Bestzeit</span><span>Zuletzt</span></div>';
@@ -25822,10 +25848,10 @@ async function sikoreUebersicht(){
         '<span>'+woche+'</span><span>'+(st ? st.fehlerfrei+' / '+st.reihen : '–')+'</span><span>'+best+'</span>'+
         '<span>'+(zl ? new Date(zl).toLocaleDateString('de-CH', {day:'numeric', month:'numeric'}) : '–')+'</span></div>';
     });
-    h += '</div><div class="modal-actions">'+andereKlassenKnopf(alle, 'mathe')+'<button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
+    h += '</div><div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
     openModal(h, 'pr-modal pr-modal-breit');
     document.getElementById('modalOk').addEventListener('click', closeModal);
-    andereKlassenVerdrahten(function(){ sikoreUebersicht(); });
+    uebKlassenVerdrahten(function(){ sikoreUebersicht(); });
   }catch(err){ console.error(err); closeModal(); toast('Übersicht konnte nicht geladen werden.'); }
 }
 
@@ -26880,7 +26906,7 @@ function kkSchwereKarten(set, rows){
 async function kkUebersicht(set){
   openModal('<h3>📊 '+esc(set.titel)+' – Klassenübersicht</h3><p>Wird geladen …</p>', 'pr-modal pr-modal-breit');
   try{
-    var alle = await loadStudentRoster(), roster = uebersichtRoster(alle, set.fach);
+    var roster = await uebRoster(set.fach);
     var daten = await Promise.all(roster.map(function(s){
       return Promise.all([
         getDoc(kkStandRef(s.uid, set.id)).then(function(d){
@@ -26891,11 +26917,12 @@ async function kkUebersicht(set){
         }).catch(function(){ return {}; })
       ]);
     }));
-    var rows = roster.map(function(s, i){ return {s:s, st:daten[i][0], serie:kkSerieAktuell(daten[i][1])}; });
+    var rows = uebNurMitStand(roster.map(function(s, i){ return {s:s, st:daten[i][0], serie:kkSerieAktuell(daten[i][1])}; }), function(r){ return r.st; });
     rows.sort(function(a, b){ return (a.s.displayName || a.s.username || '').localeCompare(b.s.displayName || b.s.username || '', 'de'); });
     var geuebt = rows.filter(function(r){ return r.st && r.st.wRichtig; }).length;
     var brennt = rows.filter(function(r){ return r.serie > 0; }).length;
     var h = '<h3>📊 '+esc(set.titel)+' – Klassenübersicht</h3>';
+    h += uebKlassenFeld();
     h += '<div class="pr-zahlen"><div><b>'+geuebt+' / '+rows.length+'</b><span>haben diese Woche geübt</span></div>'+
       '<div><b>🔥 '+brennt+'</b><span>mit laufender Voci-Serie</span></div>'+
       '<div><b>'+set.karten.length+'</b><span>Karten im Set</span></div></div>';
@@ -26923,12 +26950,12 @@ async function kkUebersicht(set){
         (w.wer ? '<small>'+w.wer+' Schüler:in'+(w.wer === 1 ? '' : 'nen')+' · '+w.x+'× falsch</small>' : '')+
         (w.box1 ? '<small>🔴 '+w.box1+' in Box 1</small>' : '')+'</div>';
     }).join('') + '</div>';
-    h += '<div class="modal-actions">'+andereKlassenKnopf(alle, set.fach)+'<button class="btn btn-ghost btn-sm" id="kkUebTest" type="button">📝 Voci-Test machen</button>'+
+    h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="kkUebTest" type="button">📝 Voci-Test machen</button>'+
       '<button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
     openModal(h, 'pr-modal pr-modal-breit');
     document.getElementById('modalOk').addEventListener('click', closeModal);
     document.getElementById('kkUebTest').addEventListener('click', function(){ kkVociTest(set); });
-    andereKlassenVerdrahten(function(){ kkUebersicht(set); });
+    uebKlassenVerdrahten(function(){ kkUebersicht(set); });
   }catch(err){ console.error(err); closeModal(); toast('Übersicht konnte nicht geladen werden.'); }
 }
 
@@ -29298,15 +29325,16 @@ function mtTempoZeichnen(){
 async function mtUebersicht(def){
   openModal('<h3>📊 '+esc(def.icon+' '+def.name)+' – Klassenübersicht</h3><p>Wird geladen …</p>', 'pr-modal pr-modal-breit');
   try{
-    var alle = await loadStudentRoster(), roster = uebersichtRoster(alle, def.fach);
+    var roster = await uebRoster(def.fach);
     var stats = await Promise.all(roster.map(function(s){
       return getDoc(mtStatsRef(s.uid, def.id)).then(function(d){ return d.exists() && d.data().mt ? mtStatsNorm(d.data().mt) : null; }).catch(function(){ return null; });
     }));
-    var rows = roster.map(function(s, i){ return {s:s, st:stats[i]}; });
+    var rows = uebNurMitStand(roster.map(function(s, i){ return {s:s, st:stats[i]}; }), function(r){ return r.st; });
     rows.sort(function(a, b){ return (a.s.displayName || a.s.username || '').localeCompare(b.s.displayName || b.s.username || '', 'de'); });
     var aktiv = rows.filter(function(r){ return r.st && r.st.wAufgaben; }).length;
     var ziel = rows.filter(function(r){ return r.st && r.st.wRichtig >= r.st.ziel; }).length;
     var h = '<h3>📊 '+esc(def.icon+' '+def.name)+' – Klassenübersicht</h3>';
+    h += uebKlassenFeld();
     h += '<div class="pr-zahlen"><div><b>'+aktiv+' / '+rows.length+'</b><span>haben diese Woche geübt</span></div><div><b>'+ziel+'</b><span>Wochenziel erreicht</span></div></div>';
     h += '<p class="pr-hinweis">«Übt auf» = Level der letzten Runde. «Quote» = richtige Antworten insgesamt. Bestzeit = Tempo-Modus, eine fehlerfreie Runde auf dem Übungslevel.</p>';
     h += '<div class="sk-ueb"><div class="sk-ueb-row mt-ueb-row sk-ueb-kopf"><span>Name</span><span>Übt auf</span><span>Diese Woche</span><span>Quote</span><span>Bestzeit</span><span>Zuletzt</span></div>';
@@ -29319,10 +29347,10 @@ async function mtUebersicht(def){
         '<span>'+(st && st.level ? 'Level '+st.level : '–')+'</span><span>'+woche+'</span><span>'+quote+'</span><span>'+best+'</span>'+
         '<span>'+(zl ? new Date(zl).toLocaleDateString('de-CH', {day:'numeric', month:'numeric'}) : '–')+'</span></div>';
     });
-    h += '</div><div class="modal-actions">'+andereKlassenKnopf(alle, def.fach)+'<button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
+    h += '</div><div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
     openModal(h, 'pr-modal pr-modal-breit');
     document.getElementById('modalOk').addEventListener('click', closeModal);
-    andereKlassenVerdrahten(function(){ mtUebersicht(def); });
+    uebKlassenVerdrahten(function(){ mtUebersicht(def); });
   }catch(err){ console.error(err); closeModal(); toast('Übersicht konnte nicht geladen werden.'); }
 }
 
@@ -31190,14 +31218,15 @@ function tippStatsLaden(){
 async function tippUebersicht(){
   openModal('<h3>📊 Tipptrainer – Klassenübersicht</h3><p>Wird geladen …</p>', 'pr-modal pr-modal-breit');
   try{
-    var alle = await loadStudentRoster(), roster = uebersichtRoster(alle, TIPP_SUBJECT);
+    var roster = await uebRoster(TIPP_SUBJECT);
     var stats = await Promise.all(roster.map(function(s){
       return getDoc(tippStatsRef(s.uid)).then(function(d){ return d.exists() && d.data().tippen ? tippStatsNorm(d.data().tippen) : null; }).catch(function(){ return null; });
     }));
-    var rows = roster.map(function(s, i){ return {s:s, st:stats[i]}; });
+    var rows = uebNurMitStand(roster.map(function(s, i){ return {s:s, st:stats[i]}; }), function(r){ return r.st; });
     rows.sort(function(a, b){ return (a.s.displayName || a.s.username || '').localeCompare(b.s.displayName || b.s.username || '', 'de'); });
     var aktiv = rows.filter(function(r){ return r.st && r.st.wDurchg; }).length, ziel = rows.filter(function(r){ return r.st && r.st.wMs >= r.st.ziel * 60000; }).length;
     var h = '<h3>📊 Tipptrainer – Klassenübersicht</h3>';
+    h += uebKlassenFeld();
     h += '<div class="pr-zahlen"><div><b>'+aktiv+' / '+rows.length+'</b><span>haben diese Woche geübt</span></div><div><b>'+ziel+'</b><span>Wochenziel erreicht</span></div></div>';
     h += '<p class="pr-hinweis">«Lektion» = höchste bestandene von '+TIPP_LEKTIONEN.length+'. Tempo und Genauigkeit = Durchschnitt der letzten drei Texte (Anschläge pro Minute).</p>';
     h += '<div class="sk-ueb"><div class="sk-ueb-row tt-ueb-row sk-ueb-kopf"><span>Name</span><span>Lektion</span><span>Tempo</span><span>Genauigkeit</span><span>Diese Woche</span><span>Total</span><span>Zuletzt</span></div>';
@@ -31213,10 +31242,10 @@ async function tippUebersicht(){
         '<span>'+woche+'</span><span>'+(st ? tippMinText(st.ms) : '–')+'</span>'+
         '<span>'+(zl ? new Date(zl).toLocaleDateString('de-CH', {day:'numeric', month:'numeric'}) : '–')+'</span></div>';
     });
-    h += '</div><div class="modal-actions">'+andereKlassenKnopf(alle, TIPP_SUBJECT)+'<button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
+    h += '</div><div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
     openModal(h, 'pr-modal pr-modal-breit');
     document.getElementById('modalOk').addEventListener('click', closeModal);
-    andereKlassenVerdrahten(function(){ tippUebersicht(); });
+    uebKlassenVerdrahten(function(){ tippUebersicht(); });
   }catch(err){ console.error(err); closeModal(); toast('Übersicht konnte nicht geladen werden.'); }
 }
 
