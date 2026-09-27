@@ -15815,6 +15815,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-09-27-pruefung-ganze-klasse', datum:'2026-09-27', fuer:'lehrer', text:'📝 Prüfung für «Ganze Klasse»: In der Übersicht erscheinen nur noch die Schüler:innen dieser Klasse – keine Gruppen-Mitglieder aus anderen Klassen mehr (die sind nur dabei, wenn du unter «Für» die 👥 Gruppe wählst).'},
   {id:'2026-09-27-gruppe-alle-faecher', datum:'2026-09-27', fuer:'lehrer', text:'👥 Gruppen: Beim Fach gibt es neu «🏫 Alle Fächer» – so kannst du eine ganze Klasse (oder jede andere Gruppe) einmal anlegen und in jedem Fach im Kalender unter «Für» auswählen.'},
   {id:'2026-09-27-umfrage-serie', datum:'2026-09-27', fuer:'lehrer', text:'⚡ Blitzumfrage mit mehreren Fragen: «+ Weitere Frage in dieser Umfrage», speichern, und am Beamer mit «▶︎ Nächste Frage» durchgehen. Am Schluss zeigt «📊 Übersicht aller Fragen» alle Ergebnisse untereinander.'},
   {id:'2026-09-27-pruefung-ordner', datum:'2026-09-27', fuer:'lehrer', text:'📝 Prüfungen im Ordner: in der Prüfung «📁 Ablegen» oder im Fach «🏫 Aus dem Klassenzimmer» › Prüfung. Bis zum Freigeben sieht nur ihr Lehrpersonen sie im Ordner, danach auch die Klasse (mit «Prüfung starten», später «Resultat»). «▶️ Freigeben» fragt jetzt, ob mit 🛡️ Safe Exam Browser oder im normalen Browser geschrieben wird.'},
@@ -24326,7 +24327,9 @@ var pruefGruppenNamen = {};
 function pruefRosterFuer(p){
   var list = pruefRosterCache.list;
   if(!list) return null;
-  if(!Array.isArray(p.mitglieder)) return rosterFuerFach(list, pruefFach(p));
+  // Ganze Klasse: nur die Klasse selbst (inkl. Fach-Gäste wie Mathe) — keine
+  // Gruppen-Gäste aus anderen Klassen, die schreiben nur mit einer 👥 Gruppe.
+  if(!Array.isArray(p.mitglieder)) return rosterFuerFach(list.filter(function(s){ return !s.gruppenGast; }), pruefFach(p));
   var da = {};
   var out = list.filter(function(s){ if(p.mitglieder.indexOf(s.uid) < 0 || da[s.uid]) return false; da[s.uid] = 1; return true; });
   if(p.gruppeId && pruefGruppenNamen[p.gruppeId] === undefined){
