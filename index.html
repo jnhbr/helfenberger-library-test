@@ -1952,6 +1952,8 @@
   .lang-liste{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin:10px 0 4px;}
   .lang-b{display:flex;align-items:center;gap:9px;padding:10px 12px;border:2px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font:inherit;font-weight:700;font-size:14.5px;cursor:pointer;text-align:start;}
   .lang-b:hover{border-color:var(--brand);}
+  .lang-opt{display:flex;align-items:flex-start;gap:9px;margin:10px 0 4px;padding:10px 12px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:14px;line-height:1.4;cursor:pointer;}
+  .lang-opt input{margin-top:3px;flex:none;width:18px;height:18px;}
   .lang-b.an{border-color:var(--brand);background:var(--brand);color:var(--brand-contrast);}
   .lang-f{font-size:19px;line-height:1;}
   /* Rechts-nach-links: die Shell dreht, Unterrichtsinhalt bleibt links-nach-rechts. */
@@ -7402,6 +7404,7 @@ async function authGeaendert(user){
     render();
     if(prNeu) pruefNeuNachWechsel(prNeu);
     layoutLoad();
+    i18nKontoLaden();
     stpVorladen();
     loadPencilEgg();
     startDebtWatch();
@@ -7647,7 +7650,7 @@ var i18nNamen = Object.create(null), i18nNameProfil = null;
 // Fach-Kürzel (WAH, TTG, ISF …) sind keine Wörter – die Maschine macht daraus Unsinn.
 var i18nKuerzel = Object.create(null);
 SUBJECTS.forEach(function(f){ if(f.name === f.name.toUpperCase()) i18nKuerzel[f.name] = 1; });
-var i18nGemacht = new WeakMap(), i18nAttrGemacht = new WeakMap(), i18nRahmen = [], i18nHaengt = false;
+var i18nGemacht = new WeakMap(), i18nOrig = new WeakMap(), i18nAttrGemacht = new WeakMap(), i18nRahmen = [], i18nHaengt = false;
 function i18nCode(){ return lsGet('hl_lang') || 'de'; }
 function i18nPack(){ return HL_I18N[i18nCode()] || null; }
 function i18nSprache(code){ return HL_SPRACHEN.filter(function(s){ return s.c === code; })[0] || HL_SPRACHEN[0]; }
@@ -7848,6 +7851,7 @@ function i18nDom(root){
       // Die Übungs-Helfer erkennen «Prüfen»-Knöpfe am deutschen Text.
       var knopf = innen && k.parentElement.closest('button');
       if(knopf) knopf.setAttribute('data-de', k.nodeValue.trim());
+      i18nOrig.set(k, k.nodeValue);
       k.nodeValue = t;
       i18nGemacht.set(k, t);
     });
@@ -7879,11 +7883,13 @@ function i18nAlles(){
 }
 // Eine Übungsseite (iframe srcdoc, gleicher Origin) mitübersetzen – ausser in Sprachfächern.
 function i18nFrame(fr, fach){
-  if(!fr || !i18nPack() || i18nIstSprachfach(fach) || !window.MutationObserver) return;
+  if(!fr || !i18nTippAktiv() || i18nIstSprachfach(fach) || !window.MutationObserver) return;
   fr.addEventListener('load', function(){
     try{
       var d = fr.contentDocument;
       if(!d || !d.body) return;
+      i18nTippHoeren(d);
+      if(!i18nPack()) return;
       var timer = null;
       new MutationObserver(function(){
         if(i18nLaeuft) return;
@@ -7908,6 +7914,202 @@ function i18nStart(){
   i18nDom(document.body);
   i18nCacheLaden().then(i18nAlles);
 }
+/* ---------- 🇩🇪 Original antippen + 🔊 Vorlesen ----------
+   Im Fremdsprachen-Modus zeigt ein Tipp auf einen übersetzten Text das deutsche
+   Original in einer kleinen Blase (bei Knöpfen: lange drücken, damit der Knopf
+   selbst normal bleibt). Ist im Sprach-Dialog «🔊 Vorlesen» eingeschaltet, hat
+   die Blase einen Knopf, der den deutschen Text vorliest – das geht dann auch
+   ohne Fremdsprache. Die Blase hängt im Dokument des Tipps (Shell oder
+   Übungsseite) und dort am Vollbild-Element, sonst wäre sie im Vollbild unsichtbar. */
+var I18N_KLICKBAR = 'button,a,input,select,textarea,label,summary,option,[role="button"],[data-sort]';
+var i18nBlaseEl = null, i18nBlaseTimer = null, i18nDruck = null, i18nSchluck = 0;
+function i18nVorlesenAn(){ return lsGet('hl_vorlesen') === '1' && enKannSprechen(); }
+function i18nTippAktiv(){ return !!i18nPack() || i18nVorlesenAn(); }
+// Deutscher Text eines Elements: übersetzte Knoten liefern ihr Original.
+function i18nOriginalVon(el){
+  if(!el || !el.ownerDocument || (el.textContent || '').length > 700) return null;
+  var w = el.ownerDocument.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), n, text = '', hat = false;
+  while((n = w.nextNode())){
+    var p = n.parentElement;
+    if(p && p.closest('script,style,textarea,.wackel-x')) continue;
+    var o = i18nOrig.get(n);
+    if(o != null && i18nGemacht.get(n) === n.nodeValue){ text += o; hat = true; }
+    else text += n.nodeValue;
+  }
+  text = text.replace(/\s+/g, ' ').trim();
+  return /\p{L}{2}/u.test(text) ? {text:text, hat:hat} : null;
+}
+function i18nBlaseZu(){
+  clearTimeout(i18nBlaseTimer);
+  if(i18nBlaseEl){ i18nBlaseEl.remove(); i18nBlaseEl = null; try{ speechSynthesis.cancel(); }catch(e){} }
+}
+function i18nBlase(el, x, y){
+  i18nBlaseZu();
+  if(!el || !el.closest || el.closest(I18N_TABU)) return false;
+  var d = el.ownerDocument, innen = d !== document;
+  var o = i18nOriginalVon(el);
+  if(!o) return false;
+  var vorlesen = i18nVorlesenAn();
+  if(!o.hat){
+    // Nicht übersetzt: nur zum Vorlesen – und nie in Sprachfächern (die Stimme ist deutsch).
+    var zone = innen ? '' : i18nSprachzone();
+    if(!vorlesen || (zone && el.closest(zone))) return false;
+  }
+  var b = d.createElement('div');
+  b.id = 'i18nBlase';
+  b.setAttribute('data-noi18n', '1');
+  b.setAttribute('dir', 'ltr');
+  b.setAttribute('lang', 'de');
+  var breite = Math.min(360, (d.documentElement.clientWidth || 360) - 16);
+  b.style.cssText = 'position:fixed;z-index:2147483600;box-sizing:border-box;max-width:' + breite + 'px;display:flex;align-items:center;gap:10px;' +
+    'background:#1f2430;color:#fff;border-radius:12px;padding:9px 12px;font:500 14.5px/1.4 system-ui,-apple-system,sans-serif;text-align:left;' +
+    'box-shadow:0 10px 30px -8px rgba(0,0,0,.55);white-space:normal;';
+  if(o.hat){
+    var s = d.createElement('span');
+    s.textContent = '🇩🇪 ' + o.text;
+    b.appendChild(s);
+  }
+  if(vorlesen){
+    var k = d.createElement('button');
+    k.type = 'button';
+    k.textContent = o.hat ? '🔊' : '🔊 Vorlesen';
+    k.setAttribute('aria-label', 'Vorlesen');
+    k.style.cssText = 'flex:none;border:0;border-radius:9px;background:#fff;color:#1f2430;font:700 15px/1 system-ui,-apple-system,sans-serif;padding:8px 11px;cursor:pointer;';
+    k.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      clearTimeout(i18nBlaseTimer);
+      enSprechen(o.text);
+      i18nBlaseTimer = setTimeout(function warten(){
+        var spricht = false;
+        try{ spricht = speechSynthesis.speaking; }catch(err){}
+        if(spricht) i18nBlaseTimer = setTimeout(warten, 1500); else i18nBlaseZu();
+      }, 4000);
+    });
+    b.appendChild(k);
+  }
+  (d.fullscreenElement || d.webkitFullscreenElement || d.body).appendChild(b);
+  var r = b.getBoundingClientRect(), vw = d.documentElement.clientWidth, vh = d.documentElement.clientHeight;
+  b.style.left = Math.max(8, Math.min(x - r.width / 2, vw - r.width - 8)) + 'px';
+  b.style.top = (y + 18 + r.height > vh - 8 ? Math.max(8, y - r.height - 14) : y + 18) + 'px';
+  i18nBlaseEl = b;
+  i18nBlaseTimer = setTimeout(i18nBlaseZu, 9000);
+  return true;
+}
+function i18nTippHoeren(d){
+  d.addEventListener('click', function(e){
+    if(Date.now() < i18nSchluck){ i18nSchluck = 0; e.preventDefault(); e.stopPropagation(); return; }
+    var el = e.target && e.target.nodeType === 1 ? e.target : null;
+    if(el && el.closest('#i18nBlase')) return;
+    i18nBlaseZu();
+    if(!el || !i18nTippAktiv() || document.body.classList.contains('wackeln')) return;
+    if(el.closest(I18N_KLICKBAR)) return;
+    var zeiger = '';
+    try{ zeiger = (d.defaultView || window).getComputedStyle(el).cursor; }catch(err){}
+    if(zeiger === 'pointer') return;
+    i18nBlase(el, e.clientX, e.clientY);
+  }, true);
+  // Knöpfe und Antwortmöglichkeiten: lange drücken (der Klick danach zählt nicht).
+  d.addEventListener('pointerdown', function(e){
+    clearTimeout(i18nDruck && i18nDruck.timer);
+    i18nDruck = null;
+    var el = e.target && e.target.nodeType === 1 ? e.target : null;
+    if(!el || !i18nTippAktiv() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if(el.closest('#i18nBlase,[data-sort],input,select,textarea,[contenteditable="true"]')) return;
+    var x = e.clientX, y = e.clientY;
+    i18nDruck = {x:x, y:y, timer:setTimeout(function(){
+      i18nDruck = null;
+      if(i18nBlase(el, x, y)) i18nSchluck = Date.now() + 60000;   // bis kurz nach dem Loslassen
+    }, 600)};
+  }, true);
+  var los = function(){
+    if(i18nDruck){ clearTimeout(i18nDruck.timer); i18nDruck = null; }
+    if(i18nSchluck > Date.now() + 5000) i18nSchluck = Date.now() + 400;
+  };
+  d.addEventListener('pointermove', function(e){ if(i18nDruck && Math.abs(e.clientX - i18nDruck.x) + Math.abs(e.clientY - i18nDruck.y) > 12) los(); }, true);
+  d.addEventListener('pointerup', los, true);
+  d.addEventListener('pointercancel', los, true);
+  d.addEventListener('scroll', function(){ if(i18nBlaseEl && i18nBlaseEl.ownerDocument === d) i18nBlaseZu(); }, true);
+}
+i18nTippHoeren(document);
+
+/* ---------- 👤 Sprache am Konto ----------
+   progress/{uid}/einstellungen/sprache = {code, vorlesen, updatedAt}: Die Wahl
+   kommt auf jedes Gerät mit. hl_lang_uid merkt sich, wem die lokale Wahl gehört –
+   meldet sich an einem geteilten Gerät jemand anderes an, erbt er sie nicht. */
+function i18nKontoRef(uid){ return doc(db, 'progress', uid || state.user.uid, 'einstellungen', 'sprache'); }
+function i18nKontoSichern(){
+  if(!state.user) return Promise.resolve();
+  lsSet('hl_lang_uid', state.user.uid);
+  return setDoc(i18nKontoRef(), {code:i18nCode(), vorlesen:lsGet('hl_vorlesen') === '1', updatedAt:serverTimestamp()})
+    .catch(function(err){ console.error('Sprache speichern', err); });
+}
+function i18nKontoLaden(){
+  if(!state.user) return;
+  var uid = state.user.uid;
+  getDoc(i18nKontoRef(uid)).then(function(snap){
+    if(!state.user || state.user.uid !== uid) return;
+    var lokal = i18nCode(), lokalV = lsGet('hl_vorlesen') === '1', besitzer = lsGet('hl_lang_uid');
+    var soll = lokal, sollV = lokalV;
+    if(snap.exists()){
+      var d = snap.data() || {};
+      soll = HL_SPRACHEN.some(function(s){ return s.c === d.code; }) ? d.code : 'de';
+      sollV = !!d.vorlesen;
+    } else if(besitzer && besitzer !== uid){
+      soll = 'de'; sollV = false;          // Wahl einer anderen Person auf diesem Gerät
+    } else if(lokal !== 'de' || lokalV){
+      i18nKontoSichern();                   // bisher nur lokal gewählt -> ans Konto hängen
+    }
+    lsSet('hl_lang_uid', uid);
+    if(sollV !== lokalV) lsSet('hl_vorlesen', sollV ? '1' : '0');
+    if(soll !== lokal){
+      lsSet('hl_lang', soll);
+      if(i18nCode() === soll) location.reload();   // (ohne localStorage kein Neuladen in Schleife)
+    }
+  }).catch(function(err){ console.error('Sprache laden', err); });
+}
+// 👥 Für Lehrpersonen: wer in der offenen Klasse eine andere Sprache oder Vorlesen nutzt.
+function i18nKlasseUebersicht(){
+  openModal('<h3>🌐 Sprachen in '+esc(klasseLabel())+'</h3><p class="pr-hinweis" id="i18nKlInfo">Wird geladen …</p><div id="i18nKlListe"></div>'+
+    '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Zurück</button></div>', 'pr-modal');
+  document.getElementById('modalCancel').addEventListener('click', i18nWahl);
+  loadStudentRoster().then(function(roster){
+    roster = ohneGaeste(roster);
+    return Promise.all(roster.map(function(s){
+      return getDoc(i18nKontoRef(s.uid)).then(function(snap){ return {s:s, d:snap.exists() ? snap.data() : null}; });
+    }));
+  }).then(function(liste){
+    var info = document.getElementById('i18nKlInfo'), box = document.getElementById('i18nKlListe');
+    if(!info || !box) return;
+    var mit = liste.filter(function(x){ return x.d && ((x.d.code && x.d.code !== 'de') || x.d.vorlesen); })
+      .sort(function(a, b){ return String(a.s.displayName || '').localeCompare(String(b.s.displayName || ''), 'de'); });
+    info.textContent = mit.length
+      ? mit.length + ' von ' + liste.length + ' Schüler:innen nutzen eine andere Sprache oder das Vorlesen. Bei ihnen sind Aufgaben und Prüfungen maschinell übersetzt (ausser in Sprachfächern).'
+      : 'Niemand in dieser Klasse hat eine andere Sprache oder das Vorlesen gewählt.';
+    box.innerHTML = mit.length ? '<div class="pr-tabelle" data-noi18n="1">' + mit.map(function(x){
+      var sp = i18nSprache(x.d.code);
+      return '<div class="pr-zeile"><div class="pr-name">'+esc(x.s.displayName || '')+'</div><div class="pr-st">'+
+        (x.d.code && x.d.code !== 'de' ? esc(sp.f + ' ' + sp.n) : '🇩🇪 Deutsch')+(x.d.vorlesen ? ' · 🔊 Vorlesen' : '')+'</div></div>';
+    }).join('') + '</div>' : '';
+  }).catch(function(err){
+    console.error('Sprachen der Klasse', err);
+    var info = document.getElementById('i18nKlInfo');
+    if(info) info.textContent = err && err.code === 'permission-denied'
+      ? 'Die Übersicht braucht die neuen Datenbank-Regeln – sie sind noch nicht publiziert.'
+      : 'Die Übersicht konnte nicht geladen werden.';
+  });
+}
+// Markierung in den Prüfungs-Ansichten der Lehrperson.
+// Fremdsprache nur vermerken, wenn die Aufgaben wirklich maschinell übersetzt werden.
+function pruefSpracheJetzt(sess){ return i18nPack() && sess && !i18nIstSprachfach(sess.fach) ? i18nCode() : ''; }
+function pruefSpracheMark(t){
+  if(!t || !t.sprache) return '';
+  var sp = i18nSprache(t.sprache);
+  return ' <span class="pr-vs" data-noi18n="1" title="Aufgaben maschinell übersetzt: '+esc(sp.n)+'">🌐 '+esc(String(t.sprache).toUpperCase())+'</span>';
+}
+function pruefSpracheHinweis(t){
+  if(!t || !t.sprache) return '';
+  return '<p class="pr-hinweis">🌐 Diese Prüfung wurde im Fremdsprachen-Modus gelöst ('+esc(i18nSprache(t.sprache).n)+'): Die Aufgaben waren maschinell übersetzt.</p>';
+}
 function i18nRichtung(){
   var sp = i18nSprache(i18nCode());
   document.documentElement.setAttribute('lang', sp.c);
@@ -7917,13 +8119,24 @@ function i18nRichtung(){
 function i18nWahl(){
   var akt = i18nCode();
   var h = '<h3>🌐 Sprache wählen</h3>';
-  h += '<p class="pr-hinweis">Die ganze Library erscheint in der gewählten Sprache – auch die Aufgaben. Nur in den Sprachfächern (Deutsch, Englisch, Französisch) bleiben die Aufgaben im Original. Antworten schreibst du weiterhin auf Deutsch. Übersetzt wird automatisch mit Google Translate; Namen und Zahlen werden dabei nicht mitgeschickt. Beim ersten Öffnen einer Seite dauert es einen Moment. Die Einstellung gilt nur auf diesem Gerät.</p>';
-  h += '<div class="lang-liste">' + HL_SPRACHEN.map(function(s){
+  h += '<p class="pr-hinweis">Die ganze Library erscheint in der gewählten Sprache – auch die Aufgaben. Nur in den Sprachfächern (Deutsch, Englisch, Französisch) bleiben die Aufgaben im Original. Antworten schreibst du weiterhin auf Deutsch. Übersetzt wird automatisch mit Google Translate; Namen und Zahlen werden dabei nicht mitgeschickt. Beim ersten Öffnen einer Seite dauert es einen Moment. Die Wahl gehört zu deinem Konto und gilt auf jedem Gerät.</p>';
+  h += '<div class="lang-liste" data-noi18n="1">' + HL_SPRACHEN.map(function(s){
     return '<button type="button" class="lang-b'+(s.c === akt ? ' an' : '')+'" data-lang="'+esc(s.c)+'"><span class="lang-f">'+esc(s.f)+'</span><span>'+esc(s.n)+'</span></button>';
   }).join('') + '</div>';
-  h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button></div>';
+  h += '<p class="pr-hinweis">🇩🇪 Tippe auf einen übersetzten Text, dann siehst du ihn auf Deutsch. Bei Knöpfen: lange drücken.</p>';
+  if(enKannSprechen()) h += '<label class="lang-opt"><input type="checkbox" id="langVorlesen"'+(lsGet('hl_vorlesen') === '1' ? ' checked' : '')+'> <span>🔊 Vorlesen einschalten: Text antippen (bei Knöpfen lange drücken) und auf 🔊 tippen – der deutsche Text wird vorgelesen.</span></label>';
+  h += '<div class="modal-actions">'+(pruefIstLehrer() ? '<button class="btn btn-ghost btn-sm" id="langKlasse" type="button">👥 Sprachen in '+esc(klasseLabel())+'</button>' : '')+
+    '<button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button></div>';
   openModal(h, 'pr-modal');
   document.getElementById('modalCancel').addEventListener('click', closeModal);
+  var vor = document.getElementById('langVorlesen');
+  if(vor) vor.addEventListener('change', function(){
+    lsSet('hl_vorlesen', vor.checked ? '1' : '0');
+    i18nKontoSichern();
+    toast(vor.checked ? '🔊 Vorlesen ist eingeschaltet.' : 'Vorlesen ist ausgeschaltet.');
+  });
+  var kl = document.getElementById('langKlasse');
+  if(kl) kl.addEventListener('click', i18nKlasseUebersicht);
   document.querySelector('.lang-liste').addEventListener('click', function(e){
     var b = e.target.closest('[data-lang]');
     if(!b) return;
@@ -7931,7 +8144,10 @@ function i18nWahl(){
     closeModal();
     // Der einfachste und sicherste Weg zurück in die Ausgangssprache ist ein
     // Neuaufbau der Seite – so bleibt kein halb übersetzter Text stehen.
-    location.reload();
+    // Vorher (höchstens 2 s) aufs Konto schreiben, damit die Wahl mitkommt.
+    var neu = function(){ if(neu.fertig) return; neu.fertig = true; location.reload(); };
+    setTimeout(neu, 2000);
+    i18nKontoSichern().then(neu, neu);
   });
 }
 
@@ -17295,6 +17511,8 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-04-sprache-original', datum:'2026-10-04', fuer:'alle', text:'🇩🇪 Im Sprach-Modus (🌐): Tippe auf einen übersetzten Text, und du siehst ihn auf Deutsch – bei Knöpfen lange drücken. Im Sprach-Fenster kannst du neu «🔊 Vorlesen» einschalten: Dann liest dir die Library den deutschen Text vor. Deine Sprache gehört jetzt zu deinem Konto und kommt auf jedes Gerät mit.'},
+  {id:'2026-10-04-sprache-lp', datum:'2026-10-04', fuer:'lehrer', text:'🌐 Im Sprach-Fenster zeigt «👥 Sprachen in …», wer in der Klasse eine andere Sprache oder das Vorlesen nutzt. In Prüfungen steht bei diesen Schüler:innen 🌐 mit dem Sprachkürzel neben dem Namen (Aufgaben waren maschinell übersetzt). «🔊 Vorlesen» lässt sich auch ohne Fremdsprache einschalten – z. B. für schwache Leser:innen.'},
   {id:'2026-10-04-sprache-alles', datum:'2026-10-04', fuer:'alle', text:'🌐 Der Sprach-Knopf übersetzt jetzt die ganze Library – auch Hausaufgaben, Neuigkeiten und die Aufgaben in Mathematik, Natur und Technik, Geografie, Geschichte usw. In Deutsch, Englisch und Französisch bleiben die Aufgaben im Original. Antworten schreibst du weiterhin auf Deutsch.'},
   {id:'2026-10-04-sprache-alles-lp', datum:'2026-10-04', fuer:'lehrer', text:'🌐 Fremdsprachen-Modus: Was nicht im festen Wörterbuch steht, übersetzt neu Google Translate direkt im Browser (auch Übungsseiten, Trainer und Prüfungen, ausser in Sprachfächern, bei Rechtschreib- und Tipp-Aufgaben). Zahlen, Namen aus der Klassenliste, Mail-Adressen und Links werden vor dem Senden durch Platzhalter ersetzt, Eingabefelder nie gelesen; jede Übersetzung bleibt danach auf dem Gerät gespeichert. Maschinelle Übersetzungen können holpern – im Zweifel gilt der deutsche Text.'},
   {id:'2026-10-04-anordnen-schalter', datum:'2026-10-04', fuer:'alle', text:'✏️ «Anordnen» ist jetzt ein Schalter: Tippst du nochmals darauf, hört das Wackeln auf (wie mit «Fertig»). Und das Fach Mathe heisst neu Mathematik.'},
@@ -24765,11 +24983,11 @@ async function pruefStarten(p, weiter, vorschau){
       // Nicht auf die Bestätigung des Servers warten (bei schlechter Verbindung
       // hing das ewig): der Schreibvorgang läuft im Hintergrund weiter.
       var schreiben = weiter
-        ? updateDoc(teilRef(p.id, uid), {aktiv:true, geladen:false, lebt:serverTimestamp()})
+        ? updateDoc(teilRef(p.id, uid), Object.assign({aktiv:true, geladen:false, lebt:serverTimestamp()}, pruefSpracheJetzt(sess) ? {sprache:pruefSpracheJetzt(sess)} : {}))
         : setDoc(teilRef(p.id, uid), {
             uid:uid, name:state.profile.displayName || '', status:'laeuft', aktiv:true, geladen:false,
             gestartetAm:serverTimestamp(), startMs:startMs, lebt:serverTimestamp(),
-            antworten:{}, beantwortet:0, max:pruefAnzahl(p), verstoesse:[], seb:sebAktiv()
+            antworten:{}, beantwortet:0, max:pruefAnzahl(p), verstoesse:[], seb:sebAktiv(), sprache:pruefSpracheJetzt(sess)
           });
       schreiben.catch(function(err){
         console.error('Teilnahme speichern', err);
@@ -27966,7 +28184,7 @@ function pruefMonitorZeichnen(){
       : (p.diktat ? (t.beantwortet || 0)+' Wörter geschrieben' : pruefArt(p) === 'tippen' ? (t.beantwortet || 0)+' Zeichen getippt' : (t.beantwortet || 0)+' / '+anzahl+' beantwortet') + (pruefFrist(p, t) ? ' · ⏱ ' + (pruefZeitUm(p, t) ? 'Zeit um' : Math.ceil((pruefFrist(p, t) - Date.now()) / 60000) + ' Min. übrig') : '');
     var vs = t && t.verstoesse && t.verstoesse.length ? ' · <span class="pr-vs" title="'+esc(t.verstoesse.map(function(v){ return new Date(v.at).toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'})+' '+v.grund; }).join('\n'))+'">⚠️ '+t.verstoesse.length+'× verlassen</span>' : '';
     var sebMark = !t ? '' : t.seb ? ' <span title="im Safe Exam Browser">🛡️</span>' : p.seb ? ' <small class="pr-vs">⚠️ ohne SEB</small>' : '';
-    h += '<div class="pr-zeile '+st.cls+'"><div class="pr-name">'+esc(r.name)+sebMark+(pruefArt(p) === 'sikore' && p.levels && p.levels[r.uid] ? ' <small>· Level '+esc(String(p.levels[r.uid]))+'</small>' : '')+'</div><div class="pr-st">'+esc(st.txt)+'</div><div class="pr-fort">'+fort+vs+'</div><div class="pr-akt">';
+    h += '<div class="pr-zeile '+st.cls+'"><div class="pr-name">'+esc(r.name)+sebMark+pruefSpracheMark(t)+(pruefArt(p) === 'sikore' && p.levels && p.levels[r.uid] ? ' <small>· Level '+esc(String(p.levels[r.uid]))+'</small>' : '')+'</div><div class="pr-st">'+esc(st.txt)+'</div><div class="pr-fort">'+fort+vs+'</div><div class="pr-akt">';
     if(t && t.status === 'gesperrt') h += '<button class="btn btn-primary btn-sm" data-e="'+esc(r.uid)+'" type="button">🔓 Entsperren</button>';
     if(t && t.status === 'abgegeben' && r.erg) h += '<button class="btn btn-ghost btn-sm" data-d="'+esc(r.uid)+'" type="button">Details</button>';
     if(t) h += '<button class="btn btn-ghost btn-sm" data-r="'+esc(r.uid)+'" type="button" title="Teilnahme löschen — die Person kann neu beginnen">↺</button>';
@@ -28220,6 +28438,7 @@ function pruefDetailsLehrer(p, uid){
     var h = '<h3>'+esc(t.name || '')+' — '+esc(p.titel)+'</h3>';
     h += '<div class="pr-resultat"><div><span>Note</span><b>'+pruefNoteText(pruefNote(p, r.punkte, r.max))+'</b></div><div><span>'+pruefPunkteLabel(p)+'</span><b>'+esc(pruefPunkteWert(p, r.punkte, r.max))+'</b></div></div>';
     if(t.verstoesse && t.verstoesse.length) h += '<p class="pr-hinweis">⚠️ '+t.verstoesse.length+'× verlassen: '+esc(t.verstoesse.map(function(v){ return new Date(v.at).toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'})+' '+v.grund; }).join(' · '))+'</p>';
+    h += pruefSpracheHinweis(t);
     h += '<p class="pr-hinweis">'+(p.diktat ? 'Tippe auf ❌, um einen Fehler nicht zu zählen (✅ = gestrichen).' : bank ? 'Tippe auf ✅/🟡/❌ für volle oder keine Punkte, oder trag Teilpunkte direkt ein (halbe gehen). ✋ = von Hand gewertet.' : 'Tippe auf ✅/❌, um eine Antwort von Hand anders zu werten.')+'</p>';
     h += pruefDetailsHtml(bank ? r.details : r.details.map(function(d){ return Object.assign({}, d, {max:0}); }), true);
     h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button><button class="btn btn-primary btn-sm" id="modalOk" type="button">Korrektur speichern</button></div>';
@@ -29010,6 +29229,7 @@ function sikoreDetailsLehrer(p, uid){
   var h = '<h3>'+esc(t.name || '')+' — '+esc(p.titel)+'</h3>';
   h += '<div class="pr-resultat"><div><span>Note</span><b>'+pruefNoteText(pruefNote(p, r.punkte, r.max))+'</b></div><div><span>Richtig</span><b>'+r.punkte+' / '+r.max+'</b></div><div><span>Level</span><b>'+r.level+'</b></div></div>';
   if(t.verstoesse && t.verstoesse.length) h += '<p class="pr-hinweis">⚠️ '+t.verstoesse.length+'× verlassen: '+esc(t.verstoesse.map(function(v){ return new Date(v.at).toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'})+' '+v.grund; }).join(' · '))+'</p>';
+  h += pruefSpracheHinweis(t);
   h += pruefDetailsHtml(r.details, false);
   h += '<div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
   openModal(h, 'pr-modal');
@@ -34698,6 +34918,7 @@ function tippPrDetailsLehrer(p, uid){
   var h = '<h3>'+esc(t.name || '')+' — '+esc(p.titel)+'</h3>';
   h += '<div class="pr-resultat"><div><span>Note</span><b>'+pruefNoteText(pruefNote(p, r.punkte, r.max))+'</b></div><div><span>Netto/Min.</span><b>'+r.punkte+'</b></div><div><span>Fehler</span><b>'+r.fehler+'</b></div></div>';
   if(t.verstoesse && t.verstoesse.length) h += '<p class="pr-hinweis">⚠️ '+t.verstoesse.length+'× verlassen: '+esc(t.verstoesse.map(function(v){ return new Date(v.at).toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'})+' '+v.grund; }).join(' · '))+'</p>';
+  h += pruefSpracheHinweis(t);
   h += pruefDetailsHtml(r.details, false);
   h += '<div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Schliessen</button></div>';
   openModal(h, 'pr-modal');
