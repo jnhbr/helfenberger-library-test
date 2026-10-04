@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" data-design="neu">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,17 +15,6 @@
   try{
     var t = localStorage.getItem('hl_theme');
     if(t === 'dark' || t === 'light'){ document.documentElement.setAttribute('data-theme', t); }
-  }catch(e){}
-  // Neues Design: vorerst nur auf der Testseite (Pfad enthält -test/), dort immer an.
-  // Für die Live-Seite wird diese Bedingung entfernt, sobald die Schüleransicht geprüft ist.
-  try{
-    if(/-test\//.test(location.pathname)){
-      document.documentElement.setAttribute('data-design', 'neu');
-      var f = document.createElement('link');
-      f.rel = 'stylesheet';
-      f.href = 'https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap';
-      document.head.appendChild(f);
-    }
   }catch(e){}
 })();
 </script>
@@ -43,7 +32,7 @@
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Karla:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
 <style>
   :root{
     --bg:#F4F5FA;
@@ -2436,8 +2425,9 @@
 
   /* ==================================================================
      NEUES DESIGN (Vorschau) — greift nur mit <html data-design="neu">.
-     Gesetzt im <head>-Skript, vorerst nur auf der Testseite (dort immer an).
-     Ohne das Attribut bleibt alles beim bisherigen Aussehen.
+     Seit 04.10.2026 das Design der Library für alle: das Attribut steht fest am
+     <html>-Element. Die älteren Regeln weiter oben sind die Grundlage, auf der
+     dieser Block aufsetzt (er überschreibt Farben, Schrift, Konturen, Leiste).
      Stil: Farben aus dem Sek-Altnau-Logo, 2px-Konturen, Schatten gerade nach
      unten («Taste»), dunkle Seitenleiste, Schulhaus-Foto ruhig im Hintergrund.
      ================================================================== */
@@ -2661,6 +2651,8 @@
     :root[data-design="neu"] .topbar .topbar-bell, :root[data-design="neu"] .topbar .topbar-coin, :root[data-design="neu"] .topbar .topbar-todo{gap:12px;padding:9px 12px;font-size:16px;line-height:1.3;}
     :root[data-design="neu"] .topbar .topbar-bell[title]::after, :root[data-design="neu"] .topbar .topbar-coin[title]::after, :root[data-design="neu"] #pflanzenBtn[title]::after{content:attr(title);font-size:15px;font-weight:700;}
     :root[data-design="neu"] .topbar .topbar-badge, :root[data-design="neu"] .topbar .topbar-coin-badge{position:static;margin-left:auto;order:5;}
+    :root[data-design="neu"] .topbar #streakBtn[title]::after{content:'Lern-Serie';}
+    :root[data-design="neu"] .topbar #streakBtn b{order:5;margin-left:auto;}
     :root[data-design="neu"] .topbar .topbar-todo-badge{margin-left:auto;order:5;}
     :root[data-design="neu"] .topbar .neu-mehr-btn::after{margin-left:auto !important;}
     :root[data-design="neu"] .push-popover{top:auto;bottom:20px;left:260px;right:auto;}
@@ -7063,6 +7055,7 @@ function updateCoinButton(){
   if(!btn) return;
   var badge = document.getElementById('coinBadge');
   var isTeacher = state.profile && state.profile.role === 'teacher';
+  btn.classList.toggle('layout-aus', !schulden.an);   // gleiche Logik wie das Widget (siehe layoutIstAus)
   if(!schulden.an){
     btn.hidden = true;
     if(badge) badge.hidden = true;
@@ -7177,7 +7170,7 @@ function renderDebtOverview(rows){
   );
   document.getElementById('modalOk').addEventListener('click', closeModal);
   document.getElementById('debtAusBtn').addEventListener('click', function(){
-    uiConfirm('💸 Schulden-Liste ausschalten?', 'Das Symbol verschwindet in '+klasseLabel()+' für alle. Die Einträge bleiben gespeichert. Wieder einschalten: ⚙️ Einstellungen.', 'Ausschalten', function(){
+    uiConfirm('💸 Schulden-Liste ausschalten?', 'Das Symbol verschwindet in '+klasseLabel()+' für alle. Die Einträge bleiben gespeichert. Wieder einschalten: ⚙️ Einstellungen › 🧩 Widgets.', 'Ausschalten', function(){
       schuldenSchalten(false).catch(function(err){ console.error(err); toast('Hat nicht geklappt.'); });
     });
   });
@@ -9138,8 +9131,6 @@ function openSettings(){
   if(isTeacher && !isLeitung()){
     h += '<div class="settings-section"><h4>💾 Mein Speicher</h4><div id="setQuota"><div class="empty-state" style="padding:10px;">Wird geladen …</div></div></div>';
     if(heimKlasse()) h += '<div class="settings-section"><h4>⭐ Von Lehrern empfohlen</h4><div class="settings-list" id="setVorschlaege"><div class="empty-state" style="padding:10px;">Wird geladen …</div></div></div>';
-    h += '<div class="settings-section"><h4>💸 Schulden-Liste</h4><p style="margin:0 0 8px;color:var(--text-muted);font-size:12.5px;">Kleine Beträge (z. B. Schoggibrötli), die Schüler:innen dir schulden – Symbol 💸 oben. Gilt für '+esc(klasseLabel())+'.</p>'+
-         '<div class="settings-actions"><button class="btn btn-ghost btn-sm" id="setSchuldenBtn" type="button">'+(schulden.an ? 'Ausschalten' : 'Einschalten')+'</button></div></div>';
   }
   if(isTeacher && !isLeitung()){
     h += '<div class="settings-section"><h4>🔑 Passwort vergessen?</h4><div class="settings-actions"><button class="btn btn-ghost btn-sm" id="setPwAnfBtn" type="button">'+(istJan() ? 'Passwort-Anfragen (alle)' : 'Passwort einer Schüler:in zurücksetzen')+'</button></div></div>';
@@ -9176,14 +9167,6 @@ function openSettings(){
   if(rmBtn) rmBtn.addEventListener('click', function(){ openRueckmeldungen(); });
   var statBtn = document.getElementById('setStatBtn');
   if(statBtn) statBtn.addEventListener('click', openSchulStatistik);
-  var schuldenBtn = document.getElementById('setSchuldenBtn');
-  if(schuldenBtn) schuldenBtn.addEventListener('click', function(){
-    schuldenBtn.disabled = true;
-    schuldenSchalten(!schulden.an).then(function(){
-      schuldenBtn.textContent = schulden.an ? 'Ausschalten' : 'Einschalten';
-    }, function(err){ console.error(err); if(!err || err.code !== 'klasse/abgebrochen') toast('Hat nicht geklappt.'); })
-      .then(function(){ schuldenBtn.disabled = false; });
-  });
   if(isTeacher && !isLeitung()){ if(heimKlasse()) paintSettingsAbgleich(false); showQuotaUsage(); }
 }
 
@@ -17316,6 +17299,8 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-04-neues-design', datum:'2026-10-04', fuer:'alle', text:'🎨 Die Library sieht neu aus: Die Navigation steht links (auf schmalen Bildschirmen oben), und statt Emojis gibt es einheitliche Symbole. Alle weiteren Symbole findest du unter «Mehr» – mit «★ Favoriten wählen» holst du deine wichtigsten nach oben.'},
+  {id:'2026-10-04-neues-design-lp', datum:'2026-10-04', fuer:'lehrer', text:'🎨 Neu für Lehrpersonen: In der Übungsliste stecken Umbenennen, Bearbeiten, Datei ersetzen, Verschieben und Löschen im «⋯»-Menü. 🪴 Pflanzen und 💸 Schulden stehen unter «Mehr» (als Favorit anheftbar). Die 💸 Schulden-Liste schaltest du unter ⚙️ Einstellungen › 🧩 Widgets ein oder aus.'},
   {id:'2026-10-01-beamer-fix', datum:'2026-10-01', fuer:'lehrer', text:'🔧 Im 🏫 Klassenzimmer öffnen sich Ruhephase, 🎲 Zufall, Stadt Land Fluss und 👥 Gruppen & Partner wieder.'},
   {id:'2026-10-01-kz-bereiche', datum:'2026-10-01', fuer:'lehrer', text:'🏫 Mehr Ordnung im Klassenzimmer: Die Werkzeuge stehen jetzt in vier Bereichen – 📡 Live mit der Klasse, 🎲 Am Beamer, 🗃️ Material & Prüfungen, 🧑‍🏫 Organisation. «Wer ist dran?», Würfel und Glücksrad sind zu einer Kachel 🎲 Zufall zusammengelegt (oben im Fenster umschalten). Die Blitzumfrage hat neu das Symbol 📊, Gruppen & Partner 👥. Anordnen geht weiterhin, jeweils innerhalb eines Bereichs.'},
   {id:'2026-10-01-energizer', datum:'2026-10-01', fuer:'lehrer', text:'⚡ Neu im 🏫 Klassenzimmer: Energizer – über 60 Aktivierungsspiele in vier Gruppen (🏃 Bewegung, 🧠 Kopf & Konzentration, 🌿 Ruhe & Atmung, 📚 mit Unterrichtsinhalt). Antippen zeigt das Spiel gross am Beamer mit Anleitung, Foto, Timer und oft einem eingebauten Spielhelfer: Farben-Chaos, Kim-Spiel, Rechenschlange, Atem-Kreis, Freeze, Simon sagt (auch vorgelesen) u. v. m. Bei «Steh auf, wenn’s stimmt», Tabu, Pantomime und Vier-Ecken-Quiz gibst du eigene Aussagen/Begriffe/Fragen pro Klasse ein. Dazu ⭐ Favoriten, 🕓 «zuletzt gespielt» pro Klasse, 🎲 Zufalls-Energizer (bevorzugt, was länger nicht dran war) und ➕ eigene Spiele, die alle Lehrpersonen sehen.'},
@@ -34828,6 +34813,7 @@ var LEISTE_ITEMS = [
   {id:'pushBellBtn', label:'🔔 Erinnerungen'},
   {id:'todoBtn', label:'📝 To-dos', rolle:'lehrer'},
   {id:'pflanzenBtn', label:'🪴 Pflanzen', rolle:'lehrer'},
+  {id:'coinBtn', label:'💸 Schulden-Liste', rolle:'lehrer'},
   {id:'linksBtn', label:'🔗 Links'},
   {id:'ferienInfo', label:'🚨 Ferien-Countdown'}
 ];
@@ -34835,7 +34821,10 @@ var START_ITEMS = [ {id:'stpJetzt', label:'🗓️ Jetzt / Als Nächstes (Stunde
 
 function layoutIstLehrer(){ return !!(state.profile && state.profile.role === 'teacher'); }
 function layoutRef(){ return doc(db, 'progress', state.user.uid, 'einstellungen', 'layout'); }
+// Sonderfall 💸 Schulden-Liste: Das Widget ist der Ein/Aus-Schalter der Funktion für die
+// ganze Klasse (klassen/{k}/appMeta/schulden), nicht nur ein persönliches Ausblenden.
 function layoutIstAus(key){
+  if(key === 'leiste:coinBtn') return !schulden.an;
   if(key.indexOf('kacheln:') === 0 && !layoutIstLehrer()) return false;
   return (layout.aus || []).indexOf(key) >= 0;
 }
@@ -34876,6 +34865,16 @@ function layoutSave(){
     .catch(function(err){ console.error(err); toast('Anordnung konnte nicht gespeichert werden.'); });
 }
 function layoutSetAus(key, aus){
+  if(key === 'leiste:coinBtn'){
+    if(!layoutIstLehrer()) return;
+    var schalten = function(){
+      schuldenSchalten(!aus).then(function(){ layoutAnwenden(); paintWidgetDrawer(); },
+        function(err){ console.error(err); if(!err || err.code !== 'klasse/abgebrochen') toast('Hat nicht geklappt.'); });
+    };
+    if(aus) uiConfirm('💸 Schulden-Liste ausschalten?', 'Das Symbol verschwindet in '+klasseLabel()+' für alle. Die Einträge bleiben gespeichert. Wieder einschalten: ⚙️ Einstellungen › 🧩 Widgets.', 'Ausschalten', schalten);
+    else schalten();
+    return;
+  }
   var l = (layout.aus || []).filter(function(k){ return k !== key; });
   if(aus) l.push(key);
   layout.aus = l;
