@@ -1957,6 +1957,7 @@
   /* Rechts-nach-links: die Shell dreht, Unterrichtsinhalt bleibt links-nach-rechts. */
   [dir="rtl"] .mt-blatt,[dir="rtl"] .mt-hotbild,[dir="rtl"] .sk-blatt,[dir="rtl"] .mt-bild,
   [dir="rtl"] .pr-q-body,[dir="rtl"] pre,[dir="rtl"] code,[dir="rtl"] .resource-iframe{direction:ltr;text-align:start;}
+  [dir="rtl"] .mt-frage,[dir="rtl"] .mt-tipp,[dir="rtl"] .pr-q-frage,[dir="rtl"] .pr-q-kontext{unicode-bidi:plaintext;}
   .mt-gruppe{margin:18px 0 6px;font-size:15px;letter-spacing:.02em;color:var(--text-muted);text-transform:uppercase;}
   /* Klickbare SVG-Bilder (Organe, Skelett, Periodensystem, Zeitstrahl, Wortmaschine) */
   .mt-hotbild{margin:4px 0 2px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);padding:6px;max-width:520px;}
@@ -3685,6 +3686,7 @@ var rosterCache = { klasse:null, at:0, promise:null };
 function loadStudentRoster(force){
   if(force || !rosterCache.promise || rosterCache.klasse !== state.klasse || Date.now() - rosterCache.at > 5*60*1000){
     var p = ladeStudentRoster();
+    p.then(i18nNamenMerken, function(){});
     rosterCache = { klasse:state.klasse, at:Date.now(), promise:p };
     p.catch(function(){ if(rosterCache.promise === p) rosterCache.promise = null; });
   }
@@ -7509,21 +7511,27 @@ function renderLogin(){
       btn.disabled = false;
     }
   });
+  i18nStart();
 }
 
 /* ===================== RENDER: CHROME ===================== */
 
 /* ===================== 🌐 SPRACHE DER OBERFLÄCHE =====================
-   Für neu zugezogene Schüler:innen (und ihre Eltern) lässt sich die Bedien-
-   oberfläche umstellen. Übersetzt werden Menü, Knöpfe, Fachnamen und die
-   Erklärtexte – die Aufgaben selbst bleiben in der Unterrichtssprache, sonst
-   wäre z. B. «das oder dass» sinnlos.
+   Für neu zugezogene Schüler:innen (und ihre Eltern) lässt sich die ganze
+   Library umstellen – Menü, Knöpfe, Erklärtexte, Neuigkeiten, Hausaufgaben und
+   auch die Aufgaben (Trainer, Übungsseiten, Prüfungen). Ausnahme: Sprachfächer
+   (Deutsch, Englisch, Französisch, …), Rechtschreib- und Tipp-Aufgaben – dort
+   ist die Sprache selbst der Stoff («das oder dass» wäre sonst sinnlos).
 
-   Technik: ein Wörterbuch ganzer Phrasen. Nach jedem Render laufen die Text-
-   knoten der Shell durch i18nDom(); Aufgaben- und Übungsbereiche sind über
-   I18N_TABU ausgenommen. Zahlen in einer Phrase werden als {n} gesucht und
-   danach wieder eingesetzt, damit «Level 3» und «Level 7» denselben Eintrag
-   benutzen. Die Wahl liegt nur lokal (localStorage), nicht in Firestore. */
+   Technik, zwei Stufen:
+   1. Festes Wörterbuch ganzer Phrasen (HL_I18N_ROH): sofort da, auch offline.
+   2. Alles Übrige übersetzt Google Translate (i18nSenden). Vor dem Senden
+      werden Zahlen, bekannte Namen, Mail-Adressen und Links durch Platzhalter
+      ersetzt (i18nMaske); Eingabefelder werden nie gelesen. Jede Übersetzung
+      bleibt auf dem Gerät (IndexedDB «library_i18n»), danach geht für diesen
+      Text nichts mehr hinaus. Ohne Netz bleibt der Text deutsch.
+   Nach jedem Render laufen die Textknoten durch i18nDom(); Übungsseiten im
+   iframe hängt i18nFrame() an. Die Wahl liegt nur lokal (localStorage). */
 var HL_SPRACHEN = [
   {c:'de', n:'Deutsch', f:'🇩🇪'},
   {c:'en', n:'English', f:'🇬🇧'},
@@ -7616,18 +7624,79 @@ var HL_I18N_ROH = [
 var HL_I18N = (function(){
   var out = {};
   HL_I18N_SPALTEN.forEach(function(code, i){
-    var pack = {};
+    var pack = Object.create(null);
     HL_I18N_ROH.forEach(function(z){ if(z[i+1]) pack[z[0]] = z[i+1]; });
     out[code] = pack;
   });
   return out;
 })();
-// Bereiche, die nie übersetzt werden: alles, was Unterrichtsinhalt ist.
-var I18N_TABU = '[data-noi18n],.mt-blatt,.mt-hotbild,.mt-bild,.sk-blatt,.tipp-blatt,.pr-q-body,pre,code,textarea,script,style,iframe';
+// Bereiche, die nie übersetzt werden: Tipp-Texte, Rechtschreib-Aufgaben, Code, Eingaben.
+var I18N_TABU = '[data-noi18n],.notranslate,.tipp-blatt,.rsw-text,.rsw-zeilen,pre,code,textarea,script,style,[contenteditable="true"]';
+// Aufgabenbereiche: In Sprachfächern bleiben sie im Original (siehe i18nSprachzone).
+var I18N_AUFGABE = '.mt-blatt,.mt-hotbild,.mt-bild,.sk-blatt,.pr-q-kontext,.pr-q-frage,.pr-q-opts,.pr-q-match,.pr-q-order,.pr-q-bild';
+var I18N_SPRACHFACH = /deutsch|englisch|english|franz|français|spanisch|italienisch|latein/i;
+var I18N_DIENST = 'https://translate.googleapis.com/translate_a/t?client=gtx&format=text&sl=de&tl=';
+var I18N_ZIEL = {fa:'fa-AF'};   // Dari
+var I18N_MASKE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?:\/\/[^\s<>"]+|\d+(?:[.,:]\d+)*|[\p{L}\p{M}]+/gu;
 var i18nBeobachter = null, i18nLaeuft = false;
+var i18nCache = Object.create(null), i18nCacheBereit = false, i18nCacheTimer = null;
+var i18nWarte = Object.create(null), i18nOffen = Object.create(null), i18nSendeTimer = null, i18nLaufend = 0, i18nPauseBis = 0, i18nFehler = 0;
+var i18nNamen = Object.create(null), i18nNameProfil = null;
+var i18nGemacht = new WeakMap(), i18nAttrGemacht = new WeakMap(), i18nRahmen = [], i18nHaengt = false;
 function i18nCode(){ return lsGet('hl_lang') || 'de'; }
 function i18nPack(){ return HL_I18N[i18nCode()] || null; }
 function i18nSprache(code){ return HL_SPRACHEN.filter(function(s){ return s.c === code; })[0] || HL_SPRACHEN[0]; }
+function i18nIstSprachfach(f){ return !f || I18N_SPRACHFACH.test(String(f)); }
+// In Sprachfächern ist die Sprache selbst der Stoff: dort übersetzt nur das
+// feste Wörterbuch (Knöpfe, Menü), nicht die Maschine – und Aufgaben gar nicht.
+function i18nSprachzone(){
+  var z = [];
+  try{
+    var r = state.route || {};
+    if(r.name === 'resource' && i18nIstSprachfach(r.resource && r.resource.subject)) z.push('.content');
+    else if(r.name === 'werkstatt' || r.name === 'lesereise' || r.name === 'diktatauswertung') z.push('.content');
+    if(pruef && pruef.sess && i18nIstSprachfach(pruef.sess.fach)) z.push('#pruefLock');
+  }catch(e){}
+  return z.join(',');
+}
+// Namen (eigener Name, Klassenliste) gehen nie an den Übersetzungsdienst.
+function i18nNameMerken(name){
+  (String(name || '').match(/[\p{L}\p{M}]+/gu) || []).forEach(function(t){
+    if(t.length >= 3 && t[0] !== t[0].toLowerCase()) i18nNamen[t] = 1;
+  });
+}
+function i18nNamenMerken(liste){
+  (liste || []).forEach(function(s){ if(s){ i18nNameMerken(s.displayName); i18nNameMerken(s.name); } });
+}
+// Zahlen, Namen, Mail-Adressen und Links durch {n} ersetzen: Sie verlassen den
+// Browser nicht, und «3 von 10 richtig» / «7 von 10 richtig» teilen sich einen Eintrag.
+function i18nMaske(kern){
+  var werte = [];
+  var muster = kern.replace(I18N_MASKE, function(t){
+    var c = t.charCodeAt(0);
+    if(!(c >= 48 && c <= 57) && t.indexOf('@') < 0 && !/^https?:/.test(t) && !i18nNamen[t]) return t;
+    werte.push(t);
+    return '{n}';
+  });
+  return {muster:muster, werte:werte};
+}
+// Für den Dienst stehen Platzhalter-Zahlen (301, 302, …) an Stelle der {n};
+// in der Antwort werden sie zu {1}, {2}, … – die Reihenfolge darf sich ändern.
+function i18nZumSenden(muster){
+  var i = 0;
+  return muster.replace(/\{n\}/g, function(){ return String(301 + i++); });
+}
+function i18nVomDienst(text, anzahl){
+  var gefunden = {};
+  var t = String(text || '').replace(/[٠-٩۰-۹]/g, function(z){ return String(z.charCodeAt(0) & 15); })
+    .replace(/\d+/g, function(z){
+      var i = +z - 300;
+      if(i >= 1 && i <= anzahl){ gefunden[i] = 1; return '{' + i + '}'; }
+      return z;
+    });
+  for(var j = 1; j <= anzahl; j++) if(!gefunden[j]) return '';
+  return t.trim();
+}
 // Eine Phrase nachschlagen: erst wörtlich, dann mit {n} für alle Zahlen.
 function i18nPhrase(kern, pack){
   if(pack[kern]) return pack[kern];
@@ -7637,49 +7706,194 @@ function i18nPhrase(kern, pack){
   var i = 0;
   return pack[muster].replace(/\{n\}/g, function(){ return zahlen[i++] || ''; });
 }
+// Alles, was nicht im festen Wörterbuch steht: aus dem Speicher, sonst anfragen.
+function i18nMaschine(kern){
+  if(kern.length > 1500) return null;
+  var m = i18nMaske(kern);
+  if(m.werte.length > 99 || !/\p{L}{2}/u.test(m.muster.replace(/\{n\}/g, ' '))) return null;
+  var c = i18nCache[m.muster];
+  if(c === undefined){
+    i18nHaengt = true;   // Antwort steht noch aus -> Knoten beim nächsten Durchgang wieder ansehen
+    if(i18nCacheBereit && !i18nOffen[m.muster] && !i18nWarte[m.muster]){
+      i18nWarte[m.muster] = 1;
+      if(!i18nSendeTimer) i18nSendeTimer = setTimeout(i18nSenden, 80);
+    }
+    return null;
+  }
+  if(!c) return null;
+  return c.replace(/\{(\d+)\}/g, function(x, i){ var w = m.werte[i - 1]; return w == null ? '' : w; });
+}
 // Emoji/Pfeile am Anfang und Ende stehen lassen, nur den Wortteil ersetzen.
-function i18nText(txt, pack){
+function i18nText(txt, pack, nurBuch){
   var m = txt.match(/^([\s\S]*?)([\p{L}\p{N}][\s\S]*?)(\s*)$/u);
   if(!m) return null;
   var vorne = m[1], kern = m[2], hinten = m[3];
   var t = i18nPhrase(kern, pack);
+  if(t == null && !nurBuch) t = i18nMaschine(kern);
   return t == null ? null : vorne + t + hinten;
+}
+function i18nSenden(){
+  i18nSendeTimer = null;
+  var code = i18nCode();
+  if(!i18nPack() || i18nLaufend >= 2) return;
+  if(Date.now() < i18nPauseBis || navigator.onLine === false){ i18nSendeTimer = setTimeout(i18nSenden, 15000); return; }
+  var paket = [], laenge = 0;
+  for(var k in i18nWarte){
+    if(paket.length >= 40 || laenge > 3000) break;
+    paket.push(k); laenge += k.length;
+  }
+  if(!paket.length) return;
+  paket.forEach(function(k){ delete i18nWarte[k]; i18nOffen[k] = 1; });
+  i18nLaufend++;
+  fetch(I18N_DIENST + encodeURIComponent(I18N_ZIEL[code] || code), {
+    method:'POST', credentials:'omit', referrerPolicy:'no-referrer',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:paket.map(function(k){ return 'q=' + encodeURIComponent(i18nZumSenden(k)); }).join('&')
+  }).then(function(r){
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function(liste){
+    if(!Array.isArray(liste) || liste.length !== paket.length) throw new Error('Antwort passt nicht');
+    paket.forEach(function(k, i){
+      var t = Array.isArray(liste[i]) ? liste[i][0] : liste[i];
+      i18nCache[k] = i18nVomDienst(t, (k.match(/\{n\}/g) || []).length);
+      delete i18nOffen[k];
+    });
+    i18nFehler = 0;
+    i18nCacheSichern();
+    i18nAlles();
+  }).catch(function(err){
+    // Kein Netz, gesperrt oder zu viele Anfragen: deutsch lassen und später nochmals versuchen.
+    console.warn('Übersetzung', err);
+    paket.forEach(function(k){ delete i18nOffen[k]; });
+    i18nFehler++;
+    i18nPauseBis = Date.now() + Math.min(300000, 15000 * Math.pow(2, i18nFehler - 1));
+    setTimeout(i18nAlles, i18nPauseBis - Date.now() + 200);
+  }).then(function(){
+    i18nLaufend--;
+    for(var k in i18nWarte){ if(!i18nSendeTimer) i18nSendeTimer = setTimeout(i18nSenden, 30); break; }
+  });
+}
+// Übersetzungen bleiben pro Sprache auf dem Gerät (IndexedDB, nicht localStorage –
+// den teilen sich die Übungsseiten). Geht das nicht, gilt der Speicher nur bis zum Neuladen.
+function i18nDb(){
+  return new Promise(function(ok, nein){
+    try{
+      var r = indexedDB.open('library_i18n', 1);
+      r.onupgradeneeded = function(){ r.result.createObjectStore('cache'); };
+      r.onsuccess = function(){ ok(r.result); };
+      r.onerror = function(){ nein(r.error); };
+    }catch(e){ nein(e); }
+  });
+}
+function i18nCacheLaden(){
+  var code = i18nCode();
+  return i18nDb().then(function(dbi){
+    return new Promise(function(ok){
+      var q = dbi.transaction('cache').objectStore('cache').get(code);
+      q.onsuccess = function(){ ok(q.result); dbi.close(); };
+      q.onerror = function(){ ok(null); dbi.close(); };
+    });
+  }).catch(function(){ return null; }).then(function(alt){
+    if(alt && typeof alt === 'object') Object.keys(alt).forEach(function(k){ if(typeof alt[k] === 'string' && i18nCache[k] === undefined) i18nCache[k] = alt[k]; });
+    i18nCacheBereit = true;
+  });
+}
+function i18nCacheSichern(){
+  clearTimeout(i18nCacheTimer);
+  i18nCacheTimer = setTimeout(function(){
+    var code = i18nCode(), kopie = {}, n = 0;
+    for(var k in i18nCache){ kopie[k] = i18nCache[k]; if(++n > 30000) break; }
+    i18nDb().then(function(dbi){
+      var tx = dbi.transaction('cache', 'readwrite');
+      tx.objectStore('cache').put(kopie, code);
+      tx.oncomplete = tx.onerror = tx.onabort = function(){ dbi.close(); };
+    }).catch(function(){});
+  }, 1500);
 }
 function i18nDom(root){
   var pack = i18nPack();
-  if(!pack || i18nLaeuft) return;
+  if(!pack || i18nLaeuft || !root) return;
   i18nLaeuft = true;
   try{
-    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {acceptNode:function(n){
-      if(!n.nodeValue || !/[\p{L}]/u.test(n.nodeValue)) return NodeFilter.FILTER_REJECT;
-      var el = n.parentElement;
-      if(!el || (el.closest && el.closest(I18N_TABU))) return NodeFilter.FILTER_REJECT;
+    var d = root.ownerDocument || document, innen = d !== document;
+    var zone = innen ? '' : i18nSprachzone();
+    if(state.profile && state.profile.displayName !== i18nNameProfil){ i18nNameProfil = state.profile.displayName; i18nNameMerken(i18nNameProfil); }
+    // 0 = gar nicht, 1 = nur festes Wörterbuch, 2 = alles
+    var stufe = function(el){
+      if(!el || !el.closest || el.closest(I18N_TABU)) return 0;
+      if(zone && el.closest(zone)) return el.closest(I18N_AUFGABE) ? 0 : 1;
+      return 2;
+    };
+    var walker = d.createTreeWalker(root, NodeFilter.SHOW_TEXT, {acceptNode:function(n){
+      if(!n.nodeValue || !/[\p{L}]/u.test(n.nodeValue) || i18nGemacht.get(n) === n.nodeValue) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     }});
     var knoten = [], n;
     while((n = walker.nextNode())) knoten.push(n);
     knoten.forEach(function(k){
-      var t = i18nText(k.nodeValue, pack);
-      if(t != null && t !== k.nodeValue) k.nodeValue = t;
+      var s = stufe(k.parentElement);
+      if(!s) return;
+      i18nHaengt = false;
+      var t = i18nText(k.nodeValue, pack, s === 1);
+      if(t == null || t === k.nodeValue){
+        if(!i18nHaengt) i18nGemacht.set(k, k.nodeValue);   // nichts zu tun -> nicht jedes Mal neu prüfen
+        return;
+      }
+      // Die Übungs-Helfer erkennen «Prüfen»-Knöpfe am deutschen Text.
+      var knopf = innen && k.parentElement.closest('button');
+      if(knopf) knopf.setAttribute('data-de', k.nodeValue.trim());
+      k.nodeValue = t;
+      i18nGemacht.set(k, t);
     });
     var attribute = ['title', 'placeholder', 'aria-label'];
     Array.prototype.forEach.call(root.querySelectorAll('[title],[placeholder],[aria-label]'), function(el){
-      if(el.closest && el.closest(I18N_TABU)) return;
+      var s = stufe(el);
+      if(!s) return;
+      var fertig = i18nAttrGemacht.get(el);
       attribute.forEach(function(a){
         var v = el.getAttribute(a);
-        if(!v) return;
-        var t = i18nText(v, pack);
-        if(t != null && t !== v) el.setAttribute(a, t);
+        if(!v || (fertig && fertig[a] === v)) return;
+        var t = i18nText(v, pack, s === 1);
+        if(t == null || t === v) return;
+        el.setAttribute(a, t);
+        if(!fertig){ fertig = {}; i18nAttrGemacht.set(el, fertig); }
+        fertig[a] = t;
       });
     });
   }catch(err){ console.error('Sprache', err); }
   i18nLaeuft = false;
 }
+// Shell und alle angehängten Übungsseiten durchgehen (nach jeder Antwort des Dienstes).
+function i18nAlles(){
+  i18nDom(document.body);
+  i18nRahmen = i18nRahmen.filter(function(fr){ return fr.isConnected; });
+  i18nRahmen.forEach(function(fr){
+    try{ if(fr.contentDocument && fr.contentDocument.body) i18nDom(fr.contentDocument.body); }catch(e){}
+  });
+}
+// Eine Übungsseite (iframe srcdoc, gleicher Origin) mitübersetzen – ausser in Sprachfächern.
+function i18nFrame(fr, fach){
+  if(!fr || !i18nPack() || i18nIstSprachfach(fach) || !window.MutationObserver) return;
+  fr.addEventListener('load', function(){
+    try{
+      var d = fr.contentDocument;
+      if(!d || !d.body) return;
+      var timer = null;
+      new MutationObserver(function(){
+        if(i18nLaeuft) return;
+        clearTimeout(timer);
+        timer = setTimeout(function(){ if(fr.isConnected && fr.contentDocument === d) i18nDom(d.body); }, 30);
+      }).observe(d.body, {childList:true, subtree:true});
+      if(i18nRahmen.indexOf(fr) < 0) i18nRahmen.push(fr);
+      i18nDom(d.body);
+    }catch(e){}
+  });
+}
 // Nach jedem Render (und nach jedem Dialog) automatisch übersetzen.
 function i18nStart(){
   i18nRichtung();
   if(!i18nPack() || i18nBeobachter || !window.MutationObserver) return;
-  var ziel = document.getElementById('app') || document.body;
   i18nBeobachter = new MutationObserver(function(){
     if(i18nLaeuft) return;
     clearTimeout(i18nStart.timer);
@@ -7687,6 +7901,7 @@ function i18nStart(){
   });
   i18nBeobachter.observe(document.body, {childList:true, subtree:true});
   i18nDom(document.body);
+  i18nCacheLaden().then(i18nAlles);
 }
 function i18nRichtung(){
   var sp = i18nSprache(i18nCode());
@@ -7697,7 +7912,7 @@ function i18nRichtung(){
 function i18nWahl(){
   var akt = i18nCode();
   var h = '<h3>🌐 Sprache wählen</h3>';
-  h += '<p class="pr-hinweis">Menü, Knöpfe und Erklärungen erscheinen in der gewählten Sprache. Die Übungen selbst bleiben auf Deutsch – sie sind ja der Unterrichtsstoff. Die Einstellung gilt nur auf diesem Gerät.</p>';
+  h += '<p class="pr-hinweis">Die ganze Library erscheint in der gewählten Sprache – auch die Aufgaben. Nur in den Sprachfächern (Deutsch, Englisch, Französisch) bleiben die Aufgaben im Original. Antworten schreibst du weiterhin auf Deutsch. Übersetzt wird automatisch mit Google Translate; Namen und Zahlen werden dabei nicht mitgeschickt. Beim ersten Öffnen einer Seite dauert es einen Moment. Die Einstellung gilt nur auf diesem Gerät.</p>';
   h += '<div class="lang-liste">' + HL_SPRACHEN.map(function(s){
     return '<button type="button" class="lang-b'+(s.c === akt ? ' an' : '')+'" data-lang="'+esc(s.c)+'"><span class="lang-f">'+esc(s.f)+'</span><span>'+esc(s.n)+'</span></button>';
   }).join('') + '</div>';
@@ -12154,7 +12369,7 @@ function exerciseHelperScript(rid, mitEnter){
       'var t=e.target;if(!t||t.tagName!=="INPUT"||/^(button|submit|checkbox|radio|range|file|color)$/i.test(t.type||""))return;' +
       'var n=t.parentElement;for(var d=0;n&&d<8;d++,n=n.parentElement){' +
         'var bs=n.querySelectorAll("button");for(var i=0;i<bs.length;i++){var b=bs[i];' +
-          'if(!b.disabled&&b.offsetParent!==null&&CHK.test(b.textContent||"")){e.preventDefault();b.click();return;}}' +
+          'if(!b.disabled&&b.offsetParent!==null&&CHK.test(b.getAttribute("data-de")||b.textContent||"")){e.preventDefault();b.click();return;}}' +
       '}' +
     '});' : '') +
     'document.addEventListener("DOMContentLoaded",function(){var p=document.querySelector(".calc-panel");if(!p||p.querySelector(".lib-calc-keys"))return;' +
@@ -12258,6 +12473,7 @@ function renderResource(r){
   Promise.all([contentPromise, prepareResourceSync(r.id)]).then(function(res){
     var chunkSnaps = res[0];
     var html = chunkSnaps.map(function(s){ return (s.exists() && s.data().html) || ''; }).join('');
+    i18nFrame(document.getElementById('resourceFrame'), r.subject);
     document.getElementById('resourceFrame').srcdoc = injectExerciseHelpers(html, r.id);
   }).catch(function(err){
     console.error(err);
@@ -17074,6 +17290,8 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-04-sprache-alles', datum:'2026-10-04', fuer:'alle', text:'🌐 Der Sprach-Knopf übersetzt jetzt die ganze Library – auch Hausaufgaben, Neuigkeiten und die Aufgaben in Mathematik, Natur und Technik, Geografie, Geschichte usw. In Deutsch, Englisch und Französisch bleiben die Aufgaben im Original. Antworten schreibst du weiterhin auf Deutsch.'},
+  {id:'2026-10-04-sprache-alles-lp', datum:'2026-10-04', fuer:'lehrer', text:'🌐 Fremdsprachen-Modus: Was nicht im festen Wörterbuch steht, übersetzt neu Google Translate direkt im Browser (auch Übungsseiten, Trainer und Prüfungen, ausser in Sprachfächern, bei Rechtschreib- und Tipp-Aufgaben). Zahlen, Namen aus der Klassenliste, Mail-Adressen und Links werden vor dem Senden durch Platzhalter ersetzt, Eingabefelder nie gelesen; jede Übersetzung bleibt danach auf dem Gerät gespeichert. Maschinelle Übersetzungen können holpern – im Zweifel gilt der deutsche Text.'},
   {id:'2026-10-04-anordnen-schalter', datum:'2026-10-04', fuer:'alle', text:'✏️ «Anordnen» ist jetzt ein Schalter: Tippst du nochmals darauf, hört das Wackeln auf (wie mit «Fertig»). Und das Fach Mathe heisst neu Mathematik.'},
   {id:'2026-10-04-neues-design', datum:'2026-10-04', fuer:'alle', text:'🎨 Die Library sieht neu aus: Die Navigation steht links (auf schmalen Bildschirmen oben), und alles hat klare Konturen. Alle weiteren Symbole findest du unter «Mehr» – mit «★ Favoriten wählen» holst du deine wichtigsten nach oben.'},
   {id:'2026-10-04-neues-design-lp', datum:'2026-10-04', fuer:'lehrer', text:'🎨 Neu für Lehrpersonen: In der Übungsliste stecken Umbenennen, Bearbeiten, Datei ersetzen, Verschieben und Löschen im «⋯»-Menü. 🪴 Pflanzen und 💸 Schulden stehen unter «Mehr» (als Favorit anheftbar). Die 💸 Schulden-Liste schaltest du unter ⚙️ Einstellungen › 🧩 Widgets ein oder aus.'},
@@ -24512,7 +24730,7 @@ async function pruefStarten(p, weiter, vorschau){
   ov.innerHTML = '<div class="pr-lock-msg"><div class="pr-lock-icon">📝</div><h2>'+esc(p.titel)+'</h2><p>Prüfung wird geladen …</p><p id="pruefLadeInfo"></p></div>';
   pruefFullscreenAn(ov);
   var uid = state.user.uid;
-  var sess = pruef.sess = {pid:p.id, vorschau:!!vorschau, ending:false, frame:null, missed:0, fsWasOn:false,
+  var sess = pruef.sess = {pid:p.id, fach:p.rsw ? 'deutsch' : pruefFach(p), vorschau:!!vorschau, ending:false, frame:null, missed:0, fsWasOn:false,
     antworten:null, beantwortet:0, saveTimer:null, poll:null, beat:null, abgebenGesendet:false,
     frist:vorschau && +p.zeitMin > 0 ? Date.now() + p.zeitMin * 60000 : null, uhr:null};
   sess.uhr = setInterval(pruefUhrTick, 1000);
@@ -24577,6 +24795,7 @@ async function pruefStarten(p, weiter, vorschau){
     pruefLockBarVerdrahten();
     sess.frame = document.getElementById('pruefFrame');
     sess.frame.addEventListener('load', function(){ pruefGezeigt(sess); }, {once:true});
+    i18nFrame(sess.frame, sess.fach);
     // Falls «load» ausbleibt: spätestens nach 20 s trotzdem überwachen.
     setTimeout(function(){ pruefGezeigt(sess); }, 20000);
     sess.frame.srcdoc = html;
