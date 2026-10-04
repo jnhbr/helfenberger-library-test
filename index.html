@@ -2631,7 +2631,7 @@
   :root[data-design="neu"] .topbar.neu-mehr-offen #topbarIcons > *:not(#searchBtn):not([hidden]), :root[data-design="neu"] .topbar.neu-mehr-offen #coinBtn:not([hidden]), :root[data-design="neu"] .topbar.neu-mehr-offen #pflanzenBtn:not([hidden]), :root[data-design="neu"] .topbar.neu-mehr-offen .neu-fav-wahl{display:inline-flex;}
   :root[data-design="neu"] body.wackeln #topbarIcons > *:not(#searchBtn):not([hidden]), :root[data-design="neu"] body.wackeln #pflanzenBtn:not([hidden]){display:inline-flex;}
   :root[data-design="neu"] .topbar #stundenplanBtn{display:none !important;}
-  :root[data-design="neu"] .neu-fav-wahl{color:var(--gelb) !important;}
+  :root[data-design="neu"] .neu-fav-wahl{color:var(--gelb) !important;order:31;}
   /* Roter Punkt an «Mehr», wenn darunter etwas wartet (Zähler/Neuigkeiten), solange es zugeklappt ist. */
   :root[data-design="neu"] .topbar:not(.neu-mehr-offen):has(#topbarIcons > :not(.neu-fav):not(.layout-aus) .topbar-badge:not([hidden]), #neuBtn.topbar-neu-an:not(.neu-fav):not(.layout-aus), #coinBtn:not(.neu-fav):not([hidden]) .topbar-coin-badge:not([hidden]), #pflanzenBtn:not(.neu-fav):not(.layout-aus) .topbar-todo-badge:not([hidden])) .neu-mehr-btn::after{content:'';flex:none;width:10px;height:10px;border-radius:50%;background:var(--bad);margin-left:6px;}
   @media (max-width:999px){ :root[data-design="neu"] .topbar{position:static;} }
@@ -2650,6 +2650,11 @@
     :root[data-design="neu"] .neu-nav-btn{gap:12px;padding:0 12px;font-size:16px;}
     :root[data-design="neu"] .topbar-ferien{order:6;padding:2px 12px 6px;white-space:normal;}
     :root[data-design="neu"] #topbarIcons > *:not(#searchBtn), :root[data-design="neu"] #coinBtn, :root[data-design="neu"] #pflanzenBtn, :root[data-design="neu"] .neu-fav-wahl{order:11;}
+    /* «Favoriten wählen» schliesst die Mehr-Liste ab, danach Einstellungen und der Rest. */
+    :root[data-design="neu"] .neu-fav-wahl{order:12;}
+    :root[data-design="neu"] #settingsBtn{order:13;}
+    :root[data-design="neu"] .topbar-offline{order:14;}
+    :root[data-design="neu"] #goLiveBtn{order:15;}
     :root[data-design="neu"] .topbar .btn, :root[data-design="neu"] .topbar .topbar-quiz{justify-content:flex-start;width:100%;text-align:left;}
     :root[data-design="neu"] .topbar .btn-primary{justify-content:center;margin-top:6px;}
     :root[data-design="neu"] .topbar-offline{align-self:flex-start;margin-top:10px;}
