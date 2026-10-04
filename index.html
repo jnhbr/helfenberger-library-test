@@ -2324,6 +2324,7 @@
   body.wackeln .kz-tile{animation:wackelnK .26s ease-in-out infinite alternate;}
   body.wackeln .kz-tile:nth-child(2n){animation-duration:.3s;animation-direction:alternate-reverse;}
   body.wackeln .kz-tile:hover{transform:none;}
+  body.wackeln #anordnenBtn, body.wackeln #kzAnordnenBtn{background:var(--brand);border-color:var(--brand);color:#fff;}
   @keyframes wackelnK{from{transform:rotate(-.8deg);}to{transform:rotate(.8deg);}}
   @keyframes wackelnI{from{transform:rotate(-3deg);}to{transform:rotate(3deg);}}
   @media (prefers-reduced-motion: reduce){
@@ -3146,7 +3147,7 @@ function subjectVisual(s){
 // full:true = Bildchen bringt seinen eigenen Hintergrund mit (füllt das Feld).
 const SUBJECTS = [
   {id:'lehrerbereich', name:'Lehrerbereich', color:'#475569', soft:'#E2E6EC', img:'assets/subject-lehrerbereich.webp', teacherOnly:true, wide:true},
-  {id:'mathe', name:'Mathe', gruppe:'haupt', color:'#4361EE', soft:'#E4E8FD', img:'assets/subject-mathe.webp'},
+  {id:'mathe', name:'Mathematik', gruppe:'haupt', color:'#4361EE', soft:'#E4E8FD', img:'assets/subject-mathe.webp'},
   {id:'deutsch', name:'Deutsch', gruppe:'haupt', color:'#E63950', soft:'#FBDEE2', img:'assets/subject-deutsch.webp'},
   {id:'englisch', name:'Englisch', gruppe:'haupt', color:'#9B2C2C', soft:'#F5DADA', img:'assets/subject-englisch.webp'},
   {id:'franzoesisch', name:'Französisch', gruppe:'haupt', color:'#2F3E9E', soft:'#DEE1F5', img:'assets/subject-franzoesisch.webp'},
@@ -8203,7 +8204,7 @@ function renderHome(){
     html += '<button class="btn btn-ghost btn-sm" id="klassenzimmerBtn" type="button">🏫 Klassenzimmer</button>';
   }
   html += '<button class="btn btn-ghost btn-sm" id="toolsBtn" type="button" title="PDFs und Bilder komprimieren, zusammenführen, Seiten bearbeiten">🧰 Tools</button>';
-  html += '<button class="btn btn-ghost btn-sm" id="anordnenBtn" type="button" title="Kacheln und Symbole verschieben (oder lange auf eine Kachel drücken)">✏️ Anordnen</button>';
+  html += '<button class="btn btn-ghost btn-sm" id="anordnenBtn" type="button" title="Kacheln und Symbole verschieben (oder lange auf eine Kachel drücken) – nochmals klicken beendet das Anordnen">✏️ Anordnen</button>';
   html += '</div>';
   html += '<div id="aemtliBanner"></div>';
   html += '<div id="stpJetzt"></div>';
@@ -8236,7 +8237,7 @@ function renderHome(){
   }
   document.getElementById('kalenderBtn').addEventListener('click', function(){ state.route = {name:'kalender'}; render(); });
   document.getElementById('toolsBtn').addEventListener('click', function(){ state.route = {name:'tools'}; render(); });
-  document.getElementById('anordnenBtn').addEventListener('click', function(){ wackelnStart(); });
+  document.getElementById('anordnenBtn').addEventListener('click', function(){ wackelnUmschalten(); });
   initKachelSort();
   renderStpJetzt();
   renderHomeworkWidget();
@@ -17073,6 +17074,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-04-anordnen-schalter', datum:'2026-10-04', fuer:'alle', text:'✏️ «Anordnen» ist jetzt ein Schalter: Tippst du nochmals darauf, hört das Wackeln auf (wie mit «Fertig»). Und das Fach Mathe heisst neu Mathematik.'},
   {id:'2026-10-04-neues-design', datum:'2026-10-04', fuer:'alle', text:'🎨 Die Library sieht neu aus: Die Navigation steht links (auf schmalen Bildschirmen oben), und alles hat klare Konturen. Alle weiteren Symbole findest du unter «Mehr» – mit «★ Favoriten wählen» holst du deine wichtigsten nach oben.'},
   {id:'2026-10-04-neues-design-lp', datum:'2026-10-04', fuer:'lehrer', text:'🎨 Neu für Lehrpersonen: In der Übungsliste stecken Umbenennen, Bearbeiten, Datei ersetzen, Verschieben und Löschen im «⋯»-Menü. 🪴 Pflanzen und 💸 Schulden stehen unter «Mehr» (als Favorit anheftbar). Die 💸 Schulden-Liste schaltest du unter ⚙️ Einstellungen › 🧩 Widgets ein oder aus.'},
   {id:'2026-10-01-beamer-fix', datum:'2026-10-01', fuer:'lehrer', text:'🔧 Im 🏫 Klassenzimmer öffnen sich Ruhephase, 🎲 Zufall, Stadt Land Fluss und 👥 Gruppen & Partner wieder.'},
@@ -20951,7 +20953,7 @@ function renderKlassenzimmer(){
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Startseite</button></div>';
   html += '<h2 class="page-welcome" style="margin-bottom:6px;">🏫 Klassenzimmer</h2>';
   html += '<p class="kz-intro">Werkzeuge für den Unterricht — nur für dich sichtbar. '+
-    '<button class="btn btn-ghost btn-sm" id="kzAnordnenBtn" type="button" title="Werkzeuge verschieben oder ausblenden (oder lange auf eine Kachel drücken)">✏️ Anordnen</button></p>';
+    '<button class="btn btn-ghost btn-sm" id="kzAnordnenBtn" type="button" title="Werkzeuge verschieben oder ausblenden (oder lange auf eine Kachel drücken) – nochmals klicken beendet das Anordnen">✏️ Anordnen</button></p>';
   var sichtbar = kzSichtbar();
   KZ_BEREICHE.forEach(function(b){
     var tiles = sichtbar.filter(function(t){ return t.bereich === b.id; });
@@ -20970,7 +20972,7 @@ function renderKlassenzimmer(){
   renderChrome(html);
 
   document.getElementById('backBtn').addEventListener('click', goHome);
-  document.getElementById('kzAnordnenBtn').addEventListener('click', function(){ wackelnStart(); });
+  document.getElementById('kzAnordnenBtn').addEventListener('click', function(){ wackelnUmschalten(); });
   wackelMarken();
   Array.prototype.forEach.call(document.querySelectorAll('[data-tool]'), function(b){
     b.addEventListener('click', function(){
@@ -34738,6 +34740,8 @@ function wackelnStart(){
   document.addEventListener('keydown', wackelnEsc);
   wackelMarken();
 }
+// «✏️ Anordnen» ist ein Ein/Aus-Schalter: ein zweiter Klick beendet den Wackelmodus.
+function wackelnUmschalten(){ if(wackelnAktiv()) wackelnEnde(); else wackelnStart(); }
 function wackelnEsc(e){ if(e.key === 'Escape' && !modalEl.classList.contains('show')) wackelnEnde(); }
 function wackelnEnde(){
   document.body.classList.remove('wackeln');
