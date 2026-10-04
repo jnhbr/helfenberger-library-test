@@ -2575,6 +2575,8 @@
   :root[data-design="neu"] .resource-card.current, :root[data-design="neu"] .folder-card.has-current{border-color:var(--bad);box-shadow:0 5px 0 var(--bad);}
   :root[data-design="neu"] .resource-card.sk-karte:hover{border-color:var(--kontur);box-shadow:0 7px 0 var(--kontur);}
   :root[data-design="neu"] .dropzone{border-color:#7C8494;}
+  /* Die Knopfreihe der Lehrperson bricht um, statt rechts aus der Karte zu laufen. */
+  :root[data-design="neu"] .resource-actions{flex-wrap:wrap;flex-shrink:1;}
 
   /* Fächer-Kacheln: Illustration ohne getöntes Feld, Schatten in der Fachfarbe */
   :root[data-design="neu"] .subject-grid{gap:24px 20px;}
@@ -2607,7 +2609,7 @@
   :root[data-design="neu"] .topbar-todo-badge{background:var(--blau);color:#1D1D1B;}
   :root[data-design="neu"] .topbar-todo-badge.due{background:var(--bad);color:#FFFFFF;}
   :root[data-design="neu"] .neu-nav{display:flex;flex-wrap:wrap;gap:4px;order:10;flex:1 1 100%;}
-  :root[data-design="neu"] .neu-nav-btn{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 10px;border:2px solid transparent;border-radius:10px;background:transparent;color:#FFFFFF;font-weight:700;font-size:15px;text-align:left;}
+  :root[data-design="neu"] .neu-nav-btn{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 8px;border:2px solid transparent;border-radius:10px;background:transparent;color:#FFFFFF;font-weight:700;font-size:14.5px;text-align:left;}
   :root[data-design="neu"] .neu-nav-btn:hover{background:rgba(255,255,255,.14);}
   :root[data-design="neu"] .neu-nav-btn.on{background:var(--gelb);border-color:var(--gelb);color:#1D1D1B;}
   :root[data-design="neu"] .neu-nav-btn svg{flex:none;width:20px;height:20px;}
@@ -2630,7 +2632,7 @@
     :root[data-design="neu"] .neu-nav{order:0;flex:0 0 auto;flex-direction:column;flex-wrap:nowrap;}
     :root[data-design="neu"] .neu-nav-btn{gap:12px;padding:0 12px;font-size:16px;}
     :root[data-design="neu"] .topbar-user{margin:0;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:6px;font-size:15px;}
-    :root[data-design="neu"] .topbar .btn, :root[data-design="neu"] .topbar .topbar-quiz{justify-content:flex-start;width:100%;}
+    :root[data-design="neu"] .topbar .btn, :root[data-design="neu"] .topbar .topbar-quiz{justify-content:flex-start;width:100%;text-align:left;}
     :root[data-design="neu"] .topbar .topbar-klasse{justify-content:space-between;padding:9px 12px;}
     :root[data-design="neu"] .topbar .btn-primary{justify-content:center;}
     :root[data-design="neu"] .topbar-offline{align-self:flex-start;}
