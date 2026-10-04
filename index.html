@@ -3057,8 +3057,9 @@ function fuerRolleSichtbar(r){ return !istLehrerHtml(r) || !!(state.profile && s
    Angemeldet bleibt Jan: state.profile ist das Profil der Schüler:in (alsAnsicht:true),
    state.user nur ein Platzhalter mit deren uid, damit die ganze App deren Pfade liest.
    Gespeichert wird in dieser Ansicht NICHTS (alle Schreib-Wrapper unten verwerfen),
-   und was laut firestore.rules nur die Schüler:in selbst lesen darf (eigene Noten,
-   private Einträge), bleibt leer. */
+   und was laut firestore.rules nur die Schüler:in selbst lesen darf (private
+   Kalendereinträge, Anordnung), bleibt leer. Den 🎶 Notenrechner darf Jan lesen
+   (firestore.rules: isJan() bei noten und pruefungsnoten). */
 const ALS_SCHUELER_KEY = 'hl_alsSchueler';         // sessionStorage: uid der Schüler:in
 const ALS_SCHUELER_FAV_KEY = 'hl_alsSchuelerFav';  // localStorage: {uid, name} für den Schnellknopf
 function alsSchueler(){ return !!(state.profile && state.profile.alsAnsicht); }
@@ -10077,7 +10078,8 @@ async function runGoLive(){
 /* ===================== NOTENRECHNER (Schüler:innen) =====================
    Privater Rechner hinter dem 🎶-Knopf oben. Alles in EINEM Dokument
    progress/{uid}/noten/liste -> {faecher:{fachId:[{id,name,note,gewicht}]}}.
-   Nur die Person selbst liest/schreibt es (siehe firestore.rules).
+   Nur die Person selbst liest/schreibt es (siehe firestore.rules); lesen darf
+   es ausserdem Jan in der 🎒 Schüleransicht.
    Gespeichert wird immer das ganze Dokument per setDoc OHNE merge - mit
    merge:true würde ein gelöschtes Fach/eine gelöschte Note stehen bleiben.
    Dazu kommen die Noten aus Online-Prüfungen (progress/{uid}/pruefungsnoten/*,
@@ -17611,7 +17613,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-10-04-schueleransicht', datum:'2026-10-04', fuer:'lehrer', text:'🎒 Nur für Jan: Unter ⚙️ Einstellungen › «Schüleransicht» direkt in die Ansicht einer Schülerin oder eines Schülers wechseln (einmal wählen, danach ein Klick). Gespeichert wird dabei nichts; zurück geht es über das gelbe Band.'},
+  {id:'2026-10-04-schueleransicht', datum:'2026-10-04', fuer:'lehrer', text:'🎒 Nur für Jan: Unter ⚙️ Einstellungen › «Schüleransicht» direkt in die Ansicht einer Schülerin oder eines Schülers wechseln (einmal wählen, danach ein Klick), inklusive 🎶 Notenrechner. Gespeichert wird dabei nichts; zurück geht es über das gelbe Band.'},
   {id:'2026-10-04-widgets-neben-anordnen', datum:'2026-10-04', fuer:'alle', text:'🧩 Beim Anordnen steht der Knopf «Widgets» jetzt direkt rechts neben «✏️ Anordnen» statt unten. Hörst du mit dem Anordnen auf, verschwindet er wieder.'},
   {id:'2026-10-04-sprache-original', datum:'2026-10-04', fuer:'alle', text:'🇩🇪 Im Sprach-Modus (🌐): Tippe auf einen übersetzten Text, und du siehst ihn auf Deutsch – bei Knöpfen lange drücken. Im Sprach-Fenster kannst du neu «🔊 Vorlesen» einschalten: Dann liest dir die Library den deutschen Text vor. Deine Sprache gehört jetzt zu deinem Konto und kommt auf jedes Gerät mit.'},
   {id:'2026-10-04-sprache-lp', datum:'2026-10-04', fuer:'lehrer', text:'🌐 Im Sprach-Fenster zeigt «👥 Sprachen in …», wer in der Klasse eine andere Sprache oder das Vorlesen nutzt. In Prüfungen steht bei diesen Schüler:innen 🌐 mit dem Sprachkürzel neben dem Namen (Aufgaben waren maschinell übersetzt). «🔊 Vorlesen» lässt sich auch ohne Fremdsprache einschalten – z. B. für schwache Leser:innen.'},
