@@ -7610,6 +7610,8 @@ var HL_I18N_ROH = [
 ['Musik','Music','Musique','Musica','Música','Müzik','Музика','Muzîk','الموسيقى','موسیقی','موسیقي'],
 ['Sport','Sports','Sport','Sport','Deporte','Spor','Спорт','Werziş','الرياضة','ورزش','سپورت'],
 ['Medien und Informatik','Media and computer science','Médias et informatique','Media e informatica','Medios e informática','Medya ve bilişim','Медіа та інформатика','Medya û enformatîk','الإعلام والمعلوماتية','رسانه و انفورماتیک','رسنۍ او انفورماتیک'],
+['Werken','Crafts','Travaux manuels','Lavori manuali','Manualidades','El işi','Трудове навчання','Karên destan','الأشغال اليدوية','کار دستی','لاسي کارونه'],
+['Band','Band','Groupe de musique','Band musicale','Banda de música','Müzik grubu','Музичний гурт','Koma muzîkê','الفرقة الموسيقية','گروه موسیقی','د موسیقۍ ډله'],
 ['Natur und Technik','Science and technology','Sciences et techniques','Scienze e tecnica','Ciencia y tecnología','Doğa ve teknik','Природа і техніка','Xweza û teknîk','العلوم والتقنية','طبیعت و تکنیک','طبیعت او تخنیک'],
 ['Wochenziel: {n} / {n} richtige Aufgaben','Weekly goal: {n} / {n} correct exercises','Objectif de la semaine : {n} / {n} exercices justes','Obiettivo settimanale: {n} / {n} esercizi corretti','Meta semanal: {n} / {n} ejercicios correctos','Haftalık hedef: {n} / {n} doğru alıştırma','Тижнева мета: {n} / {n} правильних завдань','Armanca hefteyê: {n} / {n} xebatên rast','هدف الأسبوع: {n} / {n} تمارين صحيحة','هدف هفتگی: {n} / {n} تمرین درست','اوونیزه موخه: {n} / {n} سم تمرینونه'],
 ['von {n} richtig','{n} correct','justes sur {n}','su {n} corretti','de {n} correctos','{n} üzerinden doğru','з {n} правильно','ji {n} rast','من {n} صحيحة','از {n} درست','له {n} څخه سم'],
@@ -7642,6 +7644,9 @@ var i18nBeobachter = null, i18nLaeuft = false;
 var i18nCache = Object.create(null), i18nCacheBereit = false, i18nCacheTimer = null;
 var i18nWarte = Object.create(null), i18nOffen = Object.create(null), i18nSendeTimer = null, i18nLaufend = 0, i18nPauseBis = 0, i18nFehler = 0;
 var i18nNamen = Object.create(null), i18nNameProfil = null;
+// Fach-Kürzel (WAH, TTG, ISF …) sind keine Wörter – die Maschine macht daraus Unsinn.
+var i18nKuerzel = Object.create(null);
+SUBJECTS.forEach(function(f){ if(f.name === f.name.toUpperCase()) i18nKuerzel[f.name] = 1; });
 var i18nGemacht = new WeakMap(), i18nAttrGemacht = new WeakMap(), i18nRahmen = [], i18nHaengt = false;
 function i18nCode(){ return lsGet('hl_lang') || 'de'; }
 function i18nPack(){ return HL_I18N[i18nCode()] || null; }
@@ -7708,7 +7713,7 @@ function i18nPhrase(kern, pack){
 }
 // Alles, was nicht im festen Wörterbuch steht: aus dem Speicher, sonst anfragen.
 function i18nMaschine(kern){
-  if(kern.length > 1500) return null;
+  if(kern.length > 1500 || i18nKuerzel[kern]) return null;
   var m = i18nMaske(kern);
   if(m.werte.length > 99 || !/\p{L}{2}/u.test(m.muster.replace(/\{n\}/g, ' '))) return null;
   var c = i18nCache[m.muster];
