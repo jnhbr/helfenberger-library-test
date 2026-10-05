@@ -11176,19 +11176,26 @@ function maxDepthBelow(folderId){
 // versehentlich eine ganze Übungssammlung mitverschwinden.
 function askDeleteFolder(f){
   var c = subtreeCounts(f.id);
-  if(c.folders || c.resources){
-    var was = [];
-    if(c.folders) was.push(c.folders+' Unterordner');
-    if(c.resources) was.push(c.resources+' Übung'+(c.resources===1?'':'en'));
-    uiInfo('Ordner ist nicht leer',
-      '«'+f.name+'» enthält noch '+was.join(' und ')+'. Verschiebe den Inhalt zuerst woandershin (Knopf «Verschieben»), dann lässt sich der Ordner löschen.');
-    return;
-  }
-  uiConfirm('Ordner löschen?', '«'+f.name+'» ist leer und wird entfernt.', 'Löschen', function(){
-    deleteDoc(kdoc('folders', f.id))
-      .then(function(){ toast('Ordner gelöscht.'); })
-      .catch(function(err){ console.error(err); toast('Löschen fehlgeschlagen.'); });
-  }, true);
+  // Zusatzmaterial (Quiz, Umfragen, Wortwolken, Karteikarten, Prüfungen) zählt auch zum Inhalt:
+  // Ohne seinen Ordner fiele es auf die Fach-Hauptebene.
+  kzmLoad(true).then(function(){
+    var ids = subtreeIds(f.id);
+    var zusatz = kzmItems().filter(function(it){ return it.ordner && ids.indexOf(it.ordner) >= 0; }).length;
+    if(c.folders || c.resources || zusatz){
+      var was = [];
+      if(c.folders) was.push(c.folders+' Unterordner');
+      if(c.resources) was.push(c.resources+' Übung'+(c.resources===1?'':'en'));
+      if(zusatz) was.push(zusatz+' Stück Zusatzmaterial (Quiz, Umfragen, Wortwolken, Karteikarten oder Prüfungen)');
+      uiInfo('Ordner ist nicht leer',
+        '«'+f.name+'» enthält noch '+was.join(' und ')+'. Verschiebe den Inhalt zuerst woandershin (Knopf «Verschieben» bzw. «📁 Ablegen») oder lösche ihn, dann lässt sich der Ordner löschen.');
+      return;
+    }
+    uiConfirm('Ordner löschen?', '«'+f.name+'» ist leer und wird entfernt.', 'Löschen', function(){
+      deleteDoc(kdoc('folders', f.id))
+        .then(function(){ toast('Ordner gelöscht.'); })
+        .catch(function(err){ console.error(err); toast('Löschen fehlgeschlagen.'); });
+    }, true);
+  });
 }
 
 /* ===================== ÜBUNGEN: SORTIEREN, VERSCHIEBEN, MARKIEREN ===================== */
@@ -17629,6 +17636,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-05-zusatzmaterial-ordner', datum:'2026-10-05', fuer:'lehrer', text:'📁 Zusatzmaterial bleibt in seinem Ordner: Ein Ordner mit Quizzen, Umfragen, Wortwolken, Karteikarten oder Prüfungen lässt sich nicht mehr «leer» löschen (bisher fiel das Material dann auf die Fach-Hauptebene). «📥 Paket importieren» legt nichts mehr doppelt an, auch wenn du ein Stück inzwischen in einen Unterordner verschoben hast. Neu in den 🔒 Unterrichtsplanungen: Programmpunkte mit ⠿ verschieben und ⚡ Zufalls-Energizer aus dem Klassenzimmer.'},
   {id:'2026-10-04-schueleransicht', datum:'2026-10-04', fuer:'lehrer', text:'🎒 Neu unter ⚙️ Einstellungen › «Schüleransicht»: die Library so sehen wie eine Schülerin oder ein Schüler (einmal aus der Klassenliste wählen, danach ein Klick). Gespeichert wird dabei nichts; der private Notenrechner und eigene Kalendereinträge bleiben verborgen. Zurück geht es über das gelbe Band.'},
   {id:'2026-10-04-widgets-neben-anordnen', datum:'2026-10-04', fuer:'alle', text:'🧩 Beim Anordnen steht der Knopf «Widgets» jetzt direkt rechts neben «✏️ Anordnen» statt unten. Hörst du mit dem Anordnen auf, verschwindet er wieder.'},
   {id:'2026-10-04-sprache-original', datum:'2026-10-04', fuer:'alle', text:'🇩🇪 Im Sprach-Modus (🌐): Tippe auf einen übersetzten Text, und du siehst ihn auf Deutsch – bei Knöpfen lange drücken. Im Sprach-Fenster kannst du neu «🔊 Vorlesen» einschalten: Dann liest dir die Library den deutschen Text vor. Deine Sprache gehört jetzt zu deinem Konto und kommt auf jedes Gerät mit.'},
@@ -20442,6 +20450,31 @@ function enZufall(ausser){
   enOeffnen(pool[zufallInt(pool.length)]);
 }
 
+/* Für eingebettete Seiten im Viewer (🔒 Unterrichtsplanung, gleicher Origin): Katalog lesen
+   (inkl. eigener Spiele und «zuletzt gespielt» der Klasse) und ein Spiel in der Beamer-Ansicht
+   öffnen. Nur für Lehrpersonen. */
+window.hlEnergizer = {
+  liste: function(){
+    if(!state.profile || state.profile.role !== 'teacher') return Promise.resolve([]);
+    return enLaden().then(function(){
+      return enAlle().map(function(s){
+        return {id:s.id, kat:s.kat, icon:s.icon || '', titel:s.titel, min:s.min, platz:!!s.platz, sozial:s.sozial || '',
+          kurz:s.kurz || '', schritte:s.schritte || [], tipp:s.tipp || '', gespielt:enGespieltAm(s.id)};
+      });
+    });
+  },
+  oeffnen: function(id){
+    if(!state.profile || state.profile.role !== 'teacher') return Promise.resolve(false);
+    return enLaden().then(function(){
+      var s = enFinde(id);
+      if(!s) return false;
+      enOeffnen(s);
+      if(en.overlay && en.overlay.el) en.overlay.el.style.zIndex = '1500';   // über dem (Pseudo-)Vollbild des Viewers
+      return true;
+    });
+  }
+};
+
 /* ---------- Beamer-Ansicht ---------- */
 function enOeffnen(s){
   if(!en.overlay){
@@ -22012,7 +22045,7 @@ function kzmPaketZeigen(pk, fach, ordner){
     (unter.length ? '<br><small>Unterordner: '+esc(unter.join(', '))+'</small>' : '')+'</p>';
   h += kzmAblageHtml(zielFach, zielOrdner, true);
   if(pk.ordner && !gleich) h += '<label class="gr-opt"><input type="checkbox" id="kzmPkNeu" checked> Darin den Ordner «'+esc(pk.ordner)+'» neu anlegen</label>';
-  h += '<p class="kk-ed-info">Was es am selben Ort mit gleichem Titel schon gibt, wird übersprungen.</p>';
+  h += '<p class="kk-ed-info">Was es schon gibt (gleicher Titel am selben Ort oder dasselbe Stück in einem anderen Ordner des Fachs), wird übersprungen.</p>';
   h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button>'+
     '<button class="btn btn-primary btn-sm" id="modalOk" type="button">📥 Importieren</button></div>';
   openModal(h, 'modal-wide');
@@ -22028,6 +22061,18 @@ function kzmPaketZeigen(pk, fach, ordner){
       if(document.getElementById('kzmBox')) kzmNachAenderung(); else render();
     }).catch(function(err){ console.error(err); toast('Import hat nicht geklappt'+(err && err.code ? ' ('+err.code+')' : '')+'.'); closeModal(); });
   });
+}
+// Inhalt eines Stücks als Text – zum Erkennen von Doppelten (App und admin/material-import.js).
+function kzmInhaltSig(typ, d){
+  var j = function(a){ return (Array.isArray(a) ? a : []).join('|'); };
+  if(typ === 'quiz') return (Array.isArray(d) ? d : []).map(function(f){ return [f.q, j(f.a), f.c].join('#'); }).join('~');
+  if(typ === 'umfrage') return (Array.isArray(d) ? d : []).map(function(f){ return [f.frage, j(f.optionen)].join('#'); }).join('~');
+  if(typ === 'kk') return (Array.isArray(d) ? d : []).map(function(k){ return k.v + '#' + k.r; }).join('~');
+  return String(d || '');
+}
+function kzmItemSig(it){
+  var r = it.raw || {};
+  return kzmInhaltSig(it.typ, it.typ === 'quiz' ? r.questions : it.typ === 'umfrage' ? umfrageFragen(r) : it.typ === 'kk' ? r.karten : r.frage);
 }
 async function kzmPaketImport(pk, fach, ordner, neuerOrdner){
   var ordnerNeu = async function(parent, name){
@@ -22047,7 +22092,13 @@ async function kzmPaketImport(pk, fach, ordner, neuerOrdner){
   for(var i = 0; i < pk.stuecke.length; i++){
     var st = pk.stuecke[i];
     var ziel = st.unter ? await ordnerNeu(ordner, st.unter) : ordner;
-    if(vorhanden.some(function(it){ return it.typ === st.typ && it.fach === fach && (it.ordner || null) === (ziel || null) && String(it.titel).trim().toLowerCase() === st.titel.toLowerCase(); })){ r.doppelt++; continue; }
+    // Schon da = gleicher Titel am selben Ort, oder dasselbe Stück (Titel + Inhalt) irgendwo im Fach –
+    // sonst käme nach dem Verschieben in einen Unterordner bei jedem Import eine zweite Kopie dazu.
+    var sig = kzmInhaltSig(st.typ, st.typ === 'quiz' ? st.daten : st.typ === 'umfrage' ? st.daten.fragen : st.typ === 'kk' ? st.daten.karten : st.daten.frage);
+    if(vorhanden.some(function(it){
+      return it.typ === st.typ && it.fach === fach && String(it.titel).trim().toLowerCase() === st.titel.toLowerCase() &&
+        ((it.ordner || null) === (ziel || null) || kzmItemSig(it) === sig);
+    })){ r.doppelt++; continue; }
     if(st.typ === 'quiz'){
       await setDoc(doc(kcol('quizzes')), {title:st.titel, subject:fach, folderId:ziel || null, questions:st.daten,
         createdBy:state.profile.displayName, createdAt:serverTimestamp()});
