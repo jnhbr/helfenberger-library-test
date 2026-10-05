@@ -283,7 +283,9 @@
   .subject-head h2{font-size:24px;}
 
   .resource-list{display:flex;flex-direction:column;gap:12px;}
-  .bk-unten:not(:empty){margin-top:18px;}
+  /* Die Briefkästen sind ein eigener Block unter dem Material – mit deutlichem Abstand, nie an die letzte Übung geklebt. */
+  .bk-unten:not(:empty){margin-top:28px;}
+  #resourceList + .bk-liste:not(:empty), #gruppenFach:not(:empty) + .bk-liste:not(:empty){margin-top:28px;}
   .resource-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 18px;box-shadow:var(--shadow);display:flex;align-items:center;gap:16px;flex-wrap:wrap;transition:border-color .15s ease, box-shadow .15s ease;}
   .resource-card.sk-karte{width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;}
   .resource-card.sk-karte:hover{border-color:var(--brand);}
