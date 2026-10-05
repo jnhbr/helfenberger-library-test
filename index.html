@@ -12395,6 +12395,7 @@ async function bkLabel(stand, uid){
 var SVA_SICHTBAR_AB = '2026-10-19';
 var SVA_WERK_ID = 'sva_werkstatt';
 var SVA_CHECKS = [2,1,2,2,2,2,2,1,2,2,1,2,2,2];   // Selbstcheck-Punkte pro Station s1…s14
+var SVA_AUFFRISCHEN = [1,2,1,1];                     // Selbstcheck-Punkte der Pflicht-Stationen a1…a4 (zuerst)
 var SVA_ABGABE_PUNKTE = 21;
 var SVA_TERMINE = [
   {id:'thema',      d:'2026-11-02', bis:null,         typ:'erinnerung', t:'SVA: Themenfindung', text:'Montagmorgen in der Schule. Ziel: Dein Thema ist konkret und bereit zur Umsetzung.'},
@@ -12480,8 +12481,14 @@ function svaStandLesen(d){
       for(var j=0;j<n;j++){ if(!c[j]) ok = false; }
       if(ok) fertig++; else if(!erste) erste = i+1;
     });
+    var auf = 0;
+    SVA_AUFFRISCHEN.forEach(function(n, i){
+      var c = (s.c || {})['a'+(i+1)] || [], ok = true;
+      for(var j=0;j<n;j++){ if(!c[j]) ok = false; }
+      if(!ok && !auf) auf = i+1;
+    });
     var ab = 0; Object.keys(s.a || {}).forEach(function(k){ if(s.a[k]) ab++; });
-    return {fertig:fertig, erste:erste, abgabe:ab, check:Object.keys(s.q || {}).length, t:s.t || 0};
+    return {fertig:fertig, erste:erste, auffrischen:auf, abgabe:ab, check:Object.keys(s.q || {}).length, t:s.t || 0};
   }catch(e){ return null; }
 }
 function svaStandKlasse(){
@@ -12538,7 +12545,7 @@ async function svaStandZeigen(klasse){
       var st = x.st, name = esc(x.s.displayName || x.s.username || '?');
       if(!st) return '<tr class="vorbei"><td>'+name+'</td><td colspan="4">noch nicht geöffnet</td></tr>';
       return '<tr><td>'+name+'</td><td><span class="sva-balken"><span style="width:'+Math.round(st.fertig / N * 100)+'%"></span></span> '+st.fertig+' / '+N+'</td>'+
-        '<td>'+(st.fertig === N ? '✅ fertig' : 'Station '+st.erste)+'</td><td>'+st.abgabe+' / '+SVA_ABGABE_PUNKTE+'</td>'+
+        '<td>'+(st.fertig === N ? '✅ fertig' : st.auffrischen ? 'Auffrischen A'+st.auffrischen : 'Station '+st.erste)+'</td><td>'+st.abgabe+' / '+SVA_ABGABE_PUNKTE+'</td>'+
         '<td>'+(st.t ? new Date(st.t).toLocaleDateString('de-CH') : '–')+'</td></tr>';
     }).join('')+'</table><p class="sva-klein">Der Stand wird gesichert, während die Werkstatt offen ist (spätestens beim Verlassen). Wer auf Papier arbeitet, erscheint als «noch nicht geöffnet».</p>';
 }
