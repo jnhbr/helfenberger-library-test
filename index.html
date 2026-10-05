@@ -283,6 +283,7 @@
   .subject-head h2{font-size:24px;}
 
   .resource-list{display:flex;flex-direction:column;gap:12px;}
+  .bk-unten:not(:empty){margin-top:18px;}
   .resource-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 18px;box-shadow:var(--shadow);display:flex;align-items:center;gap:16px;flex-wrap:wrap;transition:border-color .15s ease, box-shadow .15s ease;}
   .resource-card.sk-karte{width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;}
   .resource-card.sk-karte:hover{border-color:var(--brand);}
@@ -13077,9 +13078,10 @@ function renderSubject(subjectId, folderId){
       (isLeitung() ? '' : '<button class="btn btn-ghost btn-sm" id="bkNeuBtn" type="button" title="Die Klasse gibt hier Dateien ab, du holst sie auf deinen Computer">📮 Briefkasten aufstellen</button>')+'</div>';
   }
 
-  html += '<div id="bkListe" class="resource-list bk-liste"></div>';
   html += '<div id="resourceList" class="resource-list"><div class="empty-state">Wird geladen …</div></div>';
   if(!isTeacher) html += '<div id="gruppenFach" class="resource-list"></div>';
+  // 📮 Briefkästen stehen zuunterst – zuerst kommt das Material (Wunsch von Jan, 05.10.2026).
+  html += '<div id="bkListe" class="resource-list bk-liste bk-unten"></div>';
 
   renderChrome(html);
   document.getElementById('backBtn').addEventListener('click', goHome);
@@ -19943,6 +19945,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-05-bk-unten', datum:'2026-10-05', fuer:'alle', text:'📮 Die Briefkästen stehen im Fach neu ganz unten – oben kommt zuerst das Material.'},
   {id:'2026-10-05-sva-lp4', datum:'2026-10-05', fuer:'lehrer', text:'🎓 SVA: Oben im Fach SVA steht für deine 3. Klasse neu «🔔 Braucht Aufmerksamkeit» (Gespräch gewünscht, Grobkonzept fehlt, Rapport überfällig, lange kein Journaleintrag). Unter «📋 Projekte der Klasse» gibst du zum Grobkonzept eine Rückmeldung (besprochen / überarbeiten + Kommentar), die das Kind im Fach SVA sieht, und trägst für Schüler:innen, die auf Papier arbeiten, Thema, Stunden und Ausstellungsbedarf nach.'},
   {id:'2026-10-05-sva-alle', datum:'2026-10-05', fuer:'alle', text:'🎓 Neu: die Kachel «SVA» für die Abschlussarbeit der 3. Klassen. Dort findest du den Fahrplan mit allen Terminen, die «Dossier-Werkstatt» (Schritt für Schritt zum Arbeitsdossier in Word, mit Erklärvideo) und «Mein SVA-Projekt» (Grobkonzept, Arbeitsjournal, Rapport, Ausstellung). Bist du in der 1. oder 2. Klasse und brauchst die Kachel noch nicht? Lange auf die Kachel drücken und mit «−» ausblenden.'},
   {id:'2026-10-05-vor', datum:'2026-10-05', fuer:'alle', text:'→ Neben dem Zurück-Pfeil gibt es jetzt auch einen Pfeil nach vorne.'},
