@@ -175,7 +175,7 @@ function zStart(el){
     '<div class="karte"><div class="zwei"><label>Vorname und Name<input type="text" data-k="name" value="'+esc(S.name)+'" placeholder="Vorname Nachname"></label><label>Klasse<input type="text" data-k="klasse" value="'+esc(S.klasse)+'" placeholder="G3b"></label></div></div>'+
     '<div class="karte"><div class="zeile"><span>Mein Thema</span><span class="leiter"></span><b>'+(S.g.thema ? esc(S.g.thema.split('\n')[0].slice(0, 70)) : 'noch offen')+'</b></div>'+
     '<div class="zeile"><span>Grobkonzept</span><span class="leiter"></span><b>'+konzeptStand()+' von '+FELDER.length+' Feldern'+(S.g.bereit ? ' · bereit zum Besprechen' : '')+'</b></div>'+
-    '<div class="zeile"><span>Arbeitszeit</span><span class="leiter"></span><b>'+hText(h)+' Stunden in '+S.j.length+' Einträgen</b></div>'+
+    '<div class="zeile"><span>Arbeitszeit</span><span class="leiter"></span><b>'+hText(h)+' Stunden in '+S.j.length+(S.j.length === 1 ? ' Eintrag' : ' Einträgen')+'</b></div>'+
     '<div class="zeile"><span>Letzter Eintrag</span><span class="leiter"></span><b>'+(letzter ? datCH(letzter.d) : '–')+'</b></div>'+
     '<div class="zeile"><span>Rapporte</span><span class="leiter"></span><b>'+RAPPORTE.filter(function(r){ return S.r[r[0]] && S.r[r[0]].am; }).length+' von 2 abgeschlossen</b></div></div>'+
     '<div class="hinweis">Alles, was du hier einträgst, sieht deine Lehrperson. Trag nach <b>jeder</b> Arbeitsphase kurz ins Arbeitsjournal ein – daraus schreibst du später dein Arbeitsprotokoll im Dossier.</div>';
@@ -207,7 +207,7 @@ function zJournal(el, offenKopie){
     '<label>Was habe ich gemacht?<textarea id="jW" rows="3" placeholder="Arbeitsschritt kurz beschreiben"></textarea></label>'+
     '<label>Kommentar<textarea id="jK" rows="2" placeholder="Was hat gut geklappt? Was war schwierig? Was nehme ich mit?"></textarea></label>'+
     '<div class="reihe"><button class="btn" type="button" id="jAdd">Eintrag speichern</button><span id="jErr" class="fehlertext"></span></div></div>'+
-    '<h2 style="margin-top:24px">'+S.j.length+' Einträge · '+hText(h)+' Stunden</h2>'+
+    '<h2 style="margin-top:24px">'+S.j.length+(S.j.length === 1 ? ' Eintrag' : ' Einträge')+' · '+hText(h)+' Stunden</h2>'+
     (liste.length ? liste.map(function(x){ var e = x.e, m = minuten(e); return '<div class="karte eintrag"><div class="zeile"><b>'+datCH(e.d)+'</b><span>'+esc(e.von || '')+(e.bis ? '–'+esc(e.bis) : '')+(e.ort ? ' · '+esc(e.ort) : '')+'</span><span class="leiter"></span><span>'+(m ? hText(m/60)+' h' : 'ohne Zeit')+'</span></div>'+
       '<p>'+esc(e.was).replace(/\n/g,'<br>')+'</p>'+(e.kom ? '<p class="kom">'+esc(e.kom).replace(/\n/g,'<br>')+'</p>' : '')+
       '<div class="reihe"><button class="btn leise klein" type="button" data-kop="'+x.i+'">📋 Text fürs Protokoll kopieren</button><button class="btn leise klein" type="button" data-del="'+x.i+'">Löschen</button></div></div>'; }).join('') : '<div class="karte">Noch kein Eintrag.</div>');
