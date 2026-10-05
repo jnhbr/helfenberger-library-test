@@ -17646,6 +17646,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-05-mathe-einordnen', datum:'2026-10-05', fuer:'lehrer', text:'📝 Prüfungen aus Mathe-Übungsseiten: Aufgaben wie «Proportional oder nicht?» kamen als «Wahr/Falsch» – bei einer Situation mit Frage («Wie viele braucht es jetzt?») ergab das keinen Sinn. Solche Aufgaben erscheinen jetzt als Auswahl «Proportional / Nicht proportional» (Übungen 3ab und 3c sind angepasst). Bereits angelegte Prüfungen behalten ihre Fragen – dort die Fragen neu ziehen.'},
   {id:'2026-10-05-stundenplan-wochen', datum:'2026-10-05', fuer:'alle', text:'🗓️ Stundenplan mit Wochen: Mit ◀ ▶ blätterst du durch die Wochen, in den Ferien ist der Plan leer. Mit «📌 Termin» trägst du etwas nur für eine bestimmte Woche ein (z. B. Zahnarzt oder Training) – der normale Plan bleibt. Termine der Lehrperson (Sporttag, Exkursion, Ausfall) erscheinen von selbst mit 📌.'},
   {id:'2026-10-05-stundenplan-termine-lp', datum:'2026-10-05', fuer:'lehrer', text:'📌 Ausserordentliche Termine im Stundenplan: «📌 Termin» › Lektion antippen › eintragen (eine Lektion, Halbtag oder ganzer Tag, auch «fällt aus»). In «Mein Stundenplan» wählst du, ob nur du ihn siehst oder auch eine Klasse in ihrem Stundenplan; in der Ansicht «Klasse» sieht ihn die ganze Klasse. «Jetzt / Als Nächstes» auf der Startseite beachtet Ferien und Termine.'},
   {id:'2026-10-05-seb-doppelfenster', datum:'2026-10-05', fuer:'lehrer', text:'🛡️ Safe Exam Browser: Blieb das normale Browserfenster offen, aus dem der SEB gestartet wurde, sperrte es die Prüfung («Seite neu geladen oder verlassen») – im SEB liess sich weiterschreiben, gespeichert wurde aber nichts mehr. Behoben: Das normale Fenster sperrt eine SEB-Prüfung nicht mehr, und wer von aussen gesperrt wird, sieht sofort den Sperrbildschirm.'},
@@ -25588,7 +25589,11 @@ function pruefExtractImpl(){
       (th.steps || []).forEach(function(s){
         if(!s) return;
         var ctx = plain(s.title) + (s.text ? ': ' + plain(s.text) : ''), b = bild(s.diagram);
-        if(s.type === 'truefalse') (s.items || []).forEach(function(it){ add(k, {typ:'tf', kontext:ctx, bild:b, frage:plain(it.text), loesung:!!it.answer}); });
+        // labels:['Proportional','Nicht proportional'] → Auswahlfrage mit diesen Knöpfen statt «Wahr/Falsch» (Situationen einordnen)
+        if(s.type === 'truefalse') (s.items || []).forEach(function(it){
+          if(s.labels && s.labels.length === 2) add(k, {typ:'mc', kontext:ctx, bild:b, frage:plain(it.text), optionen:s.labels.map(plain), loesung:it.answer ? 0 : 1});
+          else add(k, {typ:'tf', kontext:ctx, bild:b, frage:plain(it.text), loesung:!!it.answer});
+        });
         else if(s.type === 'classify') (s.items || []).forEach(function(it){ add(k, {typ:'mc', kontext:ctx, bild:bild(it.diagram), frage:plain(s.title), optionen:(it.options || []).map(plain), loesung:+it.correct}); });
         else if(s.type === 'calc' || s.type === 'table'){
           (s.cases || []).forEach(function(c){
