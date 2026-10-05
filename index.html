@@ -1677,7 +1677,10 @@
   .mio-dot{width:13px;height:13px;border-radius:50%;background:rgba(255,255,255,.16);}
   .mio-dot.on{background:#F7B733;}
   .mio-namen{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
-  .mio-namen span{background:rgba(255,255,255,.14);border-radius:999px;padding:5px 14px;font-weight:700;font-size:15px;}
+  .mio-kind{border:2px dashed rgba(255,255,255,.28);background:none;color:rgba(255,255,255,.45);border-radius:999px;padding:5px 14px;font:inherit;font-weight:700;font-size:clamp(14px,1.3vw,18px);}
+  .mio-kind.on{border:2px solid #7ee2a0;background:rgba(46,158,91,.35);color:#fff;cursor:pointer;}
+  .mio-kind.on.aus{border-color:rgba(255,255,255,.3);background:none;color:rgba(255,255,255,.5);text-decoration:line-through;}
+  .mio-klein{font-size:13.5px;color:#aab4f0;min-height:0;}
   .mio-aktion{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;min-height:46px;}
   .mio-aktion .btn{font-size:16px;padding:11px 22px;}
   .mio-aktion .btn-ghost{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3);}
@@ -1698,6 +1701,7 @@
   .modal.mio-modal{background:radial-gradient(ellipse at 50% 0%,#2a3bb0 0%,#0d1250 60%,#060824 100%);color:#fff;border-color:#8fa3ff;}
   .mio-s{display:flex;flex-direction:column;gap:14px;}
   .mio-s-kopf{display:flex;justify-content:space-between;gap:10px;align-items:center;font-weight:700;color:#cfd6ff;}
+  .mio-s-hinweis{background:rgba(247,183,51,.18);border:1px solid #F7B733;border-radius:12px;padding:9px 12px;font-size:13.5px;line-height:1.4;}
   .mio-s-kopf b{color:#F7B733;}
   .mio-s-gross{font-family:'Baloo 2',system-ui,sans-serif;font-size:28px;font-weight:700;text-align:center;padding:14px 0 0;}
   .mio-s-frage{background:linear-gradient(#16207a,#0a1150);border:2px solid #8fa3ff;border-radius:18px;padding:16px 18px;font-size:18px;font-weight:700;text-align:center;line-height:1.35;white-space:pre-line;overflow-wrap:anywhere;}
@@ -17725,8 +17729,8 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-10-05-millionaer', datum:'2026-10-05', fuer:'lehrer', text:'💰 Neues Spiel «Wer wird Millionär» (Klassenzimmer › Live mit der Klasse): Die Klasse spielt gemeinsam. Die Frage steht am Beamer, alle stimmen still auf dem eigenen Gerät ab, der Zwischenstand bleibt verdeckt – gewählt ist, was die Mehrheit tippt. Bei Gleichstand gibt es eine Stichwahl unter den meistgewählten Antworten; steht es dann immer noch gleich, bekommt ein zufällig gezogenes Kind das Veto und entscheidet allein. Falsche Antworten kosten ein Leben, dazu gibt es die Joker 50:50, Frage tauschen und Zweite Chance. Fragen: eigene Sets mit Stufen (leicht, mittel, schwer), jedes Klassen-Quiz, jede Übung, aus der sich auch eine Prüfung machen lässt (inkl. Karteikarten), oder ein Import als Text bzw. JSON-Datei. Millionär-Sets lassen sich wie Quizze im Fach-Ordner ablegen.'},
-  {id:'2026-10-05-millionaer-sus', datum:'2026-10-05', fuer:'alle', text:'💰 Neu: «Wer wird Millionär» mit der ganzen Klasse. Startet deine Lehrperson das Spiel, erscheint oben «Millionär läuft – mitmachen». Du tippst still deine Antwort an – was die Mehrheit wählt, gilt für alle. Bei Gleichstand gibt es eine Stichwahl, und wenn es dann immer noch gleich steht, entscheidet ein zufällig gezogenes Kind allein.'},
+  {id:'2026-10-05-millionaer', datum:'2026-10-05', fuer:'lehrer', text:'💰 Neues Spiel «Wer wird Millionär» (Klassenzimmer › Live mit der Klasse): Die Klasse spielt gemeinsam. Beim Eröffnen erscheint eine Wartelobby mit der ganzen Klasse – du siehst, wer eingeloggt ist und wer noch fehlt (auf den Schülergeräten geht das Spiel von selbst auf). Die Frage steht am Beamer, alle stimmen still auf dem eigenen Gerät ab, der Zwischenstand bleibt verdeckt – gewählt ist, was die Mehrheit tippt. Bei Gleichstand gibt es eine Stichwahl unter den meistgewählten Antworten; steht es dann immer noch gleich, bekommt ein zufällig gezogenes Kind das Veto und entscheidet allein. Falsche Antworten kosten ein Leben, dazu gibt es die Joker 50:50, Frage tauschen und Zweite Chance. Fragen: eigene Sets mit Stufen (leicht, mittel, schwer), jedes Klassen-Quiz, jede Übung, aus der sich auch eine Prüfung machen lässt (inkl. Karteikarten), oder ein Import als Text bzw. JSON-Datei. Millionär-Sets lassen sich wie Quizze im Fach-Ordner ablegen.'},
+  {id:'2026-10-05-millionaer-sus', datum:'2026-10-05', fuer:'alle', text:'💰 Neu: «Wer wird Millionär» mit der ganzen Klasse. Startet deine Lehrperson das Spiel, geht es auf deinem Gerät von selbst auf (sonst oben auf «Millionär läuft – mitmachen» tippen). Du tippst still deine Antwort an – was die Mehrheit wählt, gilt für alle. Bei Gleichstand gibt es eine Stichwahl, und wenn es dann immer noch gleich steht, entscheidet ein zufällig gezogenes Kind allein.'},
   {id:'2026-10-05-mathe-einordnen', datum:'2026-10-05', fuer:'lehrer', text:'📝 Prüfungen aus Mathe-Übungsseiten: Aufgaben wie «Proportional oder nicht?» kamen als «Wahr/Falsch» – bei einer Situation mit Frage («Wie viele braucht es jetzt?») ergab das keinen Sinn. Solche Aufgaben erscheinen jetzt als Auswahl «Proportional / Nicht proportional» (Übungen 3ab und 3c sind angepasst). Bereits angelegte Prüfungen behalten ihre Fragen – dort die Fragen neu ziehen.'},
   {id:'2026-10-05-stundenplan-wochen', datum:'2026-10-05', fuer:'alle', text:'🗓️ Stundenplan mit Wochen: Mit ◀ ▶ blätterst du durch die Wochen, in den Ferien ist der Plan leer. Mit «📌 Termin» trägst du etwas nur für eine bestimmte Woche ein (z. B. Zahnarzt oder Training) – der normale Plan bleibt. Termine der Lehrperson (Sporttag, Exkursion, Ausfall) erscheinen von selbst mit 📌.'},
   {id:'2026-10-05-stundenplan-termine-lp', datum:'2026-10-05', fuer:'lehrer', text:'📌 Ausserordentliche Termine im Stundenplan: «📌 Termin» › Lektion antippen › eintragen (eine Lektion, Halbtag oder ganzer Tag, auch «fällt aus»). In «Mein Stundenplan» wählst du, ob nur du ihn siehst oder auch eine Klasse in ihrem Stundenplan; in der Ansicht «Klasse» sieht ihn die ganze Klasse. «Jetzt / Als Nächstes» auf der Startseite beachtet Ferien und Termine.'},
@@ -19007,6 +19011,11 @@ function paintUmfrageUebersicht(stage, s){
    Jede Stimme trägt spiel + runde; gezählt wird nur, was zur laufenden Runde
    gehört — so müssen die Stimmen zwischen den Runden nicht gelöscht werden.
 
+   Wartelobby (phase 'lobby'): Jedes Schülergerät mit offener Library meldet
+   sich von selbst (mioAuto -> antworten/{uid} mit runde 0) und zeigt das Spiel.
+   Am Beamer steht die ganze Klassenliste — wer eingeloggt ist, leuchtet; wer
+   nicht mitspielen soll, wird angetippt (mio.aus, nur auf dem Lehrergerät).
+
    Fragen (einheitlich {q, a:[2–4 Texte], c, st: 1 leicht | 2 mittel | 3 schwer}):
    eigene Millionär-Sets (quizzes/{id} mit art:'million'), jedes Klassen-Quiz,
    jede prüfbare Übung / jedes Karteikarten-Set (pruefProbe) oder ein Import
@@ -19022,7 +19031,7 @@ var MIO_JOKER = [
 var MIO_BUCHST = ['A', 'B', 'C', 'D'];
 
 var mio = { session:null, unsub:null, unsubAnswers:null, answers:[], overlay:null, sig:null, tick:null, spiel:null, busy:{},
-  voteOpen:false, voteSig:null, voteTick:null, my:null, joined:null, clock:{key:'', start:0}, dots:'' };
+  voteOpen:false, voteSig:null, voteTick:null, my:null, joined:null, autoFor:null, aus:{}, clock:{key:'', start:0}, dots:'' };
 
 function mioRef(){ return kdoc('quizSessions', 'million'); }
 function mioAnswersCol(){ return kcol('quizSessions', 'million', 'antworten'); }
@@ -19075,6 +19084,7 @@ function startMioWatcher(){
   mio.unsub = onSnapshot(mioRef(), function(snap){
     mio.session = snap.exists() ? snap.data() : null;
     updateMioBanner();
+    mioAuto();
     if(mio.voteOpen) paintMioVote();
     if(mio.overlay) paintMioHost();
   }, function(err){ console.error('Millionär-Listener', err); });
@@ -19085,7 +19095,25 @@ function stopMioWatcher(){
   clearInterval(mio.tick); mio.tick = null;
   clearInterval(mio.voteTick); mio.voteTick = null;
   mio.session = null; mio.answers = []; mio.sig = null; mio.spiel = null;
-  mio.voteOpen = false; mio.voteSig = null; mio.my = null; mio.joined = null; mio.clock.key = '';
+  mio.voteOpen = false; mio.voteSig = null; mio.my = null; mio.joined = null; mio.autoFor = null; mio.aus = {}; mio.clock.key = '';
+}
+// In der 🎒 Schüleransicht und als Schulleitung wird nichts gespeichert — Mitspielen geht dort nicht.
+function mioNurAnsicht(){ return alsSchueler() || isLeitung(); }
+// Schülergerät: Sobald die Lehrperson ein Spiel eröffnet, meldet sich jedes
+// Gerät mit offener Library von selbst (am Beamer steht, wer eingeloggt ist)
+// und zeigt die Wartelobby — ohne dass jemand den Knopf oben suchen muss.
+// Nicht mitten in einer Prüfung und nicht über einen anderen offenen Dialog
+// (dann beim nächsten Schritt des Spiels); wer «Schliessen» tippt, bleibt draussen
+// und kommt über den Knopf oben wieder hinein.
+function mioAuto(){
+  var s = mio.session;
+  if(!mioLaeuft(s) || !state.profile || !state.user || state.profile.role === 'teacher') return;
+  mioDabeiMelden();
+  if(mio.autoFor === s.spielId || mio.voteOpen || s.phase === 'ende') return;
+  if(pruef.sess) return;
+  if(modalEl.classList.contains('show')) return;
+  mio.autoFor = s.spielId;
+  openMioVote();
 }
 function updateMioBanner(){
   var btn = document.getElementById('mioJoinBtn');
@@ -19099,6 +19127,7 @@ function mioMeine(s){ return (mio.my && s && mio.my.spiel === s.spielId && mio.m
 
 function openMioVote(){
   if(!mioLaeuft(mio.session)) return;
+  mio.autoFor = mio.session.spielId;
   mio.voteOpen = true; mio.voteSig = null;
   paintMioVote();
   if(!mio.voteTick) mio.voteTick = setInterval(mioVoteTick, 500);
@@ -19108,11 +19137,12 @@ function mioVoteZu(){
   clearInterval(mio.voteTick); mio.voteTick = null;
   closeModal();
 }
-// «Ich spiele mit»: einmal pro Spiel. Am Beamer zählt, wer hier gemeldet ist —
-// erst wenn alle Gemeldeten gestimmt haben, schliesst die Abstimmung von selbst.
+// «Ich bin eingeloggt»: einmal pro Spiel, von selbst (mioAuto). Am Beamer zählt,
+// wer hier gemeldet ist — erst wenn alle Gemeldeten gestimmt haben, schliesst
+// die Abstimmung von selbst.
 function mioDabeiMelden(){
   var s = mio.session;
-  if(!s || !state.user || state.profile.role === 'teacher' || mio.joined === s.spielId) return;
+  if(!s || !state.user || state.profile.role === 'teacher' || mioNurAnsicht() || mio.joined === s.spielId) return;
   var id = s.spielId;
   mio.joined = id;
   setDoc(doc(mioAnswersCol(), state.user.uid), {spiel:id, runde:0, name:state.profile.displayName, at:Date.now()})
@@ -19135,10 +19165,11 @@ function paintMioVote(){
   mio.voteSig = sig;
 
   var h = '<div class="mio-s">';
+  if(mioNurAnsicht()) h += '<div class="mio-s-hinweis">👀 Nur Ansicht: Hier wird nichts gespeichert – du erscheinst nicht in der Wartelobby und deine Stimme zählt nicht. Zum Mitspielen mit einem Schülerkonto anmelden.</div>';
   if(s.phase === 'lobby'){
     h += '<div class="mio-s-kopf"><span>💰 '+esc(s.titel || 'Wer wird Millionär')+'</span></div>';
-    h += '<div class="mio-s-gross">Du bist dabei! 🎉</div>';
-    h += '<p class="mio-s-status">Gleich geht es los. Du stimmst still für dich ab – was die Mehrheit tippt, gilt für die ganze Klasse.</p>';
+    h += '<div class="mio-s-gross">'+(mioNurAnsicht() ? 'Wartelobby' : 'Du bist dabei! 🎉')+'</div>';
+    h += '<p class="mio-s-status">Warte, bis deine Lehrperson startet. Du stimmst still für dich ab – was die Mehrheit tippt, gilt für die ganze Klasse.</p>';
   } else if(s.phase === 'ende'){
     h += '<div class="mio-s-kopf"><span>💰 '+esc(s.titel || 'Wer wird Millionär')+'</span><span>'+mioHerzen(s)+'</span></div>';
     h += '<div class="mio-s-gross">'+(s.grund === 'million' ? '🏆 Ihr seid Millionär!' : 'Das Spiel ist vorbei')+'</div>';
@@ -19657,10 +19688,13 @@ function openMioSetup(titel, fragen){
 
 /* ---------- Lehrergerät: Spiel am Beamer ---------- */
 
-function mioDabei(){
+// Alle Geräte, die sich für dieses Spiel gemeldet haben (= eingeloggt).
+function mioGemeldet(){
   var id = mio.spiel ? mio.spiel.spielId : (mio.session || {}).spielId;
   return mio.answers.filter(function(a){ return a.spiel === id; });
 }
+// Wer mitspielt: gemeldet und in der Wartelobby nicht ausgeschlossen (mio.aus).
+function mioDabei(){ return mioGemeldet().filter(function(a){ return !mio.aus[a.uid]; }); }
 function mioStimmen(s){
   var w = mioWaehlbar(s);
   return mioDabei().filter(function(a){ return a.runde === s.runde && typeof a.choice === 'number' && w.indexOf(a.choice) >= 0; });
@@ -19720,6 +19754,9 @@ function openMioHost(){
   mio.overlay.el.querySelector('#mioClose').addEventListener('click', function(){
     uiConfirm('Spiel beenden?', 'Die Klasse sieht danach wieder die normale Ansicht.', 'Beenden', function(){ if(mio.overlay) mio.overlay.close(); }, true);
   });
+  // Klassenliste für die Wartelobby (wer fehlt noch?).
+  mio.aus = {};
+  klasseRosterLoad().then(function(){ mio.sig = null; paintMioHost(); }).catch(function(err){ console.error(err); });
   mio.unsubAnswers = onSnapshot(mioAnswersCol(), function(snap){
     mio.answers = [];
     snap.forEach(function(d){ mio.answers.push(Object.assign({uid:d.id}, d.data())); });
@@ -19731,7 +19768,13 @@ function openMioHost(){
     var b = e.target && e.target.closest ? e.target.closest('button') : null;
     if(!b || b.disabled) return;
     var a = b.getAttribute('data-mio');
-    if(b.hasAttribute('data-jk')) mioJoker(b.getAttribute('data-jk'));
+    if(b.hasAttribute('data-mkind')){
+      // Wartelobby: Namen antippen = spielt nicht mit (z. B. Gerät zu Hause offen).
+      var ku = b.getAttribute('data-mkind');
+      if(mio.aus[ku]) delete mio.aus[ku]; else mio.aus[ku] = true;
+      mio.sig = null; paintMioHost();
+    }
+    else if(b.hasAttribute('data-jk')) mioJoker(b.getAttribute('data-jk'));
     else if(a === 'weiter') mioWeiter();
     else if(a === 'zu') mioSchliessen(true);
     else if(a === 'auf') mioAufloesen();
@@ -19751,7 +19794,7 @@ function paintMioHost(){
   var t = mio.overlay.el.querySelector('#mioBarTitel'); if(t && t.textContent !== s.titel) t.textContent = s.titel || '';
   // Timer, Zähler und Punkte stehen bewusst nicht in der Signatur — die zieht mioHostTick nach.
   var sig = [s.phase, s.runde, s.pos, s.leben, (s.weg || []).join(','), (s.kandidaten || []).join(','), s.vetoUid, s.wahl, s.richtig, s.grund,
-    JSON.stringify(s.joker || {}), s.phase === 'lobby' ? mioDabei().map(function(a){ return a.uid; }).join(',') : ''].join('|');
+    JSON.stringify(s.joker || {}), s.phase === 'lobby' ? mioGemeldet().map(function(a){ return a.uid; }).join(',') + '#' + Object.keys(mio.aus).join(',') + '#' + klasseRoster.list.length : ''].join('|');
   if(sig !== mio.sig || !stage.firstChild){
     mio.sig = sig; mio.dots = '';
     stage.innerHTML = mioHostHtml(s);
@@ -19797,10 +19840,20 @@ function mioHostHtml(s){
   h += '<span class="mio-leben" title="Leben">'+mioHerzen(s)+'</span></div>';
 
   if(s.phase === 'lobby'){
-    var da = mioDabei();
-    h += '<div class="mio-frage">💰 Wer wird Millionär?<small>Tippt oben in der Library auf «💰 Millionär läuft – mitmachen».</small></div>';
-    h += '<div class="mio-status">Ihr spielt gemeinsam: Alle stimmen still ab, die Mehrheit zählt. Gleichstand → Stichwahl → Veto.<br><b>'+da.length+'</b> '+(da.length === 1 ? 'ist' : 'sind')+' dabei</div>';
-    h += '<div class="mio-namen">'+da.map(function(a){ return '<span>'+esc(a.name || '?')+'</span>'; }).join('')+'</div>';
+    // Wartelobby: die ganze Klasse, wer eingeloggt ist, leuchtet. Gemeldete, die
+    // nicht auf der Klassenliste stehen (z. B. das Testkonto), kommen hinten dran.
+    var gem = {}, kinder = [];
+    mioGemeldet().forEach(function(a){ gem[a.uid] = a; });
+    ohneGaeste(klasseRoster.list).forEach(function(k){ kinder.push({uid:k.uid, name:k.displayName || '?', da:!!gem[k.uid]}); delete gem[k.uid]; });
+    Object.keys(gem).forEach(function(u){ kinder.push({uid:u, name:gem[u].name || '?', da:true}); });
+    var nDa = kinder.filter(function(k){ return k.da; }).length, nSpielt = mioDabei().length;
+    h += '<div class="mio-frage">💰 Wartelobby<small>Öffnet die Library auf eurem Gerät – das Spiel erscheint von selbst.</small></div>';
+    h += '<div class="mio-status"><b>'+nDa+' von '+kinder.length+'</b> '+(nDa === 1 ? 'ist' : 'sind')+' eingeloggt'+(nSpielt !== nDa ? ' · '+nSpielt+' spielen mit' : '')+'</div>';
+    h += '<div class="mio-namen">'+kinder.map(function(k){
+      return k.da ? '<button class="mio-kind on'+(mio.aus[k.uid] ? ' aus' : '')+'" data-mkind="'+mioAttr(k.uid)+'" type="button" title="'+(mio.aus[k.uid] ? 'Spielt nicht mit – antippen: wieder dabei' : 'Eingeloggt – antippen: spielt nicht mit')+'">'+esc(k.name)+'</button>'
+        : '<span class="mio-kind" title="Noch nicht eingeloggt">'+esc(k.name)+'</span>';
+    }).join('')+'</div>';
+    h += '<div class="mio-status mio-klein">Hell = eingeloggt, blass = fehlt noch. Namen antippen = spielt nicht mit (z.&nbsp;B. Gerät zu Hause offen).</div>';
     h += '<div class="mio-aktion"><button class="btn btn-primary" data-mio="weiter" type="button">▶︎ Erste Frage</button></div>';
   } else if(s.phase === 'ende'){
     var kopf = s.grund === 'million' ? '🏆 Ihr seid Millionär!' : s.grund === 'leben' ? '💔 Keine Leben mehr' : '📭 Die Fragen sind aufgebraucht';
