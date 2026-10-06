@@ -203,20 +203,46 @@ function zKonzept(el){
   };
 }
 
-/* Text fürs Arbeitsprotokoll in Word: nur reiner Text (so übernimmt er die Schrift des Dossiers) und genau ZWEI Absätze –
-   1. Datum, Zeit, Dauer in Minuten, Ort   2. Was gemacht + Kommentar. Innerhalb des zweiten Absatzes stehen weiche
-   Zeilenumbrüche (Zeichen 11, in Word = Umschalt+Enter). Sind in der Protokoll-Tabelle die zwei rechten Zellen markiert,
-   füllt Word mit jedem Absatz eine Zelle; mit drei Absätzen ging früher der Kommentar verloren. */
+/* Text fürs Arbeitsprotokoll in Word. In der Zwischenablage liegen zwei Fassungen:
+   - formatiert (text/html): eine Tabelle mit zwei Zellen – oben Datum, Zeit, Dauer in Minuten, Ort; unten «Was gemacht» und
+     «Kommentar» als eigene Absätze. Sind in der Protokoll-Tabelle die zwei rechten Zellen markiert, füllt Word Zelle für Zelle.
+     Bewusst OHNE Schriftangabe: so gilt die Schrift des Dossiers (Formatvorlage «Standard»). Linksbündig wird erzwungen, auch
+     wenn das Dossier im Blocksatz steht: Word übernimmt «links» nur als eigene Formatierung, wenn die mitgelieferte
+     Formatvorlage p.MsoNormal Blocksatz sagt. Der letzte Absatz einer Zelle behält in Word immer das Format der Zelle –
+     darum folgt am Schluss ein leerer Absatz. (In Word/Mac mit der Rettungsvorlage geprüft, 06.10.2026.)
+   - reiner Text (text/plain) als Reserve: genau ZWEI Absätze, im zweiten weiche Zeilenumbrüche (Zeichen 11 = Umschalt+Enter). */
+function protokollKopf(e){
+  var m = minuten(e);
+  return datCH(e.d)+(e.von ? ', '+e.von+(e.bis ? '–'+e.bis : '')+' Uhr' : '')+(m ? ' ('+m+' Minuten)' : '')+(e.ort ? ', '+e.ort : '');
+}
 function protokollText(e){
-  var m = minuten(e), weich = function(t){ return String(t || '').replace(/\r?\n+/g, '\u000B'); };
-  var kopf = datCH(e.d)+(e.von ? ', '+e.von+(e.bis ? '–'+e.bis : '')+' Uhr' : '')+(m ? ' ('+m+' Minuten)' : '')+(e.ort ? ', '+e.ort : '');
-  return kopf+'\n'+weich(e.was)+(e.kom ? '\u000BKommentar: '+weich(e.kom) : '');
+  var weich = function(t){ return String(t || '').replace(/\r?\n+/g, '\u000B'); };
+  return protokollKopf(e)+'\n'+weich(e.was)+(e.kom ? '\u000BKommentar: '+weich(e.kom) : '');
+}
+function protokollHtml(e){
+  var P = '<p class="MsoNormal" align="left" style="margin:0;text-align:left">', TD = '<td valign="top" style="vertical-align:top">';
+  var abs = function(t, vor){ return String(t || '').split(/\r?\n+/).filter(function(z){ return z.trim(); }).map(function(z, i){ return P+esc((i ? '' : vor)+z)+'</p>'; }).join(''); };
+  return '<style>p.MsoNormal{margin:0;text-align:justify;}</style><table><tr>'+TD+P+esc(protokollKopf(e))+'</p></td></tr><tr>'+TD+
+    abs(e.was, '')+(e.kom ? abs(e.kom, 'Kommentar: ') : '')+P+'&nbsp;</p></td></tr></table>';
+}
+// Legt beide Fassungen in die Zwischenablage (copy-Ereignis: unverändertes HTML), sonst über die Clipboard-API, sonst nur Text.
+function kopieren(text, html){
+  var ok = false, h = function(ev){ ev.clipboardData.setData('text/plain', text); ev.clipboardData.setData('text/html', html); ev.preventDefault(); ok = true; };
+  document.addEventListener('copy', h);
+  try{ document.execCommand('copy'); }catch(e){}
+  document.removeEventListener('copy', h);
+  if(ok) return Promise.resolve();
+  if(navigator.clipboard && navigator.clipboard.write && window.ClipboardItem){
+    return navigator.clipboard.write([new ClipboardItem({'text/plain':new Blob([text], {type:'text/plain'}), 'text/html':new Blob([html], {type:'text/html'})})]);
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+  return Promise.reject(new Error('keine Zwischenablage'));
 }
 function zJournal(el, offenKopie){
   var liste = S.j.map(function(e, i){ return {e:e, i:i}; }).sort(function(a, b){ return (a.e.d + (a.e.von || '')) < (b.e.d + (b.e.von || '')) ? 1 : -1; });
   var h = stunden();
   el.innerHTML = '<h2>Arbeitsjournal</h2><div class="hinweis">Nach jeder Arbeitsphase ein kurzer Eintrag. Die Stunden werden gezählt (Richtwert: <b>'+ZIEL_MIN+' bis '+ZIEL_MAX+' Stunden</b>). Fotos kommen direkt ins Word-Dossier – hier schreibst du nur den Text.</div>'+
-    '<div class="hinweis"><b>So kommt ein Eintrag ins Arbeitsprotokoll:</b> «Text fürs Protokoll kopieren» antippen. In Word in der Protokoll-Tabelle die <b>zwei rechten Zellen markieren</b> und einfügen (<kbd>Strg</kbd> + <kbd>V</kbd>): Oben stehen Datum, Zeit, Dauer und Ort, unten dein Text mit dem Kommentar – in der Schrift deines Dossiers.</div>'+
+    '<div class="hinweis"><b>So kommt ein Eintrag ins Arbeitsprotokoll:</b> «Text fürs Protokoll kopieren» antippen. In Word in der Protokoll-Tabelle die <b>zwei rechten Zellen markieren</b> und einfügen (<kbd>Strg</kbd> + <kbd>V</kbd>): Oben stehen Datum, Zeit, Dauer und Ort, unten dein Text mit dem Kommentar – linksbündig und in der Schrift deines Dossiers.</div>'+
     '<div class="karte"><label class="fl">Neuer Eintrag</label><div class="vier"><label>Datum<input type="date" id="jD" value="'+heute()+'"></label><label>von<input type="time" id="jV"></label><label>bis<input type="time" id="jB"></label><label>Arbeitsort<input type="text" id="jO" placeholder="zu Hause, Werkstatt …"></label></div>'+
     '<label>Was habe ich gemacht?<textarea id="jW" rows="3" placeholder="Arbeitsschritt kurz beschreiben"></textarea></label>'+
     '<label>Kommentar<textarea id="jK" rows="2" placeholder="Was hat gut geklappt? Was war schwierig? Was nehme ich mit?"></textarea></label>'+
@@ -234,9 +260,8 @@ function zJournal(el, offenKopie){
   el.onclick = function(ev){
     var d = ev.target.closest('[data-del]'), k = ev.target.closest('[data-kop]');
     if(d){ if(d.getAttribute('data-sicher')){ S.j.splice(+d.getAttribute('data-del'), 1); sichern(true); zJournal(el); } else { d.setAttribute('data-sicher', '1'); d.textContent = 'Wirklich löschen?'; } }
-    if(k){ var e = S.j[+k.getAttribute('data-kop')], txt = protokollText(e);
-      var fertig = function(){ k.textContent = '✓ Kopiert'; };
-      if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(fertig, function(){ k.textContent = 'Kopieren nicht möglich'; }); else k.textContent = 'Kopieren nicht möglich'; }
+    if(k){ var e = S.j[+k.getAttribute('data-kop')];
+      kopieren(protokollText(e), protokollHtml(e)).then(function(){ k.textContent = '✓ Kopiert'; }, function(){ k.textContent = 'Kopieren nicht möglich'; }); }
   };
 }
 
