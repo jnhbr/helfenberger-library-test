@@ -199,21 +199,26 @@ async function bis(fn, text, ms){
     await lp.waitForSelector('#lspStage');
     await bis(async () => (await lp.$$eval('#lspStage .lsp-kind.on', e => e.length)) === 3, 'drei Geräte in der Bingo-Lobby');
     await lp.click('[data-lh="los"]');
-    for(const p of alle) await p.waitForSelector('.bg-feld[data-zeit]');
-    const frage = await lp.$eval('.lsp-frage', e => e.innerText), antwort = 'Richtig' + (/Frage (\d+)/.exec(frage) || [])[1];
-    let getippt = 0;
-    for(const p of alle){
-      const i = await p.$$eval('.bg-feld', (e, r) => e.findIndex(x => x.textContent === r), antwort);
-      if(i >= 0){ await p.click('.bg-feld[data-i="' + i + '"]'); getippt++; }
+    // So viele Fragen, bis mindestens ein Kind die Antwort auf der Karte hat (höchstens acht).
+    let getippt = 0, gruen = 0, antwort = '', runden = 0;
+    while(!getippt && runden < 8){
+      runden++;
+      for(const p of alle) await p.waitForSelector('.bg-feld[data-zeit]');
+      await lp.waitForSelector('#lspTimer');
+      antwort = 'Richtig' + (/Frage (\d+)/.exec(await lp.$eval('.lsp-frage', e => e.innerText)) || [])[1];
+      for(const p of alle){
+        const i = await p.$$eval('.bg-feld', (e, r) => e.findIndex(x => x.textContent === r), antwort);
+        if(i >= 0){ await p.click('.bg-feld[data-i="' + i + '"]'); getippt++; }
+      }
+      await warte(lp, 600);
+      await lp.click('[data-lh="auf"]');
+      await lp.waitForSelector('.lsp-loesung');
+      if(!getippt){ await lp.click('[data-lh="weiter"]'); }
     }
-    await warte(lp, 600);
-    await lp.click('[data-lh="auf"]');
-    await lp.waitForSelector('.lsp-loesung');
     ok((await lp.$eval('.lsp-loesung', e => e.textContent)) === antwort, 'Lösung am Beamer: ' + antwort);
-    let gruen = 0;
     await warte(lp, 800);
     for(const p of alle) gruen += await p.$$eval('.bg-feld.ok', e => e.length);
-    ok(gruen === getippt, 'Jedes richtig getippte Feld ist grün (' + gruen + ' von ' + getippt + ')');
+    ok(getippt > 0 && gruen === getippt, 'Jedes richtig getippte Feld ist grün (' + gruen + ' von ' + getippt + ', nach ' + runden + ' Frage' + (runden === 1 ? '' : 'n') + ')');
     await lp.click('[data-lh="ende"]');
     await lp.waitForSelector('[data-lh="schluss"]');
     await lp.click('[data-lh="schluss"]');
