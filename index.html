@@ -40829,7 +40829,7 @@ function neueVersionDa(){
   var schon = false;
   try{ schon = sessionStorage.getItem('hl_neu_geladen') === '1'; }catch(e){}
   var ruhig = !neueVersion.bedient && Date.now() - neueVersion.start < 25000 && !overlayStack.length && !modalEl.classList.contains('show') &&
-    (!state.route || state.route.name === 'login' || state.route.name === 'home');
+    (!state.route || state.route.name === 'loading' || state.route.name === 'login' || state.route.name === 'home');
   if(ruhig && !schon){
     try{ sessionStorage.setItem('hl_neu_geladen', '1'); }catch(e){}
     location.reload();
