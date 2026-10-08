@@ -1,7 +1,7 @@
 name: Prüfen
 
 # Läuft bei jedem Push auf die Testseite (dieser Ordner .github/ wird nie live
-# kopiert). Drei unabhängige Prüfungen:
+# kopiert). Vier unabhängige Prüfungen:
 #  - Leitplanken: admin/check-leitplanken.js (Syntax, keine nativen Dialoge,
 #    kein localStorage.clear/orderBy, delete-Regeln separat, doctype)
 #  - Smoke-Test: admin/smoke-test.js (Seite lädt in Chromium, Login erscheint,
@@ -9,6 +9,10 @@ name: Prüfen
 #  - Regeln: admin/rules-test/ im Firestore-Emulator (Löschen geht für
 #    Lehrpersonen, Klassen getrennt, Rückmeldungen/Fehlerlog). Nie gegen die
 #    echte Datenbank.
+#  - Login: admin/login-test/ — die echte Seite im Browser, mit echtem Firebase-SDK
+#    und echter Anmeldung, gegen die Emulatoren (Anmeldung + Datenbank mit den
+#    echten Regeln). Spielt mit einem Lehrer- und drei Schülergeräten alle
+#    Live-Spiele einmal durch. Nie gegen die echte Datenbank.
 # Die nächtliche Freigabe im Live-Repo macht Leitplanken + Smoke-Test nochmals.
 
 on:
@@ -59,3 +63,22 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npx firebase emulators:exec --config ../../firebase.json --only firestore --project demo-library "node --test"
+
+  login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Login-Test (Emulatoren + Chromium)
+        working-directory: admin/login-test
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium >/dev/null
+          npx firebase emulators:exec --config ../../firebase.json --only auth,firestore --project demo-library "node login-test.js"
