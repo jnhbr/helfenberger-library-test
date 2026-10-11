@@ -3687,7 +3687,7 @@ const SUBJECTS = [
   {id:'sport', name:'Sport', gruppe:'neben', color:'#5FA829', soft:'#E4F3D9', img:'assets/subject-sport.webp'},
   {id:'werken', name:'Werken', gruppe:'neben', color:'#A9642E', soft:'#F1E1D2', img:'assets/subject-werken.webp'},
   {id:'textiles-werken', name:'TTG', gruppe:'neben', color:'#DB6A8F', soft:'#FBE3EB', img:'assets/subject-textiles-werken.webp'},
-  {id:'wah', name:'WAH', gruppe:'neben', color:'#D97706', soft:'#FBEBD3', img:'assets/subject-wah.webp', full:true},
+  {id:'wah', name:'WAH', gruppe:'neben', color:'#D97706', soft:'#FBEBD3', img:'assets/subject-wah.webp'},
   {id:'berufswahl', name:'Berufswahl', gruppe:'neben', color:'#E8752C', soft:'#FBE4D4', img:'assets/subject-berufswahl.webp'},
   {id:'sva', name:'SVA', gruppe:'neben', color:'#3046C9', soft:'#E3E7FB', img:'assets/subject-sva.webp'},
   {id:'gtz', name:'GTZ', gruppe:'frei', color:'#3D6A8A', soft:'#DCE8EF', img:'assets/subject-gtz.webp'},
@@ -3704,7 +3704,7 @@ const SUBJECTS = [
   {id:'schach-jassen', name:'Schach & Jassen', gruppe:'frei', color:'#1F2937', soft:'#E2E4E8', img:'assets/subject-schach-jassen.webp'},
   {id:'raetsel-logik', name:'Rätsel & Logik', gruppe:'frei', color:'#1E3A5F', soft:'#DCE6F2', img:'assets/subject-raetsel-logik.webp'}
 ];
-SUBJECTS.forEach(function(s){ s.icon = subjectVisual(s); });
+SUBJECTS.forEach(function(s){ if(s.img) s.img += '?v=20261011'; s.icon = subjectVisual(s); });
 function subjectById(id){ return SUBJECTS.find(function(s){return s.id===id;}); }
 
 /* ===================== KALENDER (Hausaufgaben, Abgaben, Erinnerungen, Prüfungen) =====================
@@ -21149,6 +21149,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-11-neue-fachbilder', datum:'2026-10-11', fuer:'alle', text:'🎨 Alle Fächer haben neue, einheitliche Bildchen bekommen.'},
   {id:'2026-10-11-pruefung-aktuell', datum:'2026-10-11', fuer:'lehrer', text:'🧩 Nach dem Baukasten zeigen 🖨️ Drucken (PDF/Word) und 🧮 Aufgaben & Punkte immer die bearbeitete Fassung der Prüfung, nicht mehr die ursprüngliche.'},
   {id:'2026-10-09-differenzierung', datum:'2026-10-09', fuer:'lehrer', text:'🎯 Differenzierung: Bei jeder Übung gibt es «🎯 Zuweisen». Du setzt ein Niveau (A Grundlagen, B Standard, C Vertiefung) als Abzeichen und kannst festlegen, dass nur ausgewählte Personen (oder eine deiner 👥 Gruppen) die Übung sehen. Lehrpersonen sehen immer alles, ein Chip «🎯 n Pers.» zeigt dir die Einschränkung.'},
   {id:'2026-10-09-niveau', datum:'2026-10-09', fuer:'alle', text:'🎯 Manche Übungen haben ein Abzeichen A, B oder C: A sind die Grundlagen, B der Standard, C die Vertiefung. Deine Lehrperson kann Übungen auch gezielt einzelnen Personen zuteilen.'},
