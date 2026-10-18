@@ -9366,6 +9366,8 @@ var KIB_ZIELE = {
    f = Frage (steht auch auf den Vorschlägen), w = zusätzliche Suchwörter, a = Antwort, ziel = Knopf aus KIB_ZIELE. */
 var KIB_WISSEN = [
   // ---------- für alle ----------
+  {id:'erklaervideo', fuer:'alle', f:'Was ist das Erklärvideo über der Übung?', w:'video youtube simple duck film erklärung ente',
+   a:'Bei manchen Übungen steht oben ein kurzes Erklärvideo von «Simple Duck». Tippe auf «▶ Ansehen», um es zu starten, und auf «✕ Schliessen», um es wieder zuzuklappen. Das Video lädt erst, wenn du darauf tippst.'},
   {id:'passwort', fuer:'alle', f:'Wie ändere ich mein Passwort?', w:'kennwort pw neues passwort wechseln setzen', ziel:'einstellungen',
    a:'Öffne ⚙️ Einstellungen und tippe auf «🔑 Passwort ändern». Gib dein Passwort nie weiter.'},
   {id:'abmelden', fuer:'alle', f:'Wie melde ich mich ab?', w:'ausloggen logout abmeldung konto wechseln anderes konto', ziel:'einstellungen',
@@ -16294,8 +16296,8 @@ function injectExerciseHelpers(html, rid){
    resources/{id}.erklaervideos = [{id:'<YouTube-Video-ID>', titel:'…', ab?:ISO-Zeit, episode}], gesetzt von
    ~/Desktop/Claude/Projekte/wissens-shorts/werkzeuge/library.mjs (auf allen Kopien mit demselben
    Inhalt). Eingebettet über youtube-nocookie.com, kein Autoplay; das iframe entsteht erst beim Klick,
-   vorher wird nichts von YouTube geladen. Bis Jan es freigibt nur auf der Testseite sichtbar. */
-var ERKLAERVIDEO_LIVE = false;
+   vorher wird nichts von YouTube geladen. Mit ERKLAERVIDEO_LIVE = false wieder nur auf der Testseite. */
+var ERKLAERVIDEO_LIVE = true;   // seit 18.10.2026 freigegeben (Jan)
 function erklaervideos(r){
   if(!IS_TEST_SITE && !ERKLAERVIDEO_LIVE) return [];
   return (Array.isArray(r.erklaervideos) ? r.erklaervideos : []).filter(function(v){
@@ -21259,6 +21261,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-18-erklaervideo', datum:'2026-10-18', fuer:'alle', text:'🎬 Erklärvideos: Bei manchen Übungen steht oben jetzt ein kurzes Erklärvideo von «Simple Duck». Tipp auf «▶ Ansehen» – das Video erklärt dir den Stoff in ein paar Minuten, danach übst du gleich darunter.'},
   {id:'2026-10-17-bewegung-klick', datum:'2026-10-17', fuer:'alle', text:'✨ Mehr Schwung: Fach-Kacheln drücken sich beim Antippen ein wie eine Taste. Im ⚡ Übungstrainer poppen richtige Aufgaben nach dem Auswerten mit einem Haken auf, und dein Wochenziel-Ring füllt sich sichtbar.'},
   {id:'2026-10-17-kz-ordner-zu', datum:'2026-10-17', fuer:'lehrer', text:'📁 Im 🏫 Klassenzimmer lassen sich jetzt auch die Ordner innerhalb eines Fachs auf- und zuklappen. Beim Öffnen einer Liste ist alles eingeklappt – du siehst zuerst nur die Fächer.'},
   {id:'2026-10-17-kz-nach-fach', datum:'2026-10-17', fuer:'lehrer', text:'🗂️ Ordnung im 🏫 Klassenzimmer: Klassen-Quiz, Spiel- und Schätz-Sets, Karteikarten, gespeicherte Wortwolken und Blitzumfragen, Prüfungen und die Fragen-Auswahl der Spiele stehen jetzt nach Fach und darin nach Ordner, je Fach ein- und ausklappbar (beim Öffnen ist alles eingeklappt). Neu gibt es das Fach «🎲 Trivia» für Allgemeinwissen-Quizze und Spiel-Sets ohne Fachbezug – beim Anlegen oder mit «📁 Ablegen» wählen. Abstimmungen sind nach offen / geschlossen geordnet.'},
