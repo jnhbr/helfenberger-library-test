@@ -3539,9 +3539,12 @@ function isLeitung(){ return !!(state.profile && state.profile.leitung); }
 // sind aber nur für Lehrpersonen sichtbar (Feld nurLehrer:true). Wie beim Lehrerbereich ein
 // Filter in der App — überall, wo Schüler:innen Übungen sehen, sowie in Lernstand/Prüfungen.
 function istLehrerHtml(r){ return !!(r && r.nurLehrer); }
+// 🙈 Ausgeblendet (Feld ausgeblendet:true): z. B. ein Lösungsdossier, das die Klasse erst
+// sehen soll, wenn das Thema durch ist. Lehrpersonen sehen es gestrichelt, Schüler:innen gar nicht.
+function istAusgeblendet(r){ return !!(r && r.ausgeblendet); }
 function fuerRolleSichtbar(r){
   var lehrer = !!(state.profile && state.profile.role === 'teacher');
-  if(istLehrerHtml(r) && !lehrer) return false;
+  if((istLehrerHtml(r) || istAusgeblendet(r)) && !lehrer) return false;
   // 🎯 Differenzierung: r.nurFuer = [uid, …] → nur diese Schüler:innen sehen die Übung.
   if(r && Array.isArray(r.nurFuer) && !lehrer && !(state.user && r.nurFuer.indexOf(state.user.uid) >= 0)) return false;
   return true;
@@ -4163,7 +4166,7 @@ function uiCalendarEntryForm(existing, onSaved){
       var found = {};
       snap.forEach(function(d){
         var res = d.data();
-        if(istLehrerHtml(res)) return;   // Lehrer-HTMLs nie im Kalender der Klasse verlinken
+        if(istLehrerHtml(res) || istAusgeblendet(res)) return;   // Lehrer-HTMLs/Ausgeblendetes nie im Kalender der Klasse verlinken
         var label = (res.pdf ? '📄 ' : res.externalUrl ? '🔗 ' : '') + (res.title || res.fileName || d.id);
         rows.push({id:d.id, label:label, current:!!res.current});
         if(selectedLinks.hasOwnProperty(d.id)){ found[d.id] = true; selectedLinks[d.id] = label; }
@@ -14512,6 +14515,17 @@ function renderFolderContents(){
         .then(function(){ toast(patch.nurLehrer ? '«'+(r.title || r.fileName)+'» sehen jetzt nur noch Lehrpersonen.' : '«'+(r.title || r.fileName)+'» ist wieder für alle sichtbar.'); })
         .catch(function(err){ console.error(err); lpBtn.disabled = false; toast('Hat nicht geklappt.'); });
     });
+    var ausBtn = document.getElementById('aus-'+r.id);
+    if(ausBtn) ausBtn.addEventListener('click', function(){
+      ausBtn.disabled = true;
+      // false statt Feld löschen: so zieht auch die nächtliche Spiegelung die Änderung nach.
+      var patch = { ausgeblendet: !istAusgeblendet(r) };
+      if(patch.ausgeblendet && r.current) patch.current = false;
+      updateDoc(kdoc('resources', r.id), patch)
+        .then(function(){ inhaltSchutzNachfuehren(r); })
+        .then(function(){ toast(patch.ausgeblendet ? '🙈 «'+(r.title || r.fileName)+'» ist für die Klasse ausgeblendet.' : '👁 «'+(r.title || r.fileName)+'» ist wieder für die Klasse sichtbar.'); })
+        .catch(function(err){ console.error(err); ausBtn.disabled = false; toast('Hat nicht geklappt.'); });
+    });
     var empBtn = document.getElementById('emp-'+r.id);
     if(empBtn) empBtn.addEventListener('click', function(){
       empBtn.disabled = true;
@@ -14868,16 +14882,18 @@ function resourceCardHtml(r, index, total, isTeacher){
   }
   var uploaded = r.uploadedAt && r.uploadedAt.toDate ? r.uploadedAt.toDate().toLocaleDateString('de-CH') : '';
   var lp = istLehrerHtml(r);
-  var html = '<div class="resource-card'+(r.current?' current':'')+(lp?' lehrer-html':'')+'" id="card-'+r.id+'">';
+  var aus = !lp && istAusgeblendet(r);
+  var html = '<div class="resource-card'+(r.current?' current':'')+(lp||aus?' lehrer-html':'')+'" id="card-'+r.id+'">';
   if(isTeacher){
     html += '<div class="move-btns">';
     html += '<button class="move-btn" id="up-'+r.id+'" type="button" title="Nach oben"'+(index===0?' disabled':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>';
     html += '<button class="move-btn" id="down-'+r.id+'" type="button" title="Nach unten"'+(index===total-1?' disabled':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>';
     html += '</div>';
   }
-  html += '<div class="resource-info"><h4>'+esc(r.title || r.fileName)+(r.current?' <span class="chip-current">Aktuell</span>':'')+(lp?' <span class="chip-lehrer">🔒 Nur Lehrpersonen</span>':'')+niveauChipHtml(r, isTeacher)+'</h4>';
+  html += '<div class="resource-info"><h4>'+esc(r.title || r.fileName)+(r.current?' <span class="chip-current">Aktuell</span>':'')+(lp?' <span class="chip-lehrer">🔒 Nur Lehrpersonen</span>':'')+(aus?' <span class="chip-lehrer">🙈 Ausgeblendet</span>':'')+niveauChipHtml(r, isTeacher)+'</h4>';
   if(!lp) html += '<div class="resource-bar"><span id="pbar-'+r.id+'" style="width:0%;background:var(--brand)"></span></div>';
   var metaStart = lp ? 'Lehrer-HTML · für Schüler:innen unsichtbar' : r.pdf ? '📄 PDF' : r.externalUrl ? '🔗 Link · öffnet in neuem Tab' : 'Noch nicht geübt';
+  if(aus) metaStart = 'Für Schüler:innen ausgeblendet · ' + metaStart;
   html += '<div class="resource-meta" id="pmeta-'+r.id+'">'+metaStart+(uploaded?' · hinzugefügt am '+uploaded:'')+'</div>';
   html += '</div>';
   html += '<div class="resource-actions">';
@@ -14885,6 +14901,7 @@ function resourceCardHtml(r, index, total, isTeacher){
   if(isTeacher){
     if(!lp) html += '<button class="btn btn-sm btn-lehrer'+(r.niveau || Array.isArray(r.nurFuer) ? ' active' : '')+'" id="zu-'+r.id+'" type="button" title="Niveau A/B/C setzen und festlegen, wer diese Übung sieht">🎯 Zuweisen</button>';
     if(!r.externalUrl && !r.pdf) html += '<button class="btn btn-sm btn-lehrer'+(lp?' active':'')+'" id="lp-'+r.id+'" type="button" title="'+(lp?'Wieder für alle sichtbar machen':'Nur für Lehrpersonen sichtbar machen (z. B. Unterrichtsplanung)')+'">'+(lp?'🔓 Für alle sichtbar machen':'🔒 Nur Lehrpersonen')+'</button>';
+    if(!lp) html += '<button class="btn btn-sm btn-lehrer'+(aus?' active':'')+'" id="aus-'+r.id+'" type="button" title="'+(aus?'Wieder für die Klasse einblenden (z. B. wenn das Thema durch ist)':'Für die Klasse ausblenden (z. B. Lösungsdossier, bis das Thema durch ist)')+'">'+(aus?'👁 Einblenden':'🙈 Ausblenden')+'</button>';
     if(!r.externalUrl && !lp){
       html += '<button class="btn btn-sm btn-current'+(r.current?' active':'')+'" id="cur-'+r.id+'">'+(r.current?'Nicht mehr aktuell':'Als aktuell markieren')+'</button>';
     }
@@ -15663,7 +15680,7 @@ async function contentStillUsed(contentId, rid){
    normal sichtbar ist, den Inhalt nicht mehr öffnen können. Bestehende Inhalte:
    einmalig admin/lehrer-inhalte-schuetzen.js. */
 function inhaltGeschuetzt(entries){
-  return entries.length > 0 && entries.every(function(e){ return istLehrerHtml(e.data); });
+  return entries.length > 0 && entries.every(function(e){ return istLehrerHtml(e.data) || istAusgeblendet(e.data); });
 }
 async function inhaltSchutzSetzen(contentId, an){
   if(!contentId) return;
@@ -21513,6 +21530,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-19-ausblenden', datum:'2026-10-19', fuer:'lehrer', text:'🙈 Neu bei jeder Übung, jedem PDF und Link: «🙈 Ausblenden». Die Klasse sieht sie dann nicht (z. B. ein Lösungsdossier), du siehst sie gestrichelt. Ist das Thema durch, mit «👁 Einblenden» freigeben.'},
   {id:'2026-10-19-neues-fenster', datum:'2026-10-19', fuer:'alle', text:'🪟 Übungen, LMVZ-Seiten und PDFs kannst du neben «Vollbild» jetzt auch «In neuem Fenster» öffnen. Das Fenster ist bildschirmgross, du kannst es aber kleiner machen und in der Library nebenher etwas anderes machen – dein Stand wird trotzdem gespeichert. In Prüfungen geht das nicht.'},
   {id:'2026-10-19-sitzplan-jm-regeln', datum:'2026-10-19', fuer:'lehrer', text:'🪑 Sitzplan › ⚖️ Regeln: neu auch «darf nicht neben Mädchen/Jungen» und «muss neben Mädchen/Jungen» für einzelne Kinder. Massgebend sind die J/M-Knöpfe; «🎲 Zufällig setzen» hält sich daran.'},
   {id:'2026-10-19-beamer-zoom', datum:'2026-10-19', fuer:'lehrer', text:'🔍 Am Laptop zeigt die Library jetzt alles auf 90 %. Sobald du per AirPlay auf den Beamer spiegelst, stellt sie automatisch auf 125 % um, damit es dort gross genug und nicht verzerrt ist.'},
