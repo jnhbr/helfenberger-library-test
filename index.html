@@ -16008,10 +16008,10 @@ function checkLocalChanges(rid){
   if(syncState.resourceId !== rid) return;
   var now = lsSnapshot(), changed = false;
   Object.keys(now).forEach(function(k){
-    if(now[k] !== syncState.baseline[k] && !syncState.tracked[k]){ syncState.tracked[k] = true; changed = true; }
+    if(now[k] !== syncState.baseline[k] && !syncState.tracked[k] && !libFensterFremd(k, rid)){ syncState.tracked[k] = true; changed = true; }
   });
   Object.keys(syncState.baseline).forEach(function(k){
-    if(!(k in now) && !syncState.tracked[k]){ syncState.tracked[k] = true; changed = true; }
+    if(!(k in now) && !syncState.tracked[k] && !libFensterFremd(k, rid)){ syncState.tracked[k] = true; changed = true; }
   });
   var payload = buildStorePayload();
   if(changed || payload.json !== syncState.lastWritten) scheduleStoreWrite(rid);
@@ -16225,7 +16225,6 @@ function stopTimeTracking(){
 
 document.addEventListener('visibilitychange', function(){
   if(!timeTrack.resourceId) return;
-  if(libFensterOffen(timeTrack.resourceId)) return;   // 🪟 Übung läuft im eigenen Fenster weiter
   if(document.visibilityState === 'hidden'){
     flushTimeTracking();
     timeTrack.startedAt = null;
@@ -16385,7 +16384,8 @@ function renderResource(r){
   if(r.kk){ renderKkTrainer(r); return; }
   if(r.linkUrl){ renderLinkResource(r); return; }
   if(r.pdf){ renderPdfResource(r); return; }
-  startTimeTracking(r.id);
+  // 🪟 Läuft die Übung im eigenen Fenster, zählt und speichert das Fenster.
+  if(libFensterOffen(r.id)) stopTimeTracking(); else startTimeTracking(r.id);
   var s = subjectById(r.subject);
 
   var html = '<div class="viewer-wrap">';
@@ -16438,14 +16438,14 @@ function renderResource(r){
   // Der gesicherte Übungsstand muss in localStorage stehen, BEVOR das iframe
   // lädt — die Übungsseite liest ihn direkt beim Start. Beides läuft parallel,
   // damit das Öffnen nicht langsamer wird.
-  Promise.all([contentPromise, prepareResourceSync(r.id)]).then(function(res){
+  Promise.all([contentPromise, libFensterOffen(r.id) ? Promise.resolve(stopResourceSync()) : prepareResourceSync(r.id)]).then(function(res){
     var chunkSnaps = res[0];
     var html = chunkSnaps.map(function(s){ return (s.exists() && s.data().html) || ''; }).join('');
     var frame = document.getElementById('resourceFrame');
     if(!frame) return;
     // Läuft die Übung schon im eigenen Fenster: hier nicht ein zweites Mal starten
     // (beide würden sonst in denselben localStorage-Stand schreiben).
-    if(libFensterOffen(r.id)){ libFensterPlatzhalter(); return; }
+    if(libFensterOffen(r.id)){ libFensterPlatzhalter(r.id); return; }
     i18nFrame(frame, r.subject);
     frame.srcdoc = injectExerciseHelpers(html, r.id);
   }).catch(function(err){
@@ -16513,25 +16513,38 @@ function renderPdfResource(r){
 /* ===================== 🪟 IN NEUEM FENSTER =====================
    Wunsch von Jan (19.10.2026): Übungen (z. B. die Präp in Mathe), LMVZ-Seiten und PDFs
    neben «Vollbild» auch in einem eigenen Browserfenster öffnen — bildschirmgross, aber
-   verkleinerbar, damit man nebenher etwas anderes machen kann.
+   verkleinerbar. Das Fenster bleibt offen, auch wenn man in der Library weitergeht oder
+   eine andere Übung macht (mehrere Fenster gleichzeitig gehen auch, eines pro Seite).
    - Übungen (srcdoc): das Fenster bekommt denselben HTML-Text samt Übungs-Helfern
-     (gleicher Origin, about:blank + document.write → gleicher localStorage). window.parent
-     zeigt dort auf die Library, damit Fortschrittsmeldungen (parent.postMessage) und
-     Brücken wie window.parent.__hlSchach() weiter ankommen. Die Library bleibt dafür auf
-     der Übung stehen (Platzhalter statt iframe) und synchronisiert wie gewohnt; wer
-     die Übung in der Library verlässt, schliesst auch das Fenster. Beim Schliessen des
-     Fensters lädt der Viewer neu und zeigt den Stand aus dem Fenster.
+     (about:blank + document.write → gleicher Origin, gleicher localStorage). Weil die
+     Library dabei auf einer ganz anderen Seite stehen kann, speichert sie das Fenster
+     separat (libFensterListe statt syncState):
+       · Ein kleines Skript im Fenster meldet jeden localStorage-Schlüssel, den die Seite
+         schreibt (window.opener.__libFensterKey) → genaue Zuordnung zur Übung. Die
+         normale Beobachtung einer gleichzeitig in der Library offenen Übung übergeht
+         diese Schlüssel (libFensterFremd).
+       · Stand (storeJson, gleiche Drossel wie oben), Fortschrittsmeldungen (window.parent
+         = Library, Zuordnung über e.source) und Lernzeit (solange das Fenster sichtbar
+         ist) laufen über die Library — sie muss also irgendwo offen bleiben.
+     Dieselbe Übung läuft nie zweimal gleichzeitig: ist sie im Fenster offen, zeigt der
+     Viewer nur einen Platzhalter. Beim Schliessen lädt der Viewer neu.
    - Prüfungen: kein Knopf; sobald Prüfungs-Sperre/Warteraum erscheint (pruefOverlay)
-     oder eine Prüfungssitzung läuft, wird ein offenes Fenster geschlossen. */
-var libFenster = {win:null, rid:null, timer:null, uebung:false};
-function libFensterOffen(rid){
-  return !!(libFenster.win && !libFenster.win.closed && (!rid || libFenster.rid === rid));
+     oder eine Prüfungssitzung läuft, werden alle Fenster geschlossen. */
+var libFensterListe = {};   // rid → {win, rid, uebung, tracked, lastWritten, lastWriteAt, writeTimer, sek, tickAt}
+var libFensterTakt = null;
+function libFensterVon(rid){
+  var f = libFensterListe[rid];
+  return f && f.win && !f.win.closed ? f : null;
 }
-function libFensterZu(){
-  clearInterval(libFenster.timer);
-  var w = libFenster.win;
-  libFenster = {win:null, rid:null, timer:null, uebung:false};
-  try{ if(w && !w.closed) w.close(); }catch(e){}
+function libFensterOffen(rid){ return !!libFensterVon(rid); }
+function libFensterVonQuelle(src){
+  for(var rid in libFensterListe){ if(src && libFensterListe[rid].win === src) return libFensterListe[rid]; }
+  return null;
+}
+// Gehört der Schlüssel zu einer Übung, die gerade in einem eigenen Fenster läuft?
+function libFensterFremd(k, rid){
+  for(var id in libFensterListe){ if(id !== rid && libFensterListe[id].uebung && libFensterListe[id].tracked[k]) return true; }
+  return false;
 }
 function libFensterDarf(){
   return !document.body.classList.contains('pr-lock-open') && !pruef.sess;
@@ -16543,7 +16556,13 @@ function libFensterBtnHtml(id){
   return '<button class="btn btn-ghost btn-sm" id="'+id+'" type="button" title="In einem eigenen Fenster öffnen (verkleinerbar)">🪟 Neues Fenster</button>';
 }
 function libFensterHtml(html, r){
-  var shim = '<script>try{if(window.opener&&window.parent===window)window.parent=window.opener;}catch(e){}<\/script>';
+  var shim = '<script>(function(){try{var o=window.opener,R='+JSON.stringify(String(r.id))+';if(!o)return;' +
+    'if(window.parent===window)window.parent=o;' +
+    'var S=Storage.prototype,si=S.setItem,ri=S.removeItem;' +
+    'function m(k){try{o.__libFensterKey&&o.__libFensterKey(R,String(k));}catch(e){}}' +
+    'S.setItem=function(k,v){si.call(this,k,v);if(this===window.localStorage)m(k);};' +
+    'S.removeItem=function(k){ri.call(this,k);if(this===window.localStorage)m(k);};' +
+    '}catch(e){}})();<\/script>';
   var titel = '<title>'+esc(r.title || r.fileName || 'Übung')+'</title>';
   var headRe = /<head(\s[^>]*)?>/i;
   if(headRe.test(html)) return html.replace(headRe, function(m){ return m + shim + (/<title[\s>]/i.test(html) ? '' : titel); });
@@ -16553,6 +16572,8 @@ function wireLibFensterBtn(id, quelle, r){
   var btn = document.getElementById(id);
   if(!btn) return;
   btn.addEventListener('click', function(){
+    var offen = libFensterVon(r.id);
+    if(offen){ try{ offen.win.focus(); }catch(e){} return; }
     var src = quelle();
     if(!src){ toast('Lädt noch … bitte gleich nochmals.'); return; }
     libFensterOeffnen(r, src);
@@ -16560,9 +16581,9 @@ function wireLibFensterBtn(id, quelle, r){
 }
 function libFensterOeffnen(r, src){
   if(!libFensterDarf()){ toast('Während einer Prüfung geht das nicht.'); return; }
-  libFensterZu();
   var bw = screen.availWidth || 1280, bh = screen.availHeight || 800;
-  var w = window.open(src.url || '', 'libFenster', 'popup=yes,width='+bw+',height='+bh+',left=0,top=0,resizable=yes,scrollbars=yes');
+  var name = 'libFenster_' + String(r.id).replace(/\W/g, '');
+  var w = window.open(src.url || '', name, 'popup=yes,width='+bw+',height='+bh+',left=0,top=0,resizable=yes,scrollbars=yes');
   if(!w){ toast('Das Fenster wurde blockiert — bitte Pop-ups für die Library erlauben.'); return; }
   if(src.html != null){
     try{ w.document.open(); w.document.write(src.html); w.document.close(); }
@@ -16570,40 +16591,108 @@ function libFensterOeffnen(r, src){
   }
   try{ w.focus(); }catch(e){}
   if(isPseudoFsActive()) exitPseudoFullscreen();
-  libFenster = {win:w, rid:r.id, timer:null, uebung:src.html != null};
-  libFenster.timer = setInterval(function(){
-    if(!libFenster.win || !libFenster.win.closed) return;
-    var war = libFenster;
-    libFensterZu();
-    if(war.uebung && state.route.name === 'resource' && state.route.resource && state.route.resource.id === war.rid) render();
-  }, 700);
-  if(libFenster.uebung){
-    // Lernzeit läuft im Fenster weiter, auch wenn es die Library ganz verdeckt.
-    if(timeTrack.resourceId && !timeTrack.startedAt) timeTrack.startedAt = Date.now();
+  var f = {win:w, rid:r.id, uebung:src.html != null, tracked:{}, lastWritten:null, lastWriteAt:0, writeTimer:null, sek:0, tickAt:Date.now()};
+  libFensterListe[r.id] = f;
+  if(!libFensterTakt) libFensterTakt = setInterval(libFensterTick, 1000);
+  if(f.uebung){
+    // Die Beobachtung dieser Übung geht von der Library an das Fenster über.
+    var bisher = syncState.resourceId === r.id ? syncState.tracked : {};
+    if(syncState.resourceId === r.id) stopResourceSync();
+    f.tracked = Object.assign(loadTrackedKeys(r.id), bisher);
+    if(timeTrack.resourceId === r.id) stopTimeTracking();
     var fr = document.getElementById('resourceFrame');
     if(fr) fr.removeAttribute('srcdoc');   // Übung im Viewer anhalten, sie läuft jetzt im Fenster
-    libFensterPlatzhalter();
+    libFensterPlatzhalter(r.id);
   }
 }
-function libFensterPlatzhalter(){
+// Fenster schliessen (oder wurde geschlossen): letzter Stand + Lernzeit sichern.
+function libFensterZu(rid){
+  var f = libFensterListe[rid];
+  if(!f) return;
+  delete libFensterListe[rid];
+  if(f.uebung){ clearTimeout(f.writeTimer); libFensterSpeichern(f); libFensterZeit(f); }
+  try{ if(f.win && !f.win.closed) f.win.close(); }catch(e){}
+  if(!Object.keys(libFensterListe).length){ clearInterval(libFensterTakt); libFensterTakt = null; }
+  // Steht die Library gerade auf dieser Übung: Viewer neu laden (zeigt den Stand aus dem Fenster).
+  if(f.uebung && libFensterDarf() && state.route.name === 'resource' && state.route.resource && state.route.resource.id === rid) render();
+}
+function libFensterAlleZu(){ Object.keys(libFensterListe).forEach(libFensterZu); }
+function libFensterSpeichern(f){
+  if(!state.user || alsSchueler()) return;
+  var keys = Object.keys(f.tracked).sort(), store = {};
+  keys.forEach(function(k){ var v = lsGet(k); if(v !== null) store[k] = v; });
+  var json = JSON.stringify(store);
+  if(!keys.length || json === f.lastWritten) return;
+  if(json.length > SYNC_MAX_BYTES){
+    console.warn('Übungsstand zu gross für die Synchronisierung ('+json.length+' Zeichen) — bleibt nur auf diesem Gerät.');
+    return;
+  }
+  var rev = Math.max(Date.now(), localRev(f.rid) + 1);
+  setLocalRev(f.rid, rev);
+  saveTrackedKeys(f.rid, f.tracked);
+  f.lastWritten = json;
+  f.lastWriteAt = Date.now();
+  writeProgressWithHistory(state.user.uid, f.rid, {storeJson:json, storeKeys:keys, storeRev:rev, storeAt:serverTimestamp()})
+    .catch(function(err){ console.error('Stand (Fenster) konnte nicht gespeichert werden', err); f.lastWritten = null; });
+}
+function libFensterPlanen(f){
+  if(f.writeTimer) return;
+  var warten = Math.max(SYNC_DEBOUNCE_MS, f.lastWriteAt + SYNC_MIN_INTERVAL_MS - Date.now());
+  f.writeTimer = setTimeout(function(){ f.writeTimer = null; libFensterSpeichern(f); }, warten);
+}
+window.__libFensterKey = function(rid, k){
+  var f = libFensterListe[rid];
+  if(!f || !f.uebung || typeof k !== 'string' || k.indexOf(LIB_PREFIX) === 0) return;
+  f.tracked[k] = true;
+  libFensterPlanen(f);
+};
+function libFensterZeit(f){
+  var sek = Math.round(f.sek);
+  f.sek = 0;
+  if(sek < TIME_MIN_FLUSH_SEC || !state.user) return;
+  setDoc(doc(db,'progress', state.user.uid, 'resources', f.rid), {timeSpentSec: increment(sek)}, {merge:true})
+    .catch(function(err){ console.error('Lernzeit (Fenster) konnte nicht gespeichert werden', err); });
+  bumpStreak(sek);
+}
+// Jede Sekunde (im Hintergrund vom Browser evtl. seltener — darum mit Zeitstempel):
+// geschlossene Fenster aufräumen, Lernzeit zählen, solange das Fenster sichtbar ist.
+function libFensterTick(){
+  var jetzt = Date.now();
+  Object.keys(libFensterListe).forEach(function(rid){
+    var f = libFensterListe[rid];
+    if(!f.win || f.win.closed){ libFensterZu(rid); return; }
+    var dt = Math.min(jetzt - f.tickAt, 60000) / 1000;
+    f.tickAt = jetzt;
+    if(!f.uebung) return;
+    var sichtbar = false;
+    try{ sichtbar = f.win.document.visibilityState === 'visible'; }catch(e){}
+    if(sichtbar) f.sek += dt;
+    if(f.sek >= TIME_FLUSH_MS / 1000) libFensterZeit(f);
+  });
+}
+window.addEventListener('pagehide', function(){
+  Object.keys(libFensterListe).forEach(function(rid){
+    var f = libFensterListe[rid];
+    if(f.uebung){ libFensterSpeichern(f); libFensterZeit(f); }
+  });
+});
+function libFensterPlatzhalter(rid){
   var wrap = document.getElementById('frameWrap');
   if(!wrap) return;
   var fr = document.getElementById('resourceFrame');
   if(fr) fr.style.display = 'none';
-  var box = document.getElementById('fensterPlatzhalter');
-  if(!box){
-    box = document.createElement('div');
-    box.id = 'fensterPlatzhalter';
-    box.className = 'empty-state';
-    box.style.cssText = 'margin:24px;';
-    box.innerHTML = '<div style="font-size:32px;">🪟</div><p><b>Diese Übung läuft gerade in einem eigenen Fenster.</b></p>' +
-      '<p>Lass die Library offen, damit dein Stand gespeichert wird.</p>' +
-      '<p><button class="btn btn-ghost btn-sm" type="button" id="fensterHolen">🪟 Fenster zeigen</button> ' +
-      '<button class="btn btn-primary btn-sm" type="button" id="fensterZurueck">↩ Hierher zurückholen</button></p>';
-    wrap.appendChild(box);
-    box.querySelector('#fensterHolen').addEventListener('click', function(){ try{ libFenster.win.focus(); }catch(e){} });
-    box.querySelector('#fensterZurueck').addEventListener('click', function(){ libFensterZu(); render(); });
-  }
+  if(document.getElementById('fensterPlatzhalter')) return;
+  var box = document.createElement('div');
+  box.id = 'fensterPlatzhalter';
+  box.className = 'empty-state';
+  box.style.cssText = 'margin:24px;';
+  box.innerHTML = '<div style="font-size:32px;">🪟</div><p><b>Diese Übung läuft gerade in einem eigenen Fenster.</b></p>' +
+    '<p>Du kannst hier in der Library weiterarbeiten — lass sie einfach offen, damit dein Stand gespeichert wird.</p>' +
+    '<p><button class="btn btn-ghost btn-sm" type="button" id="fensterHolen">🪟 Fenster zeigen</button> ' +
+    '<button class="btn btn-primary btn-sm" type="button" id="fensterZurueck">↩ Hierher zurückholen</button></p>';
+  wrap.appendChild(box);
+  box.querySelector('#fensterHolen').addEventListener('click', function(){ var f = libFensterVon(rid); try{ if(f) f.win.focus(); }catch(e){} });
+  box.querySelector('#fensterZurueck').addEventListener('click', function(){ if(libFensterListe[rid]) libFensterZu(rid); else render(); });
 }
 
 var FS_ICON_ENTER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg> Vollbild';
@@ -16712,11 +16801,14 @@ function updateViewerProgress(p){
 
 window.addEventListener('message', function(e){
   var data = e.data;
-  if(!data || !data.__libProgress || !currentViewerResourceId || !state.user) return;
-  var resourceId = currentViewerResourceId;
+  if(!data || !data.__libProgress || !state.user) return;
+  // 🪟 Meldung aus einem eigenen Fenster: gehört zu dessen Übung, nicht zur gerade offenen.
+  var fenster = libFensterVonQuelle(e.source);
+  var resourceId = fenster ? fenster.rid : currentViewerResourceId;
+  if(!resourceId) return;
   // Eine Fortschrittsmeldung heisst: in der Übung ist gerade etwas passiert —
   // guter Moment, auch den localStorage-Stand einzusammeln.
-  checkLocalChanges(resourceId);
+  if(fenster) libFensterPlanen(fenster); else checkLocalChanges(resourceId);
   // Gedrosselt wie der Stand-Sync: die Meldung wird gemerkt und höchstens alle
   // SYNC_MIN_INTERVAL_MS geschrieben (sofort beim Verlassen der Übung).
   progressMeldung.offen[resourceId] = {stats:data.stats || {}, total:typeof data.total === 'number' ? data.total : null};
@@ -21421,7 +21513,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-10-19-neues-fenster', datum:'2026-10-19', fuer:'alle', text:'🪟 Übungen, LMVZ-Seiten und PDFs kannst du neben «Vollbild» jetzt auch «In neuem Fenster» öffnen. Das Fenster ist bildschirmgross, du kannst es aber kleiner machen und nebenher etwas anderes anschauen. In Prüfungen geht das nicht.'},
+  {id:'2026-10-19-neues-fenster', datum:'2026-10-19', fuer:'alle', text:'🪟 Übungen, LMVZ-Seiten und PDFs kannst du neben «Vollbild» jetzt auch «In neuem Fenster» öffnen. Das Fenster ist bildschirmgross, du kannst es aber kleiner machen und in der Library nebenher etwas anderes machen – dein Stand wird trotzdem gespeichert. In Prüfungen geht das nicht.'},
   {id:'2026-10-19-sitzplan-jm-regeln', datum:'2026-10-19', fuer:'lehrer', text:'🪑 Sitzplan › ⚖️ Regeln: neu auch «darf nicht neben Mädchen/Jungen» und «muss neben Mädchen/Jungen» für einzelne Kinder. Massgebend sind die J/M-Knöpfe; «🎲 Zufällig setzen» hält sich daran.'},
   {id:'2026-10-19-beamer-zoom', datum:'2026-10-19', fuer:'lehrer', text:'🔍 Am Laptop zeigt die Library jetzt alles auf 90 %. Sobald du per AirPlay auf den Beamer spiegelst, stellt sie automatisch auf 125 % um, damit es dort gross genug und nicht verzerrt ist.'},
   {id:'2026-10-19-ferien-ecke', datum:'2026-10-19', fuer:'alle', text:'🚨 Der Ferien-Countdown steht jetzt unten links in der Leiste und stört nicht mehr zwischen den Knöpfen. Auf dem Handy wird er nicht mehr angezeigt.'},
@@ -31634,7 +31726,7 @@ function pruefOverlay(){
   }
   ov.hidden = false;
   document.body.classList.add('pr-lock-open');
-  libFensterZu();   // 🪟 In Prüfungen keine eigenen Fenster
+  libFensterAlleZu();   // 🪟 In Prüfungen keine eigenen Fenster
   return ov;
 }
 function pruefLockHide(){
@@ -40633,7 +40725,7 @@ window.addEventListener('message', function(e){
   var d = e.data;
   if(!d || !d.__rswPruefFrage || !state.user) return;
   // nur aus einer Übung, die hier in der Library offen ist
-  var eigen = Array.prototype.some.call(document.querySelectorAll('iframe'), function(f){ return f.contentWindow === e.source; }) || (libFensterOffen() && e.source === libFenster.win);
+  var eigen = Array.prototype.some.call(document.querySelectorAll('iframe'), function(f){ return f.contentWindow === e.source; }) || !!libFensterVonQuelle(e.source);
   if(!eigen) return;
   rswPassFenster = e.source;
   rswPassSenden();
@@ -43092,7 +43184,6 @@ function render(){
   if(lph.aktiv && lph.aktiv.nurUebung){ setTimeout(function(){ lphMelden(false); updateLernphaseBanner(); }, 0); }
   if(wackelnAktiv() && state.route.name !== 'home' && state.route.name !== 'klassenzimmer') wackelnEnde();
   // Übung verlassen: Stand und Lernzeit ein letztes Mal sichern, Beobachtung stoppen.
-  if(libFenster.uebung && !(state.route.name === 'resource' && state.route.resource && state.route.resource.id === libFenster.rid)) libFensterZu();
   if(state.route.name !== 'resource' && syncState.resourceId){
     stopResourceSync();
     currentViewerResourceId = null;
