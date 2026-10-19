@@ -19499,7 +19499,17 @@ function spAutoLayout(kind, silent){
   if(!silent) toast(tables.length + ' Zweiertische gesetzt.');
 }
 
-/* ---------- Regeln ---------- */
+/* ---------- Regeln ----------
+   Neben den Paar-Regeln gibt es Regeln zum Geschlecht des Tischnachbarn:
+   "darf nicht neben Mädchen/Jungen" und "muss neben Mädchen/Jungen". Massgebend
+   ist spGender() (J/M-Knöpfe bzw. Vorbelegung). Kinder ohne Geschlecht zählen
+   bei "nicht neben" nie als Verstoss, bei "muss neben" schon. */
+var SP_G_RULES = {
+  nichtM: {g:'w', muss:false, opt:'darf nicht neben Mädchen', txt:'nicht neben Mädchen'},
+  nichtJ: {g:'m', muss:false, opt:'darf nicht neben Jungen',  txt:'nicht neben Jungen'},
+  nebenM: {g:'w', muss:true,  opt:'muss neben Mädchen',       txt:'neben einem Mädchen'},
+  nebenJ: {g:'m', muss:true,  opt:'muss neben Jungen',        txt:'neben einem Jungen'}
+};
 
 function spRulesModal(){
   function optionsHtml(sel){
@@ -19515,6 +19525,7 @@ function spRulesModal(){
       if(r.t === 'nicht') txt = esc(a?a.displayName:'?') + ' <b>nicht neben</b> ' + esc(b?b.displayName:'?');
       else if(r.t === 'zusammen') txt = esc(a?a.displayName:'?') + ' <b>neben</b> ' + esc(b?b.displayName:'?');
       else if(r.t === 'allein') txt = esc(a?a.displayName:'?') + ' <b>sitzt allein</b> am Tisch';
+      else if(SP_G_RULES[r.t]) txt = esc(a?a.displayName:'?') + ' <b>' + SP_G_RULES[r.t].txt + '</b>';
       else txt = esc(a?a.displayName:'?') + ' <b>sitzt vorne</b>';
       return '<div class="sp-rule"><span>'+txt+'</span><button class="btn btn-danger btn-sm" type="button" data-rule-del="'+i+'">Entfernen</button></div>';
     }).join('');
@@ -19525,7 +19536,8 @@ function spRulesModal(){
     h += '<p>Werden beim zufälligen Setzen berücksichtigt. Lässt sich eine Regel nicht erfüllen, wird die Variante mit den wenigsten Verstössen gewählt.</p>';
     h += '<div class="sp-rule-list" id="spRuleList">'+listHtml()+'</div>';
     h += '<div class="sp-rule-add">';
-    h += '<select class="sp-select" id="spRuleType"><option value="nicht">darf nicht neben</option><option value="zusammen">soll neben</option><option value="allein">soll allein am Tisch sitzen</option><option value="vorne">soll vorne sitzen</option></select>';
+    h += '<select class="sp-select" id="spRuleType"><option value="nicht">darf nicht neben</option><option value="zusammen">soll neben</option><option value="allein">soll allein am Tisch sitzen</option><option value="vorne">soll vorne sitzen</option>' +
+      Object.keys(SP_G_RULES).map(function(k){ return '<option value="'+k+'">'+SP_G_RULES[k].opt+'</option>'; }).join('') + '</select>';
     h += '<select class="sp-select" id="spRuleA">'+optionsHtml(null)+'</select>';
     h += '<select class="sp-select" id="spRuleB">'+optionsHtml(null)+'</select>';
     h += '<button class="btn btn-primary btn-sm" id="spRuleAdd" type="button">Hinzufügen</button>';
@@ -19537,14 +19549,15 @@ function spRulesModal(){
   function wire(){
     var typeSel = document.getElementById('spRuleType');
     var bSel = document.getElementById('spRuleB');
-    // "vorne" und "allein" betreffen nur EIN Kind — das zweite Feld verschwindet.
-    function syncB(){ bSel.style.display = (typeSel.value === 'vorne' || typeSel.value === 'allein') ? 'none' : ''; }
+    // "vorne", "allein" und die Jungen/Mädchen-Regeln betreffen nur EIN Kind — das zweite Feld verschwindet.
+    function istEinzeln(t){ return t === 'vorne' || t === 'allein' || !!SP_G_RULES[t]; }
+    function syncB(){ bSel.style.display = istEinzeln(typeSel.value) ? 'none' : ''; }
     typeSel.addEventListener('change', syncB); syncB();
     document.getElementById('spRuleAdd').addEventListener('click', function(){
       var t = typeSel.value;
       var a = document.getElementById('spRuleA').value;
       var b = bSel.value;
-      var einzeln = (t === 'vorne' || t === 'allein');
+      var einzeln = istEinzeln(t);
       if(!einzeln && a === b){ toast('Bitte zwei verschiedene Kinder wählen.'); return; }
       if(sp.doc.rules.length >= 60){ toast('Maximal 60 Regeln.'); return; }
       sp.doc.rules.push({ t:t, a:a, b: einzeln ? '' : b });
@@ -19586,9 +19599,10 @@ function spShuffleSeats(){
   var ys = spSeatTables().map(function(t){ return t.y; });
   var frontLimit = ys.length ? (Math.min.apply(null, ys) + (Math.max.apply(null, ys) - Math.min.apply(null, ys)) / 3 + 0.01) : 0;
 
-  var notPairs = [], togetherPairs = [], frontKids = [], aloneKids = [];
+  var notPairs = [], togetherPairs = [], frontKids = [], aloneKids = [], gRules = [];
   sp.doc.rules.forEach(function(r){
-    if(r.t === 'nicht') notPairs.push([r.a, r.b]);
+    if(SP_G_RULES[r.t]) gRules.push({uid:r.a, g:SP_G_RULES[r.t].g, muss:SP_G_RULES[r.t].muss});
+    else if(r.t === 'nicht') notPairs.push([r.a, r.b]);
     else if(r.t === 'zusammen') togetherPairs.push([r.a, r.b]);
     else if(r.t === 'allein') aloneKids.push(r.a);
     else if(r.t === 'vorne') frontKids.push(r.a);
@@ -19619,6 +19633,13 @@ function spShuffleSeats(){
     frontKids.forEach(function(uid){
       var sid = seatOf[uid];
       if(!sid || frontness[sid] > frontLimit) pen += 30;
+    });
+    gRules.forEach(function(r){
+      var sid = seatOf[r.uid];
+      if(!sid) return;
+      var nb = assign[partner[sid]];
+      var gleich = !!nb && spGender(nb) === r.g;
+      if(r.muss ? !gleich : gleich) pen += r.muss ? 50 : 100;
     });
     if(sp.doc.genderMode !== 'egal'){
       spSeatTables().forEach(function(t){
@@ -21289,6 +21310,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-19-sitzplan-jm-regeln', datum:'2026-10-19', fuer:'lehrer', text:'🪑 Sitzplan › ⚖️ Regeln: neu auch «darf nicht neben Mädchen/Jungen» und «muss neben Mädchen/Jungen» für einzelne Kinder. Massgebend sind die J/M-Knöpfe; «🎲 Zufällig setzen» hält sich daran.'},
   {id:'2026-10-19-beamer-zoom', datum:'2026-10-19', fuer:'lehrer', text:'🔍 Am Laptop zeigt die Library jetzt alles auf 90 %. Sobald du per AirPlay auf den Beamer spiegelst, stellt sie automatisch auf 125 % um, damit es dort gross genug und nicht verzerrt ist.'},
   {id:'2026-10-19-ferien-ecke', datum:'2026-10-19', fuer:'alle', text:'🚨 Der Ferien-Countdown steht jetzt unten links in der Leiste und stört nicht mehr zwischen den Knöpfen. Auf dem Handy wird er nicht mehr angezeigt.'},
   {id:'2026-10-18-lektionszeiten', datum:'2026-10-18', fuer:'alle', text:'⏰ Stundenplan: Die Lektionszeiten stimmen jetzt für alle mit dem Schul-Stundenplan überein. Die Morgenpause dauert 20 Minuten, die 4. Lektion beginnt um 10:15 und die 5. um 11:05. Die Zusatzlektionen über Mittag sind 11:55 und 12:45, am Abend 16:55 und 17:45.'},
