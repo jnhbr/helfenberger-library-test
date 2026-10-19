@@ -21530,6 +21530,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-19-dossier-drucken', datum:'2026-10-19', fuer:'lehrer', text:'📖 🧰 Tools › «Broschüre & Dossier drucken»: neu auch A4-Dossier (2 Klammern links). Dicke Hefte werden automatisch auf Teile mit höchstens 16 Bogen verteilt – mehr schafft der Hefter nicht. In der Desktop-App der Library druckst du direkt: Drucker, Exemplare, Farbe und Heften wählen, fertig.'},
   {id:'2026-10-19-ausblenden', datum:'2026-10-19', fuer:'lehrer', text:'🙈 Neu bei jeder Übung, jedem PDF und Link: «🙈 Ausblenden». Die Klasse sieht sie dann nicht (z. B. ein Lösungsdossier), du siehst sie gestrichelt. Ist das Thema durch, mit «👁 Einblenden» freigeben.'},
   {id:'2026-10-19-neues-fenster', datum:'2026-10-19', fuer:'alle', text:'🪟 Übungen, LMVZ-Seiten und PDFs kannst du neben «Vollbild» jetzt auch «In neuem Fenster» öffnen. Das Fenster ist bildschirmgross, du kannst es aber kleiner machen und in der Library nebenher etwas anderes machen – dein Stand wird trotzdem gespeichert. In Prüfungen geht das nicht.'},
   {id:'2026-10-19-sitzplan-jm-regeln', datum:'2026-10-19', fuer:'lehrer', text:'🪑 Sitzplan › ⚖️ Regeln: neu auch «darf nicht neben Mädchen/Jungen» und «muss neben Mädchen/Jungen» für einzelne Kinder. Massgebend sind die J/M-Knöpfe; «🎲 Zufällig setzen» hält sich daran.'},
@@ -28885,7 +28886,7 @@ var TOOLS_TILES = [
   { id:'qr',           icon:'🔳', name:'QR-Code erstellen',       desc:'Link eintippen — QR-Code gross am Beamer zeigen oder als Bild speichern.' },
   { id:'stempel',      icon:'🔢', name:'Seitenzahlen & Wasserzeichen', desc:'Seitenzahlen, eine Kopfzeile (z. B. Name) oder «LÖSUNG» quer über jede Seite.' },
   { id:'nup',          icon:'🗞️', name:'Mehrere Seiten pro Blatt', desc:'2, 4, 6 oder 8 Seiten verkleinert auf ein A4-Blatt — spart Papier.' },
-  { id:'broschuere',   icon:'📖', name:'Broschüre drucken',     desc:'PDF als gefaltetes Heft: A4-Seiten auf A3 (oder A5-Heft auf A4), in der richtigen Reihenfolge.' },
+  { id:'broschuere',   icon:'📖', name:'Broschüre & Dossier drucken', desc:'PDF als gefaltetes A5- oder A4-Heft oder als A4-Dossier – dicke Hefte werden aufgeteilt. In der Desktop-App direkt mit Heften drucken.' },
   { id:'ton',          icon:'🎙️', name:'Ton aufnehmen',           desc:'Sprachaufnahme machen, anhören und herunterladen — z. B. für einen Vortrag.' }
 ];
 
@@ -29529,102 +29530,262 @@ function tlNup(){
   });
 }
 
-/* ---------- 📖 Broschüre ----------
+/* ---------- 📖 Broschüre / Dossier drucken ----------
+   Drei Arten: A5-Heft (A4-Bogen quer, gefalzt), A4-Heft (A3-Bogen quer, gefalzt)
+   und A4-Dossier (A4 hoch, 2 Klammern links, nicht angeordnet).
    Ausschiessen fürs Heft: je zwei Seiten nebeneinander auf ein quer liegendes
    Blatt, in Heftreihenfolge (letzte+erste, zweite+vorletzte …), aufgefüllt mit
-   Leerseiten auf ein Vielfaches von 4. Gedruckt wird doppelseitig über die kurze
-   Kante, dann in der Mitte falzen/heften. Wichtig für mehrere Exemplare: Acrobat
-   schickt alle Exemplare als EIN Dokument (copies=1) — der Drucker sieht dann
-   einen dicken Stapel und lässt Falzen/Heften weg. Darum der Hinweis im Dialog. */
+   Leerseiten am Ende auf ein Vielfaches von 4. Gedruckt wird doppelseitig über
+   die kurze Kante, dann in der Mitte falzen/heften.
+   Erfahrung mit dem Konica (bizhub C551i, Sek Altnau, 19.10.2026): ein Heft mit
+   32 Bogen bricht das Gerät ab, 16 Bogen gehen -> dicke Hefte werden auf
+   mehrere Teile mit höchstens TL_BR_MAXBOGEN Bogen verteilt.
+   Mehrere Exemplare müssen als echte Exemplare (IPP-copies) zum Drucker; Acrobat
+   schickt sie als EIN Dokument, dann lässt der Drucker Falzen/Heften weg.
+   Direkt drucken (mit Heften, Falzen, Exemplaren) kann nur die Desktop-App
+   (window.libDesktop, Electron); eine Webseite kann dem Drucker das nicht mitgeben. */
 var TL_A3 = [841.89, 1190.55];
+var TL_BR_MAXBOGEN = 16, TL_BR_MAXDOSSIER = 50;
+var TL_BR_ARTEN = {
+  a4:      { label:'A5-Heft',    sub:'A4 quer, gefalzt',     papier:'A4' },
+  a3:      { label:'A4-Heft',    sub:'A3 quer, gefalzt',     papier:'A3' },
+  dossier: { label:'A4-Dossier', sub:'2 Klammern links',     papier:'A4' }
+};
+// Teile so gleichmässig wie möglich: Seiten je Teil = Vielfaches von 4 (Heft) bzw. 2 (Dossier).
+function tlBrTeile(seiten, art, maxBogen){
+  var proBogen = art === 'dossier' ? 2 : 4;
+  var maxSeiten = Math.max(1, maxBogen) * proBogen;
+  var anzahl = Math.max(1, Math.ceil(seiten / maxSeiten));
+  var gross = Math.ceil(seiten / anzahl / proBogen) * proBogen, teile = [];
+  for(var a = 0; a < seiten; a += gross){
+    var b = Math.min(seiten, a + gross);
+    teile.push({von:a, bis:b, bogen:Math.ceil((b - a) / proBogen)});
+  }
+  return teile;
+}
 function tlBroschuere(){
-  var datei = null, format = lsGet(LIB_PREFIX+'tl_brosch') === 'a4' ? 'a4' : 'a3';
-  openModal('<h3>📖 Broschüre drucken</h3>'+
+  var datei = null, seitenZahl = 0, laeuft = false;
+  var art = lsGet(LIB_PREFIX+'tl_brosch');
+  if(!TL_BR_ARTEN[art]) art = 'a4';
+  var desk = window.libDesktop && typeof window.libDesktop.drucken === 'function' ? window.libDesktop : null;
+  var exemplare = parseInt(lsGet(LIB_PREFIX+'tl_br_n'), 10) || 1;
+  var farbe = lsGet(LIB_PREFIX+'tl_br_farbe') === 'farbe' ? 'farbe' : 'sw';
+  var drucker = lsGet(LIB_PREFIX+'tl_br_drucker') || '';
+  openModal('<h3>📖 Broschüre & Dossier drucken</h3>'+
     '<div id="tlBrWahl">'+tlDateiFeld('tlBrIn', 'application/pdf', false, 'Ein PDF wählen')+'</div>'+
-    '<label class="modal-label" style="margin-top:14px;">Papier im Drucker</label>'+
-    '<div class="uf-setup-modi" id="tlBrFmt">'+
-      '<button class="kz-tab'+(format === 'a3' ? ' kz-tab-on' : '')+'" data-bf="a3" type="button">A3 → Heft in A4</button>'+
-      '<button class="kz-tab'+(format === 'a4' ? ' kz-tab-on' : '')+'" data-bf="a4" type="button">A4 → Heft in A5</button></div>'+
-    '<p class="pr-hinweis">Die Seiten werden so angeordnet, dass nach dem Falzen alles in der richtigen Reihenfolge ist. Fehlen Seiten bis zu einem Vielfachen von 4, kommen leere Seiten ans Ende.</p>'+
-    '<div class="pr-hinweis" style="margin-top:10px;"><b>So druckst du:</b><ul style="margin:4px 0 0 18px;padding:0;">'+
-      '<li>Papierformat <b id="tlBrPapier">'+(format === 'a3' ? 'A3' : 'A4')+'</b>, Grösse 100 % bzw. «Anpassen»</li>'+
-      '<li>Doppelseitig: <b>kurze Kante</b> (sonst steht jede zweite Seite auf dem Kopf)</li>'+
-      '<li>Heften: <b>Mittelheftung</b> (Saddle Stitch) bzw. Falzen: <b>Halbfalz</b></li>'+
-      '<li>«🖨️ Drucken» öffnet die Broschüre in einem neuen Tab – dort drucken (⌘P). Heften und Falzen wählst du im Druckdialog (Chrome: «Mit Systemdialog drucken»).</li>'+
-      '<li>Mehrere Exemplare: das PDF mit <b>Vorschau</b> drucken, Exemplare <b>sortiert</b>. Acrobat schickt alle Exemplare als ein einziges Dokument — dann falzt der Drucker nicht.</li>'+
-    '</ul></div>'+
+    '<label class="modal-label" style="margin-top:14px;">Was soll es werden?</label>'+
+    '<div class="uf-setup-modi" id="tlBrArt">'+Object.keys(TL_BR_ARTEN).map(function(k){
+      return '<button class="kz-tab'+(k === art ? ' kz-tab-on' : '')+'" data-bf="'+k+'" type="button" title="'+esc(TL_BR_ARTEN[k].sub)+'">'+esc(TL_BR_ARTEN[k].label)+' <small style="font-weight:500;opacity:.8;">('+esc(TL_BR_ARTEN[k].sub)+')</small></button>';
+    }).join('')+'</div>'+
+    '<p class="pr-hinweis" id="tlBrInfo"></p>'+
+    (desk ?
+      '<div style="margin-top:14px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-2);">'+
+        '<b>🖨️ Direkt drucken</b> <span class="pr-hinweis">(Desktop-App)</span>'+
+        '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;align-items:flex-end;">'+
+          '<div style="flex:2 1 200px;"><label class="modal-label">Drucker</label><select id="tlBrDrucker"><option value="">wird geladen …</option></select></div>'+
+          '<div style="flex:1 1 90px;"><label class="modal-label">Exemplare</label><input type="number" id="tlBrN" class="modal-input" min="1" max="200" step="1" value="'+exemplare+'"></div>'+
+        '</div>'+
+        '<label class="modal-label" style="margin-top:10px;">Farbe</label>'+
+        '<div class="uf-setup-modi" id="tlBrFarbe" style="margin-bottom:6px;">'+
+          '<button class="kz-tab'+(farbe === 'sw' ? ' kz-tab-on' : '')+'" data-fa="sw" type="button">Schwarz-weiss</button>'+
+          '<button class="kz-tab'+(farbe === 'farbe' ? ' kz-tab-on' : '')+'" data-fa="farbe" type="button">Farbe</button></div>'+
+        '<label class="submission-row"><input type="checkbox" id="tlBrHeften" checked> <span id="tlBrHeftenTxt">Heften und falzen</span></label>'+
+      '</div>'
+    :
+      '<div class="pr-hinweis" style="margin-top:10px;"><b>So druckst du:</b><ul style="margin:4px 0 0 18px;padding:0;" id="tlBrAnleitung"></ul></div>'
+    )+
+    '<div id="tlBrTeileListe" class="tl-liste"></div>'+
     '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button>'+
-    '<button class="btn btn-ghost btn-sm" id="tlBrDruck" type="button" disabled title="Öffnet die Broschüre in einem neuen Tab – dort drucken (⌘P)">🖨️ Drucken</button>'+
-    '<button class="btn btn-primary btn-sm" id="tlBrGo" type="button" disabled>⬇︎ Broschüre speichern</button></div>', 'modal-wide');
+    '<button class="btn btn-ghost btn-sm" id="tlBrGo" type="button" disabled>⬇︎ PDF speichern</button>'+
+    (desk ? '<button class="btn btn-primary btn-sm" id="tlBrDirekt" type="button" disabled>🖨️ Jetzt drucken</button>'
+          : '<button class="btn btn-primary btn-sm" id="tlBrDruck" type="button" disabled title="Öffnet das PDF in einem neuen Tab – dort drucken (⌘P)">🖨️ Zum Drucken öffnen</button>')+
+    '</div>', 'modal-wide');
   document.getElementById('modalCancel').addEventListener('click', closeModal);
-  var go = document.getElementById('tlBrGo'), druck = document.getElementById('tlBrDruck');
+  var go = document.getElementById('tlBrGo'), druck = document.getElementById('tlBrDruck'), direkt = document.getElementById('tlBrDirekt');
+  var teileListe = document.getElementById('tlBrTeileListe');
+  function knoepfe(an){ [go, druck, direkt].forEach(function(b){ if(b) b.disabled = !an; }); }
+  function istHeft(){ return art !== 'dossier'; }
+  function maxBogen(){ return istHeft() ? TL_BR_MAXBOGEN : TL_BR_MAXDOSSIER; }
+  function info(){
+    var el = document.getElementById('tlBrInfo'), t = '';
+    if(istHeft()) t = 'Die Seiten werden so angeordnet, dass nach dem Falzen alles stimmt. Fehlende Seiten bis zu einem Vielfachen von 4 kommen leer ans Ende. Dicke Hefte werden auf mehrere Teile mit höchstens '+TL_BR_MAXBOGEN+' Bogen verteilt – mehr schafft der Hefter nicht.';
+    else t = 'Die Seiten bleiben in ihrer Reihenfolge, doppelseitig auf A4, links 2 Klammern. Mehr als '+TL_BR_MAXDOSSIER+' Blätter fasst der Hefter nicht – dann gibt es mehrere Teile.';
+    if(seitenZahl){
+      var teile = tlBrTeile(seitenZahl, art, maxBogen());
+      t += ' <b>' + seitenZahl + ' Seiten → ' + (teile.length === 1 ? '1 ' + (istHeft() ? 'Heft' : 'Dossier') : teile.length + ' Teile') + ' à ' + teile.map(function(x){ return x.bogen; }).join(' / ') + (istHeft() ? ' Bogen ' : ' Blätter ') + TL_BR_ARTEN[art].papier + '.</b>';
+    }
+    el.innerHTML = t;
+    var anl = document.getElementById('tlBrAnleitung');
+    if(anl) anl.innerHTML =
+      '<li>Papierformat <b>'+TL_BR_ARTEN[art].papier+'</b>, Grösse 100 %</li>'+
+      (istHeft()
+        ? '<li>Doppelseitig: <b>kurze Kante</b> (sonst steht jede zweite Seite auf dem Kopf)</li><li>Heften: <b>Mittelheftung</b> (Saddle Stitch), Falzen: <b>Halbfalz</b></li>'
+        : '<li>Doppelseitig: <b>lange Kante</b></li><li>Heften: <b>2 Klammern links</b></li>')+
+      '<li>Heften und Falzen wählst du im Druckdialog (Chrome: «Mit Systemdialog drucken»). Jeden Teil einzeln drucken.</li>'+
+      '<li>Mehrere Exemplare: mit <b>Vorschau</b> drucken, Exemplare <b>sortiert</b>. Acrobat schickt alle Exemplare als ein einziges Dokument – dann heftet der Drucker nicht.</li>'+
+      '<li>Direkt drucken mit Heften, Falzen und Exemplaren geht in der Desktop-App der Library.</li>';
+    var ht = document.getElementById('tlBrHeftenTxt');
+    if(ht) ht.textContent = istHeft() ? 'Heften und falzen (Mittelheftung)' : 'Heften (2 Klammern links)';
+  }
+  info();
   Array.prototype.forEach.call(modalEl.querySelectorAll('[data-bf]'), function(b){
     b.addEventListener('click', function(){
-      format = b.getAttribute('data-bf');
-      lsSet(LIB_PREFIX+'tl_brosch', format);
+      art = b.getAttribute('data-bf');
+      lsSet(LIB_PREFIX+'tl_brosch', art);
       Array.prototype.forEach.call(modalEl.querySelectorAll('[data-bf]'), function(x){ x.classList.toggle('kz-tab-on', x === b); });
-      document.getElementById('tlBrPapier').textContent = format === 'a3' ? 'A3' : 'A4';
+      teileListe.innerHTML = '';
+      info();
     });
   });
-  tlDateiFeldVerdrahten('tlBrIn', function(files){
+  Array.prototype.forEach.call(modalEl.querySelectorAll('[data-fa]'), function(b){
+    b.addEventListener('click', function(){
+      farbe = b.getAttribute('data-fa');
+      lsSet(LIB_PREFIX+'tl_br_farbe', farbe);
+      Array.prototype.forEach.call(modalEl.querySelectorAll('[data-fa]'), function(x){ x.classList.toggle('kz-tab-on', x === b); });
+    });
+  });
+  if(desk){
+    var sel = document.getElementById('tlBrDrucker');
+    desk.drucker().then(function(r){
+      var liste = (r && r.liste) || [];
+      if(!liste.length){ sel.innerHTML = '<option value="">Kein Drucker gefunden</option>'; return; }
+      // Vorwahl: zuletzt benutzt, sonst ein Drucker mit Heftung (Konica_Heften), sonst Standard.
+      var vor = liste.some(function(d){ return d.name === drucker; }) ? drucker
+        : ((liste.filter(function(d){ return /heft/i.test(d.name); })[0] || {}).name || r.standard || liste[0].name);
+      sel.innerHTML = liste.map(function(d){
+        return '<option value="'+esc(d.name)+'"'+(d.name === vor ? ' selected' : '')+'>'+esc(d.name + (d.name === r.standard ? ' (Standard)' : ''))+'</option>';
+      }).join('');
+    }).catch(function(err){ console.error(err); sel.innerHTML = '<option value="">Drucker konnten nicht gelesen werden</option>'; });
+  }
+  tlDateiFeldVerdrahten('tlBrIn', async function(files){
     var f = files.filter(tlIstPdf)[0];
     if(!f){ toast('Bitte ein PDF wählen.'); return; }
-    datei = f; go.disabled = druck.disabled = false;
+    datei = f; seitenZahl = 0; teileListe.innerHTML = '';
     document.getElementById('tlBrWahl').querySelector('.tl-drop span').textContent = '📄 ' + f.name;
-  });
-  async function erzeugen(){
-      var PDFLib = await ladePdfLib();
-      var src = await PDFLib.PDFDocument.load(await datei.arrayBuffer(), {ignoreEncryption:true});
-      var out = await PDFLib.PDFDocument.create();
-      var eingebettet = await out.embedPages(src.getPages());
-      var drehung = src.getPages().map(function(p){ return (p.getRotation().angle || 0) % 360; });
-      var seiten = eingebettet.slice();
-      while(seiten.length % 4) seiten.push(null);
-      var n = seiten.length, gross = format === 'a3' ? TL_A3 : TL_A4;
-      var pw = gross[1], ph = gross[0], hw = pw / 2;   // Blatt quer, zwei Hälften
-      function setzen(blatt, idx, x0){
-        var e = seiten[idx];
-        if(!e) return;
-        var rot = drehung[idx], gedreht = rot === 90 || rot === 270;
-        var ew = gedreht ? e.height : e.width, eh = gedreht ? e.width : e.height;
-        var f = Math.min(hw / ew, ph / eh), w = ew*f, h = eh*f;
-        var x = x0 + (hw - w)/2, y = (ph - h)/2;
-        // drawPage dreht um die linke untere Ecke -> Ankerpunkt verschieben (wie bei tlNup).
-        var ax = x, ay = y;
-        if(rot === 90){ ax = x; ay = y + h; }
-        else if(rot === 180){ ax = x + w; ay = y + h; }
-        else if(rot === 270){ ax = x + w; ay = y; }
-        blatt.drawPage(e, {x:ax, y:ay, xScale:f, yScale:f, rotate:PDFLib.degrees(-rot)});
-      }
-      for(var i = 0; i < n/2; i++){
-        var links = i % 2 === 0 ? n-1-i : i, rechts = i % 2 === 0 ? i : n-1-i;
-        var blatt = out.addPage([pw, ph]);
-        setzen(blatt, links, 0); setzen(blatt, rechts, hw);
-      }
-      toast('📖 ' + eingebettet.length + ' Seiten → ' + (n/4) + (n/4 === 1 ? ' Bogen' : ' Bögen') + ' ' + (format === 'a3' ? 'A3' : 'A4') + ' (doppelseitig, kurze Kante).');
-      return new Blob([await out.save()], {type:'application/pdf'});
-  }
-  function dateiname(){ return tlBasis(datei.name) + '_Broschuere_' + (format === 'a3' ? 'A3' : 'A4') + '.pdf'; }
-  go.addEventListener('click', async function(){
-    go.disabled = druck.disabled = true;
-    try{ tlDownload(await erzeugen(), dateiname()); }
-    catch(err){ console.error(err); toast(tlFehlerText(err)); }
-    go.disabled = druck.disabled = false;
-  });
-  // Drucken: Tab sofort im Klick öffnen (sonst Popup-Blocker), PDF danach hineinladen.
-  // Heften/Falzen kann eine Webseite dem Drucker nicht mitgeben -> im Druckdialog wählen.
-  druck.addEventListener('click', async function(){
-    var tab = window.open('', '_blank');
-    go.disabled = druck.disabled = true;
     try{
-      var blob = await erzeugen();
-      if(tab){
-        var url = URL.createObjectURL(blob);
-        tab.location.href = url;
+      var PDFLib = await ladePdfLib();
+      seitenZahl = (await PDFLib.PDFDocument.load(await f.arrayBuffer(), {ignoreEncryption:true})).getPageCount();
+    }catch(err){ console.error(err); toast(tlFehlerText(err)); datei = null; return; }
+    if(datei === f){ info(); knoepfe(true); }
+  });
+  // Liefert pro Teil {blob, name, von, bis, bogen}.
+  async function erzeugen(){
+    var PDFLib = await ladePdfLib();
+    var src = await PDFLib.PDFDocument.load(await datei.arrayBuffer(), {ignoreEncryption:true});
+    var teile = tlBrTeile(src.getPageCount(), art, maxBogen()), mehrere = teile.length > 1, res = [];
+    for(var t = 0; t < teile.length; t++){
+      var tl = teile[t], out = await PDFLib.PDFDocument.create();
+      var idx = []; for(var k = tl.von; k < tl.bis; k++) idx.push(k);
+      if(!istHeft()){
+        (await out.copyPages(src, idx)).forEach(function(p){ out.addPage(p); });
+      } else {
+        var quell = idx.map(function(k){ return src.getPage(k); });
+        var eingebettet = await out.embedPages(quell);
+        var drehung = quell.map(function(p){ return (p.getRotation().angle || 0) % 360; });
+        var seiten = eingebettet.slice();
+        while(seiten.length % 4) seiten.push(null);
+        var n = seiten.length, gross = art === 'a3' ? TL_A3 : TL_A4;
+        var pw = gross[1], ph = gross[0], hw = pw / 2;   // Blatt quer, zwei Hälften
+        var setzen = function(blatt, i, x0){
+          var e = seiten[i];
+          if(!e) return;
+          var rot = drehung[i], gedreht = rot === 90 || rot === 270;
+          var ew = gedreht ? e.height : e.width, eh = gedreht ? e.width : e.height;
+          var f = Math.min(hw / ew, ph / eh), w = ew*f, h = eh*f;
+          var x = x0 + (hw - w)/2, y = (ph - h)/2;
+          // drawPage dreht um die linke untere Ecke -> Ankerpunkt verschieben (wie bei tlNup).
+          var ax = x, ay = y;
+          if(rot === 90){ ax = x; ay = y + h; }
+          else if(rot === 180){ ax = x + w; ay = y + h; }
+          else if(rot === 270){ ax = x + w; ay = y; }
+          blatt.drawPage(e, {x:ax, y:ay, xScale:f, yScale:f, rotate:PDFLib.degrees(-rot)});
+        };
+        for(var i = 0; i < n/2; i++){
+          var links = i % 2 === 0 ? n-1-i : i, rechts = i % 2 === 0 ? i : n-1-i;
+          var blatt = out.addPage([pw, ph]);
+          setzen(blatt, links, 0); setzen(blatt, rechts, hw);
+        }
+      }
+      var endung = art === 'dossier' ? '_Dossier_A4' : '_Broschuere_' + (art === 'a3' ? 'A3' : 'A4');
+      res.push({ blob:new Blob([await out.save()], {type:'application/pdf'}),
+        name: tlBasis(datei.name) + endung + (mehrere ? '_Teil' + (t+1) : '') + '.pdf',
+        titel: tlBasis(datei.name) + (mehrere ? ' Teil ' + (t+1) : ''),
+        von: tl.von + 1, bis: tl.bis, bogen: tl.bogen });
+    }
+    return res;
+  }
+  function teileZeigen(res, mitOeffnen){
+    if(res.length < 2 && !mitOeffnen){ teileListe.innerHTML = ''; return; }
+    teileListe.innerHTML = res.map(function(r, i){
+      return '<div class="pr-hinweis" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+
+        '<span style="flex:1 1 auto;">📄 '+(res.length > 1 ? 'Teil '+(i+1)+': ' : '')+'Seiten '+r.von+'–'+r.bis+' ('+r.bogen+(istHeft() ? ' Bogen' : ' Blätter')+')</span>'+
+        (mitOeffnen ? '<button class="btn btn-ghost btn-sm" data-tlbr-oeffnen="'+i+'" type="button">🖨️ Öffnen</button>' : '')+
+        '<button class="btn btn-ghost btn-sm" data-tlbr-laden="'+i+'" type="button">⬇︎</button></div>';
+    }).join('');
+    Array.prototype.forEach.call(teileListe.querySelectorAll('[data-tlbr-oeffnen]'), function(b){
+      b.addEventListener('click', function(){
+        var r = res[+b.getAttribute('data-tlbr-oeffnen')], url = URL.createObjectURL(r.blob);
+        if(!window.open(url, '_blank')) tlDownload(r.blob, r.name);
         setTimeout(function(){ URL.revokeObjectURL(url); }, 120000);
-      } else tlDownload(blob, dateiname());
-    }catch(err){ console.error(err); if(tab) tab.close(); toast(tlFehlerText(err)); }
-    go.disabled = druck.disabled = false;
+      });
+    });
+    Array.prototype.forEach.call(teileListe.querySelectorAll('[data-tlbr-laden]'), function(b){
+      b.addEventListener('click', function(){ var r = res[+b.getAttribute('data-tlbr-laden')]; tlDownload(r.blob, r.name); });
+    });
+  }
+  async function mitSperre(fn){
+    if(laeuft) return;
+    laeuft = true; knoepfe(false);
+    try{ await fn(); }
+    catch(err){ console.error(err); toast(tlFehlerText(err)); }
+    laeuft = false; if(modalEl.contains(go)) knoepfe(true);
+  }
+  go.addEventListener('click', function(){
+    mitSperre(async function(){
+      var res = await erzeugen();
+      res.forEach(function(r){ tlDownload(r.blob, r.name); });
+      teileZeigen(res, false);
+    });
+  });
+  if(druck) druck.addEventListener('click', function(){
+    // Bei einem Teil: Tab sofort im Klick öffnen (sonst Popup-Blocker), PDF danach hineinladen.
+    // Bei mehreren Teilen: Liste mit je einem «Öffnen»-Knopf (ein Klick = ein Tab).
+    if(laeuft) return;
+    var tab = window.open('', '_blank');
+    mitSperre(async function(){
+      try{
+        var res = await erzeugen();
+        if(res.length > 1){ if(tab) tab.close(); teileZeigen(res, true); toast('📖 ' + res.length + ' Teile – jeden einzeln öffnen und drucken.'); return; }
+        if(tab){
+          var url = URL.createObjectURL(res[0].blob);
+          tab.location.href = url;
+          setTimeout(function(){ URL.revokeObjectURL(url); }, 120000);
+        } else tlDownload(res[0].blob, res[0].name);
+      }catch(err){ if(tab) tab.close(); throw err; }
+    });
+  });
+  if(direkt) direkt.addEventListener('click', function(){
+    var name = document.getElementById('tlBrDrucker').value;
+    var n = Math.max(1, Math.min(200, parseInt(document.getElementById('tlBrN').value, 10) || 1));
+    var heften = document.getElementById('tlBrHeften').checked;
+    if(!name){ toast('Bitte einen Drucker wählen.'); return; }
+    lsSet(LIB_PREFIX+'tl_br_drucker', name); lsSet(LIB_PREFIX+'tl_br_n', String(n));
+    mitSperre(async function(){
+      var res = await erzeugen(), ok = 0, fehler = '';
+      for(var i = 0; i < res.length; i++){
+        var r = await desk.drucken({
+          pdf: new Uint8Array(await res[i].blob.arrayBuffer()), titel: res[i].titel, drucker: name, exemplare: n,
+          farbe: farbe, papier: TL_BR_ARTEN[art].papier,
+          seiten: istHeft() ? 'kurz' : 'lang',
+          heftung: !heften ? 'keine' : (istHeft() ? 'mitte' : 'links2'),
+          falzen: heften && art === 'a3', anpassen: !istHeft()
+        });
+        if(r && r.ok) ok++; else { fehler = (r && r.fehler) || 'unbekannter Fehler'; break; }
+      }
+      teileZeigen(res, false);
+      if(fehler) toast('Drucken hat nicht geklappt: ' + fehler);
+      else toast('🖨️ ' + ok + (ok === 1 ? ' Auftrag' : ' Aufträge') + ' × ' + n + ' Exemplar' + (n === 1 ? '' : 'e') + ' an «' + name + '» geschickt.');
+    });
   });
 }
 
