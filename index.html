@@ -21530,7 +21530,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-10-19-dossier-drucken', datum:'2026-10-19', fuer:'lehrer', text:'📖 🧰 Tools › «Broschüre & Dossier drucken»: neu auch A4-Dossier (2 Klammern links). Dicke Hefte werden automatisch auf Teile mit höchstens 16 Bogen verteilt – mehr schafft der Hefter nicht. In der Desktop-App der Library druckst du direkt: Drucker, Exemplare, Farbe und Heften wählen, fertig.'},
+  {id:'2026-10-19-dossier-drucken', datum:'2026-10-19', fuer:'lehrer', text:'📖 🧰 Tools › «Dossier drucken» (früher «Broschüre drucken»): A5- oder A4-Dossier, gefalzt und in der Mitte geheftet, Dicke Dossiers werden automatisch auf Teile mit höchstens 16 Bogen verteilt – mehr schafft der Hefter nicht. In der Desktop-App der Library druckst du direkt: Drucker, Exemplare, Farbe und Heften wählen, fertig.'},
   {id:'2026-10-19-ausblenden', datum:'2026-10-19', fuer:'lehrer', text:'🙈 Neu bei jeder Übung, jedem PDF und Link: «🙈 Ausblenden». Die Klasse sieht sie dann nicht (z. B. ein Lösungsdossier), du siehst sie gestrichelt. Ist das Thema durch, mit «👁 Einblenden» freigeben.'},
   {id:'2026-10-19-neues-fenster', datum:'2026-10-19', fuer:'alle', text:'🪟 Übungen, LMVZ-Seiten und PDFs kannst du neben «Vollbild» jetzt auch «In neuem Fenster» öffnen. Das Fenster ist bildschirmgross, du kannst es aber kleiner machen und in der Library nebenher etwas anderes machen – dein Stand wird trotzdem gespeichert. In Prüfungen geht das nicht.'},
   {id:'2026-10-19-sitzplan-jm-regeln', datum:'2026-10-19', fuer:'lehrer', text:'🪑 Sitzplan › ⚖️ Regeln: neu auch «darf nicht neben Mädchen/Jungen» und «muss neben Mädchen/Jungen» für einzelne Kinder. Massgebend sind die J/M-Knöpfe; «🎲 Zufällig setzen» hält sich daran.'},
@@ -28886,7 +28886,7 @@ var TOOLS_TILES = [
   { id:'qr',           icon:'🔳', name:'QR-Code erstellen',       desc:'Link eintippen — QR-Code gross am Beamer zeigen oder als Bild speichern.' },
   { id:'stempel',      icon:'🔢', name:'Seitenzahlen & Wasserzeichen', desc:'Seitenzahlen, eine Kopfzeile (z. B. Name) oder «LÖSUNG» quer über jede Seite.' },
   { id:'nup',          icon:'🗞️', name:'Mehrere Seiten pro Blatt', desc:'2, 4, 6 oder 8 Seiten verkleinert auf ein A4-Blatt — spart Papier.' },
-  { id:'broschuere',   icon:'📖', name:'Broschüre & Dossier drucken', desc:'PDF als gefaltetes A5- oder A4-Heft oder als A4-Dossier – dicke Hefte werden aufgeteilt. In der Desktop-App direkt mit Heften drucken.' },
+  { id:'broschuere',   icon:'📖', name:'Dossier drucken', desc:'PDF als A5- oder A4-Dossier, gefalzt und in der Mitte geheftet – dicke Dossiers werden aufgeteilt. In der Desktop-App direkt mit Heften drucken.' },
   { id:'ton',          icon:'🎙️', name:'Ton aufnehmen',           desc:'Sprachaufnahme machen, anhören und herunterladen — z. B. für einen Vortrag.' }
 ];
 
@@ -29530,9 +29530,9 @@ function tlNup(){
   });
 }
 
-/* ---------- 📖 Broschüre / Dossier drucken ----------
-   Drei Arten: A5-Heft (A4-Bogen quer, gefalzt), A4-Heft (A3-Bogen quer, gefalzt)
-   und A4-Dossier (A4 hoch, 2 Klammern links, nicht angeordnet).
+/* ---------- 📖 Dossier drucken ----------
+   «Dossier» = gefaltetes, mittig geheftetes Heft (Jans Begriff). Zwei Arten:
+   A5-Dossier (A4-Bogen quer, gefalzt) und A4-Dossier (A3-Bogen quer, gefalzt).
    Ausschiessen fürs Heft: je zwei Seiten nebeneinander auf ein quer liegendes
    Blatt, in Heftreihenfolge (letzte+erste, zweite+vorletzte …), aufgefüllt mit
    Leerseiten am Ende auf ein Vielfaches von 4. Gedruckt wird doppelseitig über
@@ -29545,15 +29545,14 @@ function tlNup(){
    Direkt drucken (mit Heften, Falzen, Exemplaren) kann nur die Desktop-App
    (window.libDesktop, Electron); eine Webseite kann dem Drucker das nicht mitgeben. */
 var TL_A3 = [841.89, 1190.55];
-var TL_BR_MAXBOGEN = 16, TL_BR_MAXDOSSIER = 50;
+var TL_BR_MAXBOGEN = 16;
 var TL_BR_ARTEN = {
-  a4:      { label:'A5-Heft',    sub:'A4 quer, gefalzt',     papier:'A4' },
-  a3:      { label:'A4-Heft',    sub:'A3 quer, gefalzt',     papier:'A3' },
-  dossier: { label:'A4-Dossier', sub:'2 Klammern links',     papier:'A4' }
+  a4:    { label:'A5-Dossier',        sub:'A4 quer, gefalzt',     papier:'A4' },
+  a3:    { label:'A4-Dossier',        sub:'A3 quer, gefalzt',     papier:'A3' }
 };
-// Teile so gleichmässig wie möglich: Seiten je Teil = Vielfaches von 4 (Heft) bzw. 2 (Dossier).
-function tlBrTeile(seiten, art, maxBogen){
-  var proBogen = art === 'dossier' ? 2 : 4;
+// Teile so gleichmässig wie möglich: Seiten je Teil = Vielfaches von 4.
+function tlBrTeile(seiten, maxBogen){
+  var proBogen = 4;
   var maxSeiten = Math.max(1, maxBogen) * proBogen;
   var anzahl = Math.max(1, Math.ceil(seiten / maxSeiten));
   var gross = Math.ceil(seiten / anzahl / proBogen) * proBogen, teile = [];
@@ -29571,7 +29570,7 @@ function tlBroschuere(){
   var exemplare = parseInt(lsGet(LIB_PREFIX+'tl_br_n'), 10) || 1;
   var farbe = lsGet(LIB_PREFIX+'tl_br_farbe') === 'farbe' ? 'farbe' : 'sw';
   var drucker = lsGet(LIB_PREFIX+'tl_br_drucker') || '';
-  openModal('<h3>📖 Broschüre & Dossier drucken</h3>'+
+  openModal('<h3>📖 Dossier drucken</h3>'+
     '<div id="tlBrWahl">'+tlDateiFeld('tlBrIn', 'application/pdf', false, 'Ein PDF wählen')+'</div>'+
     '<label class="modal-label" style="margin-top:14px;">Was soll es werden?</label>'+
     '<div class="uf-setup-modi" id="tlBrArt">'+Object.keys(TL_BR_ARTEN).map(function(k){
@@ -29589,7 +29588,7 @@ function tlBroschuere(){
         '<div class="uf-setup-modi" id="tlBrFarbe" style="margin-bottom:6px;">'+
           '<button class="kz-tab'+(farbe === 'sw' ? ' kz-tab-on' : '')+'" data-fa="sw" type="button">Schwarz-weiss</button>'+
           '<button class="kz-tab'+(farbe === 'farbe' ? ' kz-tab-on' : '')+'" data-fa="farbe" type="button">Farbe</button></div>'+
-        '<label class="submission-row"><input type="checkbox" id="tlBrHeften" checked> <span id="tlBrHeftenTxt">Heften und falzen</span></label>'+
+        '<label class="submission-row"><input type="checkbox" id="tlBrHeften" checked> <span>Heften und falzen (Mittelheftung)</span></label>'+
       '</div>'
     :
       '<div class="pr-hinweis" style="margin-top:10px;"><b>So druckst du:</b><ul style="margin:4px 0 0 18px;padding:0;" id="tlBrAnleitung"></ul></div>'
@@ -29604,28 +29603,21 @@ function tlBroschuere(){
   var go = document.getElementById('tlBrGo'), druck = document.getElementById('tlBrDruck'), direkt = document.getElementById('tlBrDirekt');
   var teileListe = document.getElementById('tlBrTeileListe');
   function knoepfe(an){ [go, druck, direkt].forEach(function(b){ if(b) b.disabled = !an; }); }
-  function istHeft(){ return art !== 'dossier'; }
-  function maxBogen(){ return istHeft() ? TL_BR_MAXBOGEN : TL_BR_MAXDOSSIER; }
   function info(){
     var el = document.getElementById('tlBrInfo'), t = '';
-    if(istHeft()) t = 'Die Seiten werden so angeordnet, dass nach dem Falzen alles stimmt. Fehlende Seiten bis zu einem Vielfachen von 4 kommen leer ans Ende. Dicke Hefte werden auf mehrere Teile mit höchstens '+TL_BR_MAXBOGEN+' Bogen verteilt – mehr schafft der Hefter nicht.';
-    else t = 'Die Seiten bleiben in ihrer Reihenfolge, doppelseitig auf A4, links 2 Klammern. Mehr als '+TL_BR_MAXDOSSIER+' Blätter fasst der Hefter nicht – dann gibt es mehrere Teile.';
+    t = 'Die Seiten werden so angeordnet, dass nach dem Falzen alles stimmt. Fehlende Seiten bis zu einem Vielfachen von 4 kommen leer ans Ende. Dicke Dossiers werden auf mehrere Teile mit höchstens '+TL_BR_MAXBOGEN+' Bogen verteilt – mehr schafft der Hefter nicht.';
     if(seitenZahl){
-      var teile = tlBrTeile(seitenZahl, art, maxBogen());
-      t += ' <b>' + seitenZahl + ' Seiten → ' + (teile.length === 1 ? '1 ' + (istHeft() ? 'Heft' : 'Dossier') : teile.length + ' Teile') + ' à ' + teile.map(function(x){ return x.bogen; }).join(' / ') + (istHeft() ? ' Bogen ' : ' Blätter ') + TL_BR_ARTEN[art].papier + '.</b>';
+      var teile = tlBrTeile(seitenZahl, TL_BR_MAXBOGEN);
+      t += ' <b>' + seitenZahl + ' Seiten → ' + (teile.length === 1 ? '1 Dossier' : teile.length + ' Teile') + ' à ' + teile.map(function(x){ return x.bogen; }).join(' / ') + ' Bogen ' + TL_BR_ARTEN[art].papier + '.</b>';
     }
     el.innerHTML = t;
     var anl = document.getElementById('tlBrAnleitung');
     if(anl) anl.innerHTML =
       '<li>Papierformat <b>'+TL_BR_ARTEN[art].papier+'</b>, Grösse 100 %</li>'+
-      (istHeft()
-        ? '<li>Doppelseitig: <b>kurze Kante</b> (sonst steht jede zweite Seite auf dem Kopf)</li><li>Heften: <b>Mittelheftung</b> (Saddle Stitch), Falzen: <b>Halbfalz</b></li>'
-        : '<li>Doppelseitig: <b>lange Kante</b></li><li>Heften: <b>2 Klammern links</b></li>')+
+      '<li>Doppelseitig: <b>kurze Kante</b> (sonst steht jede zweite Seite auf dem Kopf)</li><li>Heften: <b>Mittelheftung</b> (Saddle Stitch), Falzen: <b>Halbfalz</b></li>'+
       '<li>Heften und Falzen wählst du im Druckdialog (Chrome: «Mit Systemdialog drucken»). Jeden Teil einzeln drucken.</li>'+
       '<li>Mehrere Exemplare: mit <b>Vorschau</b> drucken, Exemplare <b>sortiert</b>. Acrobat schickt alle Exemplare als ein einziges Dokument – dann heftet der Drucker nicht.</li>'+
       '<li>Direkt drucken mit Heften, Falzen und Exemplaren geht in der Desktop-App der Library.</li>';
-    var ht = document.getElementById('tlBrHeftenTxt');
-    if(ht) ht.textContent = istHeft() ? 'Heften und falzen (Mittelheftung)' : 'Heften (2 Klammern links)';
   }
   info();
   Array.prototype.forEach.call(modalEl.querySelectorAll('[data-bf]'), function(b){
@@ -29672,41 +29664,37 @@ function tlBroschuere(){
   async function erzeugen(){
     var PDFLib = await ladePdfLib();
     var src = await PDFLib.PDFDocument.load(await datei.arrayBuffer(), {ignoreEncryption:true});
-    var teile = tlBrTeile(src.getPageCount(), art, maxBogen()), mehrere = teile.length > 1, res = [];
+    var teile = tlBrTeile(src.getPageCount(), TL_BR_MAXBOGEN), mehrere = teile.length > 1, res = [];
     for(var t = 0; t < teile.length; t++){
       var tl = teile[t], out = await PDFLib.PDFDocument.create();
       var idx = []; for(var k = tl.von; k < tl.bis; k++) idx.push(k);
-      if(!istHeft()){
-        (await out.copyPages(src, idx)).forEach(function(p){ out.addPage(p); });
-      } else {
-        var quell = idx.map(function(k){ return src.getPage(k); });
-        var eingebettet = await out.embedPages(quell);
-        var drehung = quell.map(function(p){ return (p.getRotation().angle || 0) % 360; });
-        var seiten = eingebettet.slice();
-        while(seiten.length % 4) seiten.push(null);
-        var n = seiten.length, gross = art === 'a3' ? TL_A3 : TL_A4;
-        var pw = gross[1], ph = gross[0], hw = pw / 2;   // Blatt quer, zwei Hälften
-        var setzen = function(blatt, i, x0){
-          var e = seiten[i];
-          if(!e) return;
-          var rot = drehung[i], gedreht = rot === 90 || rot === 270;
-          var ew = gedreht ? e.height : e.width, eh = gedreht ? e.width : e.height;
-          var f = Math.min(hw / ew, ph / eh), w = ew*f, h = eh*f;
-          var x = x0 + (hw - w)/2, y = (ph - h)/2;
-          // drawPage dreht um die linke untere Ecke -> Ankerpunkt verschieben (wie bei tlNup).
-          var ax = x, ay = y;
-          if(rot === 90){ ax = x; ay = y + h; }
-          else if(rot === 180){ ax = x + w; ay = y + h; }
-          else if(rot === 270){ ax = x + w; ay = y; }
-          blatt.drawPage(e, {x:ax, y:ay, xScale:f, yScale:f, rotate:PDFLib.degrees(-rot)});
-        };
-        for(var i = 0; i < n/2; i++){
-          var links = i % 2 === 0 ? n-1-i : i, rechts = i % 2 === 0 ? i : n-1-i;
-          var blatt = out.addPage([pw, ph]);
-          setzen(blatt, links, 0); setzen(blatt, rechts, hw);
-        }
+      var quell = idx.map(function(k){ return src.getPage(k); });
+      var eingebettet = await out.embedPages(quell);
+      var drehung = quell.map(function(p){ return (p.getRotation().angle || 0) % 360; });
+      var seiten = eingebettet.slice();
+      while(seiten.length % 4) seiten.push(null);
+      var n = seiten.length, gross = art === 'a3' ? TL_A3 : TL_A4;
+      var pw = gross[1], ph = gross[0], hw = pw / 2;   // Blatt quer, zwei Hälften
+      var setzen = function(blatt, i, x0){
+        var e = seiten[i];
+        if(!e) return;
+        var rot = drehung[i], gedreht = rot === 90 || rot === 270;
+        var ew = gedreht ? e.height : e.width, eh = gedreht ? e.width : e.height;
+        var f = Math.min(hw / ew, ph / eh), w = ew*f, h = eh*f;
+        var x = x0 + (hw - w)/2, y = (ph - h)/2;
+        // drawPage dreht um die linke untere Ecke -> Ankerpunkt verschieben (wie bei tlNup).
+        var ax = x, ay = y;
+        if(rot === 90){ ax = x; ay = y + h; }
+        else if(rot === 180){ ax = x + w; ay = y + h; }
+        else if(rot === 270){ ax = x + w; ay = y; }
+        blatt.drawPage(e, {x:ax, y:ay, xScale:f, yScale:f, rotate:PDFLib.degrees(-rot)});
+      };
+      for(var i = 0; i < n/2; i++){
+        var links = i % 2 === 0 ? n-1-i : i, rechts = i % 2 === 0 ? i : n-1-i;
+        var blatt = out.addPage([pw, ph]);
+        setzen(blatt, links, 0); setzen(blatt, rechts, hw);
       }
-      var endung = art === 'dossier' ? '_Dossier_A4' : '_Broschuere_' + (art === 'a3' ? 'A3' : 'A4');
+      var endung = '_Dossier_' + (art === 'a3' ? 'A4' : 'A5');
       res.push({ blob:new Blob([await out.save()], {type:'application/pdf'}),
         name: tlBasis(datei.name) + endung + (mehrere ? '_Teil' + (t+1) : '') + '.pdf',
         titel: tlBasis(datei.name) + (mehrere ? ' Teil ' + (t+1) : ''),
@@ -29718,7 +29706,7 @@ function tlBroschuere(){
     if(res.length < 2 && !mitOeffnen){ teileListe.innerHTML = ''; return; }
     teileListe.innerHTML = res.map(function(r, i){
       return '<div class="pr-hinweis" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+
-        '<span style="flex:1 1 auto;">📄 '+(res.length > 1 ? 'Teil '+(i+1)+': ' : '')+'Seiten '+r.von+'–'+r.bis+' ('+r.bogen+(istHeft() ? ' Bogen' : ' Blätter')+')</span>'+
+        '<span style="flex:1 1 auto;">📄 '+(res.length > 1 ? 'Teil '+(i+1)+': ' : '')+'Seiten '+r.von+'–'+r.bis+' ('+r.bogen+' Bogen)</span>'+
         (mitOeffnen ? '<button class="btn btn-ghost btn-sm" data-tlbr-oeffnen="'+i+'" type="button">🖨️ Öffnen</button>' : '')+
         '<button class="btn btn-ghost btn-sm" data-tlbr-laden="'+i+'" type="button">⬇︎</button></div>';
     }).join('');
@@ -29776,9 +29764,8 @@ function tlBroschuere(){
         var r = await desk.drucken({
           pdf: new Uint8Array(await res[i].blob.arrayBuffer()), titel: res[i].titel, drucker: name, exemplare: n,
           farbe: farbe, papier: TL_BR_ARTEN[art].papier,
-          seiten: istHeft() ? 'kurz' : 'lang',
-          heftung: !heften ? 'keine' : (istHeft() ? 'mitte' : 'links2'),
-          falzen: heften && art === 'a3', anpassen: !istHeft()
+          seiten: 'kurz', heftung: heften ? 'mitte' : 'keine',
+          falzen: heften && art === 'a3', anpassen: false
         });
         if(r && r.ok) ok++; else { fehler = (r && r.fehler) || 'unbekannter Fehler'; break; }
       }
