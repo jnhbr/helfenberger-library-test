@@ -1012,6 +1012,32 @@
   .ss-meter-mark{position:absolute;top:-2px;bottom:-2px;width:3px;background:var(--text);opacity:.6;}
   .ss-status{font-size:12px;color:var(--text-muted);}
   .ss-quelle{font-size:11px;color:var(--text-muted);}
+  /* 📖 Entdeckt (Sammlung) */
+  .ss-neu{position:absolute;left:50%;top:5%;transform:translate(-50%,-8px);z-index:2100;background:rgba(255,255,255,.9);color:#1e2433;border-radius:999px;padding:8px 18px;font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:clamp(16px,calc(2.6vh/var(--lz,1)),26px);box-shadow:0 8px 24px rgba(0,0,0,.18);opacity:0;transition:opacity .6s, transform .6s;pointer-events:none;white-space:nowrap;}
+  .ss-neu.on{opacity:1;transform:translate(-50%,0);}
+  .ss-dex{position:absolute;inset:3% 4%;z-index:5;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:20px;box-shadow:0 20px 50px rgba(0,0,0,.3);display:flex;flex-direction:column;overflow:hidden;}
+  .ss-dex[hidden]{display:none;}
+  .ss-dex-kopf{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-start;padding:16px 56px 10px 20px;position:relative;border-bottom:1px solid var(--border);}
+  .ss-dex-kopf > div:first-child{margin-right:auto;}
+  .ss-dex-titel{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:clamp(20px,calc(3vh/var(--lz,1)),28px);}
+  .ss-dex-sub{font-size:14px;color:var(--text-muted);}
+  .ss-dex-tabs{display:flex;flex-wrap:wrap;gap:6px;}
+  .ss-dex-zu{position:absolute;top:12px;right:14px;width:34px;height:34px;border-radius:50%;border:none;background:var(--surface-2);color:var(--text);font-size:16px;cursor:pointer;}
+  .ss-dex-body{flex:1;overflow:auto;padding:6px 20px 18px;}
+  .ss-dex-stufe{margin:14px 0 8px;font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-muted);}
+  .ss-dex-stufe span{text-transform:none;letter-spacing:0;font-weight:500;}
+  .ss-dex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+  .ss-dex-karte{position:relative;border:1px solid var(--border);border-radius:14px;padding:10px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;background:var(--surface);}
+  .ss-dex-rar{border-color:#e8b72c;background:color-mix(in srgb,#ffd166 14%,var(--surface));}
+  .ss-dex-bild{height:clamp(56px,calc(9vh/var(--lz,1)),90px);width:100%;display:flex;align-items:center;justify-content:center;}
+  .ss-dex-bild > svg{max-width:100%;max-height:100%;width:auto;height:100%;overflow:visible;}
+  .ss-unseen .ss-dex-bild > svg{filter:brightness(0);opacity:.18;}
+  .ss-unseen .ss-dex-name{color:var(--text-muted);}
+  .ss-dex-name{font-weight:800;font-size:15px;margin-top:4px;overflow-wrap:anywhere;hyphens:auto;}
+  .ss-dex-anz{font-size:12px;color:var(--text-muted);}
+  .ss-dex-fakt{font-size:12px;line-height:1.35;margin-top:4px;}
+  .ss-dex-neu{position:absolute;top:6px;right:6px;background:#ffe2a8;color:#7a4b00;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}
+  .ss-dex-fuss{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-top:16px;font-size:12px;color:var(--text-muted);}
   @media (max-width:900px){
     .ss-ui{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;}
     .ss-ui .rp-col-speak{display:none;}
@@ -9816,7 +9842,7 @@ var KIB_WISSEN = [
   {id:'lp-material', fuer:'lp', f:'Wie lege ich ein Quiz oder eine Umfrage in einen Fach-Ordner?', w:'unterrichtsmaterial zusatzmaterial material ordner ablegen quiz umfrage wortwolke karteikarten paket importieren aus dem klassenzimmer lehrer-html planung', ziel:'klassenzimmer',
    a:'Im Fach auf «🏫 Aus dem Klassenzimmer»: Klassen-Quiz, Karteikarten, Wortwolke, Blitzumfrage, Millionär-Set oder Prüfung neu anlegen oder Vorhandenes in den offenen Ordner holen. Es steht dann unter den Übungen, mit «▶︎ Starten».\nGesammelt findest du alles unter 🏫 Klassenzimmer › «🗃️ Unterrichtsmaterial».'},
   {id:'lp-stille-safari', fuer:'lp', f:'Was ist die «Stille Safari» in der Ruhephase?', w:'stille safari shy safari tiere ruhe lärm leise ruhephase lärmampel savanne riff wald mikrofon belohnen', ziel:'klassenzimmer',
-   a:'Im 🏫 Klassenzimmer › ⏱ Ruhephase in der Mitte von «🚦 Lärmampel» auf «🦒 Stille Safari» umschalten. Am Beamer ist dann eine ruhige Szene (Savanne, Korallenriff oder Wald). Solange der Timer läuft und es leise bleibt, kommen nach und nach Tiere hervor – das erste nach 10–20 Sekunden, insgesamt etwa 9 in einer ruhigen Ruhephase, manche sind selten. Wird es zu laut, wird die Szene neblig und die Tiere verstecken sich, bis es wieder ruhig ist (oder sie laufen davon / es wird nur neblig – unter ⚙️). Keine Punkte, kein Rot.\nPausierst du den Timer, drehen sich die Tiere zur Klasse und hören zu. ↺ oder eine neue Dauer starten eine neue, leere Szene.\n⚙️ unten: Ruhe-Grenze (mit Pegelanzeige), Tempo, Verhalten bei Lärm. Das Mikrofon misst nur den Pegel auf deinem Gerät, nichts wird aufgezeichnet oder gesendet.\nIdee und Grafiken: verändert nach teacher.dev/shy-safari (Open Source, Apache-2.0).'},
+   a:'Im 🏫 Klassenzimmer › ⏱ Ruhephase in der Mitte von «🚦 Lärmampel» auf «🦒 Stille Safari» umschalten. Am Beamer ist dann eine ruhige Szene (Savanne, Korallenriff oder Wald). Solange der Timer läuft und es leise bleibt, kommen nach und nach Tiere hervor – das erste nach 10–20 Sekunden, insgesamt etwa 9 in einer ruhigen Ruhephase, manche sind selten. Wird es zu laut, wird die Szene neblig und die Tiere verstecken sich, bis es wieder ruhig ist (oder sie laufen davon / es wird nur neblig – unter ⚙️). Keine Punkte, kein Rot.\nPausierst du den Timer, drehen sich die Tiere zur Klasse und hören zu. ↺ oder eine neue Dauer starten eine neue, leere Szene.\n📖 Entdeckt: alle Tiere der Szene – entdeckte mit Namen und Steckbrief, die anderen als graue Silhouette (pro Klasse auf diesem Gerät gespeichert).\n⚙️ unten: Ruhe-Grenze (mit Pegelanzeige), Tempo, Verhalten bei Lärm. Das Mikrofon misst nur den Pegel auf deinem Gerät, nichts wird aufgezeichnet oder gesendet.\nIdee und Grafiken: verändert nach teacher.dev/shy-safari (Open Source, Apache-2.0).'},
   {id:'lp-wer-macht-mit', fuer:'lp', f:'Wie mische ich Klassen im Glücksrad oder bei den Gruppen?', w:'glücksrad wer ist dran gruppen partner ruhephase flüstern andere klasse mischen gäste einzelne schüler dazunehmen auswahl wer macht mit abwesend', ziel:'klassenzimmer',
    a:'Im 🏫 Klassenzimmer oben rechts in 🎲 Zufall, ⏱ Ruhephase und 👥 Gruppen & Partner auf «👥 …» tippen. Dort wählst du ganze Klassen aus der ganzen Schule, deine 👥 Gruppen und einzelne Schüler:innen (Suchfeld) – z. B. die G2b und drei aus der E3a. Wer heute fehlt: Namen antippen.\nDie Auswahl gilt für Glücksrad, Wer ist dran?, Gruppen & Partner und die Flüsterliste und bleibt auf deinem Gerät gespeichert.'},
   {id:'lp-energizer', fuer:'lp', f:'Wo finde ich Energizer und Aktivierungsspiele?', w:'energizer aktivierung aktivierungsspiel bewegung pause spiel spiele auflockern konzentration ruhe atmung', ziel:'klassenzimmer',
@@ -17939,6 +17965,94 @@ function ssIntervallMs(totalSek, tempo){
 var SS_SPARKLES = [{x:6,y:10,s:1,d:0},{x:86,y:2,s:.75,d:.9},{x:100,y:60,s:.9,d:1.7},{x:60,y:98,s:.65,d:.45},{x:18,y:86,s:.85,d:1.3},{x:44,y:-6,s:.6,d:2.1},{x:72,y:40,s:.5,d:2.6}];
 var SS_MAX_TIERE = 30;
 
+/* 📖 Entdeckt (wie die «Collection» im Original): alle Tiere einer Szene nach
+   Seltenheit, entdeckte in Farbe mit Name und kurzem Steckbrief, noch nicht
+   entdeckte als graue Silhouette. Gezählt wird pro Klasse (state.klasse),
+   lokal auf dem Beamer-Gerät (hl_safari_dex). Namen und Steckbriefe sind
+   neu auf Deutsch geschrieben (das Original hat keine Fakten zu diesen Tieren). */
+var SAFARI_TIERE = {
+  // Savanne
+  'meerkat':['Erdmännchen','Während die Gruppe frisst, hält eines Wache und pfeift bei Gefahr.'],
+  'warthog':['Warzenschwein','Beim Fressen kniet es oft auf seinen Vorderbeinen.'],
+  'zebra':['Zebra','Jedes Zebra hat ein eigenes Streifenmuster – wie ein Fingerabdruck.'],
+  'gazelle':['Gazelle','Sie rennt bis zu 80 km/h schnell und schlägt dabei Haken.'],
+  'ostrich':['Strauss','Der grösste Vogel der Welt kann nicht fliegen, rennt aber bis zu 70 km/h.'],
+  'guinea-fowl':['Perlhuhn','Perlhühner leben in Gruppen und warnen mit lautem Geschrei vor Feinden.'],
+  'tortoise':['Landschildkröte','Bei Gefahr zieht sie Kopf und Beine in ihren Panzer ein.'],
+  'hornbill':['Nashornvogel','Bei vielen Nashornvögeln mauert sich das Weibchen zum Brüten in einer Baumhöhle ein – das Männchen füttert es durch einen Spalt.'],
+  'giraffe':['Giraffe','Das höchste Tier der Welt. Ihre dunkle Zunge ist etwa 45 cm lang.'],
+  'hippo':['Flusspferd','Am Tag bleibt es im Wasser, in der Nacht frisst es an Land Gras.'],
+  'rhino':['Nashorn','Sein Horn ist aus Keratin – dem gleichen Stoff wie unsere Fingernägel.'],
+  'cheetah':['Gepard','Das schnellste Landtier: bis zu 100 km/h – aber nur für kurze Zeit.'],
+  'flamingo':['Flamingo','Seine rosa Farbe kommt vom Futter: kleinen Krebsen und Algen.'],
+  'vulture':['Geier','Er entdeckt aus grosser Höhe tote Tiere und räumt so die Savanne auf.'],
+  'lion':['Löwe','Löwen sind die einzigen Katzen, die in Gruppen leben – im Rudel.'],
+  'leopard':['Leopard','Er schleppt seine Beute auf einen Baum, damit niemand sie stiehlt.'],
+  'elephant':['Elefant','Das grösste Landtier der Welt. In seinem Rüssel stecken Zehntausende Muskeln.'],
+  // Korallenriff
+  'clownfish':['Clownfisch','Er wohnt in einer Seeanemone, deren Nesseln ihm nichts anhaben.'],
+  'blue-tang':['Paletten-Doktorfisch','Am Schwanz hat er eine scharfe Klinge wie ein Skalpell – daher «Doktor».'],
+  'angelfish':['Kaiserfisch','Junge Kaiserfische sehen oft ganz anders aus als die erwachsenen.'],
+  'seahorse':['Seepferdchen','Beim Seepferdchen bekommt das Männchen die Babys.'],
+  'starfish':['Seestern','Verliert ein Seestern einen Arm, wächst ihm ein neuer nach.'],
+  'crab':['Krabbe','Krabben laufen meistens seitwärts.'],
+  'shrimp':['Garnele','Manche Garnelen putzen grosse Fische und fressen ihnen die Parasiten weg.'],
+  'parrotfish':['Papageifisch','Er knabbert Algen von den Korallen – und macht dabei feinen weissen Sand.'],
+  'pufferfish':['Kugelfisch','Bei Gefahr pumpt er sich mit Wasser zu einer dicken Kugel auf.'],
+  'octopus':['Krake','Ein Krake hat drei Herzen, blaues Blut und acht Arme.'],
+  'sea-turtle':['Meeresschildkröte','Sie legt ihre Eier an dem Strand ab, an dem sie selbst geschlüpft ist.'],
+  'moray-eel':['Muräne','Sie hat ein zweites Kiefer im Hals, das die Beute hineinzieht.'],
+  'stingray':['Stachelrochen','Er versteckt sich gern im Sand – nur die Augen schauen heraus.'],
+  'jellyfish-bloom':['Quallen','Quallen haben kein Gehirn und bestehen fast nur aus Wasser.'],
+  'cuttlefish':['Sepia','Dieser Tintenfisch kann in einem Augenblick seine Farbe wechseln.'],
+  'hammerhead-shark':['Hammerhai','Mit seinem breiten Kopf spürt er Beute auf, die im Sand versteckt ist.'],
+  'manta-ray':['Mantarochen','Er wird bis zu 7 Meter breit und frisst nur winziges Plankton.'],
+  'whale-shark':['Walhai','Der grösste Fisch der Welt ist harmlos: Er frisst nur Plankton.'],
+  // Wald
+  'chipmunk':['Streifenhörnchen','In seinen Backentaschen trägt es Vorräte in sein Versteck.'],
+  'gray-squirrel':['Grauhörnchen','Im Herbst vergräbt es Tausende Nüsse – und findet viele davon wieder.'],
+  'robin':['Wanderdrossel','Auf Englisch heisst sie «Robin» wie unser Rotkehlchen, ist aber eine grössere Drossel.'],
+  'hedgehog':['Igel','Ein Igel hat etwa 6000 Stacheln und hält im Winter Winterschlaf.'],
+  'cottontail':['Baumwollschwanz-Kaninchen','Sein Schwanz sieht aus wie ein weisser Wattebausch.'],
+  'woodpecker':['Specht','Er hämmert bis zu 20-mal pro Sekunde gegen einen Baum.'],
+  'skunk':['Stinktier','Bei Gefahr stampft es zuerst als Warnung – dann spritzt es eine stinkende Flüssigkeit.'],
+  'raccoon':['Waschbär','Er tastet sein Futter mit den Pfoten ab, als würde er es waschen.'],
+  'great-horned-owl':['Virginia-Uhu','Eulen können ihren Kopf so weit drehen, dass sie fast nach hinten schauen.'],
+  'porcupine':['Baumstachler','Er hat rund 30 000 Stacheln, die im Angreifer stecken bleiben.'],
+  'badger':['Dachs','Er gräbt grosse Baue unter der Erde mit vielen Gängen.'],
+  'beaver':['Biber','Biber bauen Dämme aus Ästen und Schlamm – auch bei uns im Thurgau.'],
+  'red-fox':['Rotfuchs','Er hört eine Maus unter dem Schnee und springt dann kopfüber hinein.'],
+  'white-tailed-deer':['Weisswedelhirsch','Bei Gefahr hebt er seinen weissen Schwanz als Warnsignal.'],
+  'gray-wolf':['Wolf','Wölfe leben im Rudel. Seit einigen Jahren gibt es auch in der Schweiz wieder Wölfe.'],
+  'black-bear':['Schwarzbär','Ein guter Kletterer, der vor allem Beeren, Nüsse und Insekten frisst.'],
+  'moose':['Elch','Sein Geweih wird fast 2 Meter breit – und fällt jeden Winter ab.']
+};
+var SAFARI_STUFEN = [['common','Häufig'],['uncommon','Selten'],['rare','Sehr selten']];
+function safariDexKlasse(){ return (typeof state !== 'undefined' && state && state.klasse) || '_'; }
+function safariDexLaden(){
+  var alle = {};
+  try{ alle = JSON.parse(lsGet(LIB_PREFIX + 'safari_dex') || '{}') || {}; }catch(e){ alle = {}; }
+  return alle;
+}
+function safariDexGesehen(){ var alle = safariDexLaden(), k = safariDexKlasse(); return alle[k] && typeof alle[k] === 'object' ? alle[k] : {}; }
+function safariDexMerken(szene, slug){
+  var alle = safariDexLaden(), k = safariDexKlasse();
+  if(!alle[k] || typeof alle[k] !== 'object') alle[k] = {};
+  var key = szene + ':' + slug, neu = !alle[k][key];
+  alle[k][key] = (alle[k][key] || 0) + 1;
+  lsSet(LIB_PREFIX + 'safari_dex', JSON.stringify(alle));
+  return neu;
+}
+function safariDexLeeren(){
+  var alle = safariDexLaden(); delete alle[safariDexKlasse()];
+  lsSet(LIB_PREFIX + 'safari_dex', JSON.stringify(alle));
+}
+function safariDexKlasseName(){
+  var k = safariDexKlasse();
+  if(k === '_') return 'Diese Klasse';
+  try{ return klasseLabel(k); }catch(e){ return k; }
+}
+
 /* Die Ruhephase im Safari-Modus: Szene als Hintergrund, Timer und
    Flüsterliste als Karten darüber. Der Timer meldet über onChange, ob er
    läuft — nur dann kommen Tiere und nur dann zählt der Lärm. */
@@ -17955,7 +18069,7 @@ function mountSafariRuhephase(stage){
 
   var h = '<div class="ss-wrap">';
   h += '<div class="ss-stage" id="ssStage" data-scene="' + esc(cfg.szene) + '" data-modus="' + esc(cfg.laut) + '">';
-  h += '<div class="ss-world" id="ssWorld"></div><div class="ss-veil"></div><div class="ss-hint" id="ssHint"></div></div>';
+  h += '<div class="ss-world" id="ssWorld"></div><div class="ss-veil"></div><div class="ss-hint" id="ssHint"></div><div class="ss-neu" id="ssNeu"></div></div>';
   h += '<div class="ss-ui">';
   h += '<div class="ss-card rp-col rp-col-timer" id="rpTimer"></div>';
   h += '<div class="ss-mid">';
@@ -17975,10 +18089,11 @@ function mountSafariRuhephase(stage){
   SAFARI_SZENEN.forEach(function(s){
     h += '<button class="ss-szene' + (s.id === cfg.szene ? ' on' : '') + '" data-szene="' + s.id + '" type="button">' + s.icon + ' ' + esc(s.name) + '</button>';
   });
+  h += '<button class="ss-szene" id="ssDexBtn" type="button" title="Alle Tiere – entdeckte und noch versteckte">📖 Entdeckt</button>';
   h += '<button class="ss-szene" id="ssZahnrad" type="button" title="Einstellungen">⚙️</button></div>';
   h += '</div>';
   h += '<div class="ss-card rp-col rp-col-speak" id="rpSpeak"></div>';
-  h += '</div></div>';
+  h += '</div><div class="ss-dex" id="ssDex" hidden></div></div>';
   stage.innerHTML = h;
 
   var sceneEl = stage.querySelector('#ssStage'), worldEl = stage.querySelector('#ssWorld');
@@ -17992,7 +18107,7 @@ function mountSafariRuhephase(stage){
   var S = {
     daten:null, ladeFehler:false, tiere:[], nextId:1, phase:'bereit', hush:false, total:300,
     clock:null, noise:'quiet', since:-Infinity, samples:[], aktivVorher:false,
-    scare:{left:3000, first:true}, fertigSeit:0
+    scare:{left:3000, first:true}, fertigSeit:0, neuJetzt:{}
   };
   S.clock = ssNewClock(ssIntervallMs(S.total, cfg.tempo), true);
   var stopped = false, raf = null, stream = null, ctx = null, analyser = null, buf = null, smooth = 0, lastSample = 0;
@@ -18013,7 +18128,7 @@ function mountSafariRuhephase(stage){
     if(S.ladeFehler) t = 'Die Szene konnte nicht geladen werden — Internet prüfen und Szene nochmals antippen.';
     else if(!S.daten) t = '';
     else if(S.phase === 'bereit' && !S.tiere.length) t = 'Timer starten — bleibt es ruhig, kommen die Tiere hervor.';
-    else if(S.phase === 'fertig') t = 'Geschafft — danke für die Ruhe! 🌿';
+    else if(S.phase === 'fertig') t = 'Geschafft — danke für die Ruhe! 🌿 Unter 📖 seht ihr, wen ihr entdeckt habt.';
     if(hintEl.textContent !== t) hintEl.textContent = t;
   }
 
@@ -18078,6 +18193,71 @@ function mountSafariRuhephase(stage){
     if(ro) ro.observe(sw);
     c.m = ssCreateMotion(c.p, Math.random(), Math.random(), c.depth, fp(c), def.flips !== undefined ? def.flips : c.p.flips);
     S.tiere.push(c);
+    if(safariDexMerken(cfg.szene, def.slug)){
+      S.neuJetzt[cfg.szene + ':' + def.slug] = 1;
+      neuMelden(def);
+    }
+    if(!dexEl.hidden) dexZeigen(dexSzene);
+  }
+
+  // Zum ersten Mal entdeckt: kurz oben in der Szene den Namen zeigen.
+  var neuEl = stage.querySelector('#ssNeu'), neuTimer = null;
+  function neuMelden(def){
+    var info = SAFARI_TIERE[def.slug];
+    neuEl.textContent = '✨ Neu entdeckt: ' + (info ? info[0] : def.slug);
+    neuEl.classList.add('on');
+    clearTimeout(neuTimer);
+    neuTimer = setTimeout(function(){ neuEl.classList.remove('on'); }, 5000);
+  }
+
+  // 📖 Entdeckt: alle Tiere der Szene, nicht entdeckte als graue Silhouette.
+  var dexEl = stage.querySelector('#ssDex'), dexSzene = cfg.szene, dexLeerenArm = false;
+  function dexZeigen(id){
+    dexSzene = id;
+    var sz = SAFARI_SZENEN.filter(function(x){ return x.id === id; })[0];
+    var h = '<div class="ss-dex-kopf"><div><div class="ss-dex-titel">📖 Entdeckt – ' + esc(sz.icon + ' ' + sz.name) + '</div>'
+      + '<div class="ss-dex-sub" id="ssDexSub">wird geladen …</div></div>'
+      + '<div class="ss-dex-tabs">';
+    SAFARI_SZENEN.forEach(function(x){ h += '<button type="button" class="ss-szene' + (x.id === id ? ' on' : '') + '" data-dex="' + x.id + '">' + x.icon + ' ' + esc(x.name) + '</button>'; });
+    h += '</div><button type="button" class="ss-dex-zu" id="ssDexZu" title="Schliessen">✕</button></div><div class="ss-dex-body" id="ssDexBody"></div>';
+    dexEl.innerHTML = h;
+    dexEl.querySelector('#ssDexZu').addEventListener('click', function(){ dexEl.hidden = true; });
+    Array.prototype.forEach.call(dexEl.querySelectorAll('[data-dex]'), function(b){
+      b.addEventListener('click', function(){ dexLeerenArm = false; dexZeigen(b.getAttribute('data-dex')); });
+    });
+    safariDatenLaden(id).then(function(d){
+      if(stopped || dexSzene !== id || dexEl.hidden) return;
+      var gesehen = safariDexGesehen(), anzahl = 0;
+      var body = '';
+      SAFARI_STUFEN.forEach(function(st){
+        var defs = d.roster.filter(function(x){ return x.tier === st[0]; });
+        if(!defs.length) return;
+        body += '<div class="ss-dex-stufe">' + st[1] + ' <span>· ' + SS_TIER_WEIGHT[st[0]] + ' % der Ankünfte</span></div><div class="ss-dex-grid">';
+        defs.forEach(function(x){
+          var n = gesehen[id + ':' + x.slug] || 0, info = SAFARI_TIERE[x.slug] || [x.slug, ''];
+          if(n) anzahl++;
+          body += '<div class="ss-dex-karte' + (n ? '' : ' ss-unseen') + (st[0] === 'rare' ? ' ss-dex-rar' : '') + '"' + (n && info[1] ? ' title="' + esc(info[1]) + '"' : '') + '>'
+            + (S.neuJetzt[id + ':' + x.slug] ? '<span class="ss-dex-neu">neu!</span>' : '')
+            + '<div class="ss-dex-bild">' + (d.art[x.slug] || '') + '</div>'
+            + '<div class="ss-dex-name">' + esc(n ? info[0] : '???') + '</div>'
+            + '<div class="ss-dex-anz">' + (n ? (n === 1 ? '1× gesehen' : n + '× gesehen') : 'noch nicht entdeckt') + '</div>'
+            + (n && info[1] ? '<div class="ss-dex-fakt">' + esc(info[1]) + '</div>' : '')
+            + '</div>';
+        });
+        body += '</div>';
+      });
+      body += '<div class="ss-dex-fuss"><span>Gespeichert auf diesem Gerät, pro Klasse.</span>'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="ssDexLeeren">' + (dexLeerenArm ? 'Wirklich alles löschen? Nochmals tippen' : 'Sammlung dieser Klasse zurücksetzen') + '</button></div>';
+      dexEl.querySelector('#ssDexBody').innerHTML = body;
+      dexEl.querySelector('#ssDexSub').textContent = safariDexKlasseName() + ' hat ' + anzahl + ' von ' + d.roster.length + ' Tieren entdeckt.';
+      dexEl.querySelector('#ssDexLeeren').addEventListener('click', function(){
+        if(!dexLeerenArm){ dexLeerenArm = true; dexZeigen(id); return; }
+        dexLeerenArm = false; safariDexLeeren(); S.neuJetzt = {}; dexZeigen(id);
+      });
+    }, function(){
+      if(stopped || dexSzene !== id) return;
+      dexEl.querySelector('#ssDexSub').textContent = 'Konnte nicht geladen werden — Internet prüfen.';
+    });
   }
 
   function fp(c){ return {width:(c.w || 1) / sceneW, height:(c.h || 1) / sceneH, aspect:sceneH / sceneW}; }
@@ -18218,6 +18398,10 @@ function mountSafariRuhephase(stage){
     b.addEventListener('click', function(){ szeneZeigen(b.getAttribute('data-szene')); });
   });
   stage.querySelector('#ssZahnrad').addEventListener('click', function(){ panel.hidden = !panel.hidden; });
+  stage.querySelector('#ssDexBtn').addEventListener('click', function(){
+    if(!dexEl.hidden){ dexEl.hidden = true; return; }
+    dexEl.hidden = false; dexLeerenArm = false; dexZeigen(cfg.szene);
+  });
   var grenzeEl = stage.querySelector('#ssGrenze');
   function marke(){ markEl.style.left = 'calc(' + cfg.grenze + '% - 1px)'; }
   grenzeEl.addEventListener('input', function(){ cfg.grenze = parseInt(grenzeEl.value, 10); lsSet(LIB_PREFIX + 'safari_grenze', String(cfg.grenze)); marke(); });
@@ -18266,6 +18450,7 @@ function mountSafariRuhephase(stage){
   beamer.cleanups.push(function(){
     stopped = true;
     if(raf) cancelAnimationFrame(raf);
+    clearTimeout(neuTimer);
     if(ro) ro.disconnect();
     mikroStop();
     stage.classList.remove('kz-stage-safari');
@@ -22566,6 +22751,7 @@ const NEUIGKEITEN = [
   {id:'2026-10-20-eins-gegen-alle', datum:'2026-10-20', fuer:'alle', text:'🔦 Neues Live-Spiel «Eins gegen alle»: Eine Person im Spotlight spielt gegen die ganze Klasse. Zuerst antwortet ihr still auf dem Gerät – die Frage steht nicht am Beamer –, dann die Person im Spotlight, mit drei Jokern. Niemand scheidet aus: Wer falsch liegt, spielt in der Comeback-Crew weiter.'},
   {id:'2026-10-20-eins-gegen-alle-lp', datum:'2026-10-20', fuer:'lehrer', text:'🔦 Klassenzimmer › 🎮 Spiele › «Eins gegen alle» (auch über «🎲 Anderes Spiel» bei jedem Spiel-Set oder Klassen-Quiz): Spotlight auslosen oder selbst wählen, Fragen pro Runde, Chancen und Zeit einstellbar. Antwortet die Person im Spotlight mündlich, tippst du ihre Antwort am Beamer an.'},
   {id:'2026-10-20-rechen-cafe', datum:'2026-10-20', fuer:'alle', text:'☕ Mathe › ⚡ Übungstrainer › «Rechen-Café»: Du stehst an der Kasse – Bestellung eintippen, Aktion in %, MWST, Trinkgeld, auf 5 Rappen runden und das Rückgeld mit Noten und Münzen geben. 10 Level, du kontrollierst sofort selbst.'},
+  {id:'2026-10-20-safari-entdeckt', datum:'2026-10-20', fuer:'lehrer', text:'📖 Stille Safari: Unter «📖 Entdeckt» siehst du alle Tiere jeder Szene – die schon entdeckten mit Namen, wie oft sie da waren und einem kurzen Steckbrief, die anderen als graue Silhouette. Gezählt wird pro Klasse. Ein neu entdecktes Tier wird kurz mit Namen angezeigt.'},
   {id:'2026-10-20-stille-safari', datum:'2026-10-20', fuer:'lehrer', text:'🦒 Neu in der ⏱ Ruhephase: «Stille Safari» statt Lärmampel (Umschalter in der Mitte). Am Beamer ist eine ruhige Savanne, ein Korallenriff oder ein Wald. Solange der Timer läuft und es leise ist, kommen nach und nach Tiere hervor; wird es zu laut, wird es neblig und die Tiere verstecken sich. Keine Punkte, kein Rot. Pausierst du den Timer, drehen sich die Tiere zur Klasse und hören zu. ⚙️ unten: Ruhe-Grenze, Tempo und was bei Lärm passiert. Verändert nach teacher.dev/shy-safari (Apache-2.0).'},
   {id:'2026-10-20-fragen-import', datum:'2026-10-20', fuer:'lehrer', text:'📥 Fragen aus Quizlet, Kahoot, Blooket, Moodle (GIFT/XML), Canvas, Blackboard, Anki u. a. importieren: Klassenzimmer › Karteikarten bzw. Klassen-Quiz › «📥 Importieren» (auch im Unterrichtsmaterial und im Fach unter «🏫 Aus dem Klassenzimmer»). Datei wählen oder den Quizlet-Export einfügen, in der Vorschau Fragen an- und abwählen, dann als Karteikarten-Set oder Klassen-Quiz ins Fach speichern. Die Datei wird nur im Browser gelesen, nichts wird hochgeladen.'},
   {id:'2026-10-20-pruefung-download', datum:'2026-10-20', fuer:'lehrer', text:'📄 Prüfungen: «Abgaben herunterladen» speichert pro Person ein PDF mit allen Aufgaben samt Bildern, Antworten, Punkten, der Note und einer Zeile für die Unterschrift der Eltern in einen Ordner deiner Wahl (Chrome, Edge, Desktop-App). Dazu kommt ein Sammel-PDF zum Drucken in einem Rutsch, in dem jede Person auf einem neuen Blatt beginnt. Neu ist auch «✍️ Note von Hand» unter «Details»: Damit überschreibst du die berechnete Note, z. B. nach einer Korrektur auf Papier. Die Note gilt dann überall.'},
