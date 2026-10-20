@@ -21733,6 +21733,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-20-spiel-vor-aemtli', datum:'2026-10-20', fuer:'alle', text:'🎮 Startet deine Lehrperson ein Live-Spiel, während der Hinweis «Heute bist du mit dem Ämtli dran» offen ist, öffnet sich das Spiel jetzt trotzdem von selbst. Dein Ämtli siehst du weiterhin auf der Startseite.'},
   {id:'2026-10-20-eigenes-fenster', datum:'2026-10-20', fuer:'lehrer', text:'🪟 Klassenzimmer › «🪟 Eigenes Fenster: an»: Wortwolken, Umfragen, Spiele und Beamer-Werkzeuge starten dann in einem eigenen Fenster im Vollbild (z. B. auf den Beamer ziehen), die Library bleibt daneben frei. Es läuft immer nur eines aufs Mal: Startest du etwas Neues, fragt die Library, ob das Laufende beendet werden soll.'},
   {id:'2026-10-20-sva-grobkonzept', datum:'2026-10-20', fuer:'alle', text:'🎓 SVA: Neue Abgaben! Dein Grobkonzept gibst du schon am Montag, 2. November, bis 12 Uhr ab – an diesem Morgen schreibst du es in der Schule fertig, wer fertig ist, darf nach Hause. Du kannst ab sofort selbstständig damit beginnen. Das Dossier-Gerüst ist neu am Mittwoch, 18. November, fällig.'},
   {id:'2026-10-19-dossier-drucken', datum:'2026-10-19', fuer:'lehrer', text:'📖 🧰 Tools › «Dossier drucken» (früher «Broschüre drucken»): A5- oder A4-Dossier, gefalzt und in der Mitte geheftet, Dicke Dossiers werden automatisch auf Teile mit höchstens 16 Bogen verteilt – mehr schafft der Hefter nicht. In der Desktop-App der Library druckst du direkt: Drucker, Exemplare, Farbe und Heften wählen, fertig.'},
@@ -22183,7 +22184,8 @@ function aemtliTagesHinweis(cfg){
   openModal(
     '<div class="ae-pop"><div class="ae-pop-icon">🧹</div>'
     + '<h3>Heute bist du mit dem Ämtli dran</h3>' + zeile + '</div>'
-    + '<div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Alles klar</button></div>'
+    + '<div class="modal-actions"><button class="btn btn-primary btn-sm" id="modalOk" type="button">Alles klar</button></div>',
+    'modal-hinweis'
   );
   document.getElementById('modalOk').addEventListener('click', closeModal);
 }
@@ -24375,7 +24377,10 @@ function lspAuto(){
   lspDabeiMelden();
   if(lsp.autoFor === s.spielId || lsp.offen || s.phase === 'ende') return;
   if(pruef.sess) return;
-  if(modalEl.classList.contains('show')) return;
+  // Ein reiner Hinweis (z. B. «Heute bist du mit dem Ämtli dran») darf ein
+  // Live-Spiel nicht blockieren — das Spiel ersetzt ihn, der Ämtli-Hinweis
+  // steht ja auch auf der Startseite. Andere offene Dialoge bleiben.
+  if(modalEl.classList.contains('show') && !modalEl.querySelector('.modal-hinweis')) return;
   lsp.autoFor = s.spielId;
   openLspS();
 }
