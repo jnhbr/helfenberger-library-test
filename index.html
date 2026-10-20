@@ -13250,10 +13250,10 @@ var SVA_CHECKS = [2,1,2,2,2,2,2,1,2,2,1,2,2,2];   // Selbstcheck-Punkte pro Stat
 var SVA_AUFFRISCHEN = [1,2,1,1];                     // Selbstcheck-Punkte der Pflicht-Stationen a1…a4 (zuerst)
 var SVA_ABGABE_PUNKTE = 21;
 var SVA_TERMINE = [
-  {id:'thema',      d:'2026-11-02', bis:null,         typ:'erinnerung', t:'SVA: Themenfindung', text:'Montagmorgen in der Schule. Ziel: Dein Thema ist konkret und bereit zur Umsetzung.'},
-  {id:'grundstein', d:'2026-11-23', bis:'2026-11-25', typ:'erinnerung', t:'SVA: Grundsteine und erste Schritte (23.–25.11.)', text:'Schule / zu Hause. Grobkonzept, Dossier-Gerüst und Materialliste stehen, erste Arbeitsschritte sind gemacht.'},
-  {id:'grob',       d:'2026-11-25', bis:null,         typ:'abgabe',     t:'SVA: Grobkonzept abgeben', text:'Unterschrieben von dir, deinen Eltern und der Lehrperson.'},
-  {id:'geruest',    d:'2026-11-25', bis:null,         typ:'abgabe',     t:'SVA: Dossier-Gerüst abgeben', text:'Titelseite, Kapitel, Verzeichnisse, Kopf- und Fusszeile stehen.'},
+  {id:'thema',      d:'2026-11-02', bis:null,         typ:'erinnerung', t:'SVA: Thema und Grobkonzept (ganzer Montagmorgen)', text:'07:30–12:00 in der Schule bei deiner Klassenlehrperson. Dein Thema steht, du schreibst dein Grobkonzept fertig und gibst es ab. Wer fertig ist, darf nach Hause. Du kannst schon vorher selbstständig damit beginnen – ein gutes Grobkonzept ist das A und O!'},
+  {id:'grob',       d:'2026-11-02', bis:null,         typ:'abgabe',     t:'SVA: Grobkonzept abgeben (bis 12 Uhr)', text:'Bis Montag, 2.11., 12:00 im Briefkasten. Ausgedruckt unterschreiben lassen: du, deine Eltern und die Lehrperson.'},
+  {id:'geruest',    d:'2026-11-18', bis:null,         typ:'abgabe',     t:'SVA: Dossier-Gerüst abgeben', text:'Titelseite, Kapitel, Verzeichnisse, Kopf- und Fusszeile stehen.'},
+  {id:'grundstein', d:'2026-11-23', bis:'2026-11-25', typ:'erinnerung', t:'SVA: Grundsteine und erste Schritte (23.–25.11.)', text:'Schule / zu Hause. Grobkonzept und Dossier-Gerüst sind abgegeben, die Materialliste steht – jetzt kommen die ersten Arbeitsschritte.'},
   {id:'frei1',      d:'2026-12-09', bis:'2026-12-11', typ:'erinnerung', t:'SVA: Freie Arbeitszeit zu Hause (9.–11.12.)', text:'Arbeitsplatz und Material sind bereit. Protokoll laufend schreiben.'},
   {id:'stand1',     d:'2026-12-11', bis:null,         typ:'abgabe',     t:'SVA: Zwischenstand + erster Rapport', text:'Aktuelles Dossier abgeben und der Lehrperson kurz berichten.'},
   {id:'frei2',      d:'2027-01-19', bis:'2027-01-21', typ:'erinnerung', t:'SVA: Freie Arbeitszeit zu Hause (19.–21.1.)', text:'Die SVA ist danach zum grossen Teil gemacht, das Dossier ziemlich fertig.'},
@@ -13790,7 +13790,7 @@ function svaAchtungGruende(x, daten, heute){
   if(!p) return g;
   ['dez','jan'].forEach(function(k){ if(p.r[k] && p.r[k].hilfe) g.push({art:'rot', t:'wünscht ein Gespräch (Rapport '+(k === 'dez' ? 'Dezember' : 'Januar')+')'}); });
   var felder = SVA_GK_FELDER.filter(function(f){ return (p.g[f[0]] || '').trim(); }).length;
-  if(heute >= svaTagePlus('2026-11-25', -7) && r.status !== 'ok' && felder < SVA_GK_FELDER.length) g.push({art:'rot', t:'Grobkonzept unvollständig ('+felder+' von '+SVA_GK_FELDER.length+' Feldern), Abgabe 25.11.'});
+  if(heute >= svaTagePlus('2026-11-02', -7) && r.status !== 'ok' && felder < SVA_GK_FELDER.length) g.push({art:'rot', t:'Grobkonzept unvollständig ('+felder+' von '+SVA_GK_FELDER.length+' Feldern), Abgabe Mo 2.11., 12 Uhr'});
   if(r.status === 'ueber') g.push({art:'gelb', t:'Grobkonzept: Überarbeitung offen'});
   if(p.g.bereit && !r.status) g.push({art:'gelb', t:'Grobkonzept bereit – wartet auf deine Rückmeldung'});
   if(heute > '2026-12-11' && !(p.r.dez && p.r.dez.am)) g.push({art:'gelb', t:'Rapport Dezember fehlt'});
@@ -21530,6 +21530,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-20-sva-grobkonzept', datum:'2026-10-20', fuer:'alle', text:'🎓 SVA: Neue Abgaben! Dein Grobkonzept gibst du schon am Montag, 2. November, bis 12 Uhr ab – an diesem Morgen schreibst du es in der Schule fertig, wer fertig ist, darf nach Hause. Du kannst ab sofort selbstständig damit beginnen. Das Dossier-Gerüst ist neu am Mittwoch, 18. November, fällig.'},
   {id:'2026-10-19-dossier-drucken', datum:'2026-10-19', fuer:'lehrer', text:'📖 🧰 Tools › «Dossier drucken» (früher «Broschüre drucken»): A5- oder A4-Dossier, gefalzt und in der Mitte geheftet, Dicke Dossiers werden automatisch auf Teile mit höchstens 16 Bogen verteilt – mehr schafft der Hefter nicht. In der Desktop-App der Library druckst du direkt: Drucker, Exemplare, Farbe und Heften wählen, fertig.'},
   {id:'2026-10-19-ausblenden', datum:'2026-10-19', fuer:'lehrer', text:'🙈 Neu bei jeder Übung, jedem PDF und Link: «🙈 Ausblenden». Die Klasse sieht sie dann nicht (z. B. ein Lösungsdossier), du siehst sie gestrichelt. Ist das Thema durch, mit «👁 Einblenden» freigeben.'},
   {id:'2026-10-19-neues-fenster', datum:'2026-10-19', fuer:'alle', text:'🪟 Übungen, LMVZ-Seiten und PDFs kannst du neben «Vollbild» jetzt auch «In neuem Fenster» öffnen. Das Fenster ist bildschirmgross, du kannst es aber kleiner machen und in der Library nebenher etwas anderes machen – dein Stand wird trotzdem gespeichert. In Prüfungen geht das nicht.'},
