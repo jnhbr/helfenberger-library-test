@@ -15165,7 +15165,7 @@ function resourceCardHtml(r, index, total, isTeacher){
       '<div class="resource-meta">Blind tippen lernen · Lektion für Lektion · Tempo und Genauigkeit</div></div>'+
       '<span class="sk-karte-pfeil" aria-hidden="true">›</span></button>';
   }
-  if(r.svaWerk || r.schach){
+  if(r.svaWerk || r.schach || r.werkzeug){
     return '<button type="button" class="resource-card sk-karte" id="open-'+r.id+'"><div class="resource-info"><h4>'+esc(r.title)+'</h4>'+
       '<div class="resource-meta">'+esc(r.meta || '')+'</div></div>'+
       '<span class="sk-karte-pfeil" aria-hidden="true">›</span></button>';
@@ -16788,7 +16788,7 @@ function renderLinkResource(r){
   var s = subjectById(r.subject);
   var html = '<div class="viewer-wrap">';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn">&larr; '+esc(s ? s.name : 'Fach')+'</button></div>';
-  html += '<div class="viewer-head"><h2>'+esc(r.title)+'</h2><span class="viewer-progress">LMVZ</span>';
+  html += '<div class="viewer-head"><h2>'+esc(r.title)+'</h2><span class="viewer-progress">'+esc(r.linkLabel || 'LMVZ')+'</span>';
   html += '<a class="btn btn-ghost btn-sm" href="'+esc(r.linkUrl)+'" target="_blank" rel="noopener">↗ Neuer Tab</a>';
   html += libFensterBtnHtml('fensterBtn');
   html += '<button class="btn btn-ghost btn-sm btn-fs" id="fsBtn" type="button">'+FS_ICON_ENTER+'</button>';
@@ -22748,6 +22748,8 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-20-mathe-werkzeuge', datum:'2026-10-20', fuer:'alle', text:'🧊 Mathe › «Werkzeuge»: «Geometrische Körper» zeigt Quader, Prisma, Pyramide, Zylinder, Kegel und Kugel in 3D. Du kannst sie drehen, als Netz auffalten und siehst Oberfläche und Volumen mit Formel. Mit den «Algebra-Kacheln» legst du Terme wie (x + 2)(x − 3) und faktorisierst sie.'},
+  {id:'2026-10-20-mathe-werkzeuge-lp', datum:'2026-10-20', fuer:'lehrer', text:'🟦 Algebra-Kacheln: Aufgabe eintippen, wählen, womit die Klasse startet (alle Kacheln, nur positive, keine), und den Link oder QR-Code teilen. Die Schüler:innen arbeiten sie Schritt für Schritt mit Kontrolle durch. Bei den Geometrischen Körpern blendest du mit 👁 die Ergebnisse aus. Beides ist verändert nach teacher.dev (Apache-2.0).'},
   {id:'2026-10-20-eins-gegen-alle', datum:'2026-10-20', fuer:'alle', text:'🔦 Neues Live-Spiel «Eins gegen alle»: Eine Person im Spotlight spielt gegen die ganze Klasse. Zuerst antwortet ihr still auf dem Gerät – die Frage steht nicht am Beamer –, dann die Person im Spotlight, mit drei Jokern. Niemand scheidet aus: Wer falsch liegt, spielt in der Comeback-Crew weiter.'},
   {id:'2026-10-20-eins-gegen-alle-lp', datum:'2026-10-20', fuer:'lehrer', text:'🔦 Klassenzimmer › 🎮 Spiele › «Eins gegen alle» (auch über «🎲 Anderes Spiel» bei jedem Spiel-Set oder Klassen-Quiz): Spotlight auslosen oder selbst wählen, Fragen pro Runde, Chancen und Zeit einstellbar. Antwortet die Person im Spotlight mündlich, tippst du ihre Antwort am Beamer an.'},
   {id:'2026-10-20-rechen-cafe', datum:'2026-10-20', fuer:'alle', text:'☕ Mathe › ⚡ Übungstrainer › «Rechen-Café»: Du stehst an der Kasse – Bestellung eintippen, Aktion in %, MWST, Trinkgeld, auf 5 Rappen runden und das Rückgeld mit Noten und Münzen geben. 10 Level, du kontrollierst sofort selbst.'},
@@ -37941,11 +37943,21 @@ function sikoreStufenHtml(aktiv, eigenes){
 }
 
 /* ---------- Mathe › 🧮 SIKORE: virtuelle Übung (direkt im Fach) + Trainer ---------- */
+/* 🧊 Mathe-Werkzeuge: statische Builds von teacher.dev-Apps (Apache-2.0, angepasst, siehe NOTICE.md im Ordner)
+   in geometrie-koerper/ und algebra-kacheln/. Öffnen im Link-Viewer (iframe src, nicht srcdoc: SvelteKit lädt
+   seine Dateien relativ zum Ordner). Kein Firestore, kein Fortschritt. */
+var MWZ_ORDNER = 'mwz_werkzeuge';
 function sikoreVirtuell(){
   return {
-    folders:[],
+    folders:[{id:MWZ_ORDNER, subject:'mathe', parentId:null, name:'🧊 Werkzeuge: 3D-Körper & Algebra-Kacheln', order:-1990, virtual:true}],
     resources:[{id:'sikore_trainer', subject:'mathe', folderId:null, order:-2000, virtual:true, sikore:true, imHub:true,
-      title:'🧮 SIKORE – Sicher Kopfrechnen'}]
+      title:'🧮 SIKORE – Sicher Kopfrechnen'},
+      {id:'mwz_koerper', subject:'mathe', folderId:MWZ_ORDNER, order:0, virtual:true, werkzeug:true, linkUrl:'geometrie-koerper/', linkLabel:'Werkzeug',
+        title:'🧊 Geometrische Körper – Netz, Oberfläche, Volumen',
+        meta:'Quader, Würfel, Prisma, Pyramide, Zylinder, Kegel, Kugel in 3D drehen · Netz auffalten · Oberfläche und Volumen exakt mit Formel · Ergebnisse ausblendbar'},
+      {id:'mwz_kacheln', subject:'mathe', folderId:MWZ_ORDNER, order:1, virtual:true, werkzeug:true, linkUrl:'algebra-kacheln/', linkLabel:'Werkzeug',
+        title:'🟦 Algebra-Kacheln – ausmultiplizieren und faktorisieren',
+        meta:'Terme wie (x + 2)(x − 3) mit Kacheln legen · Schritt für Schritt mit Kontrolle · Lehrperson erstellt eine Aufgabe und teilt sie per Link oder QR-Code'}]
   };
 }
 // Eigenes Level (Schüler:in): jüngste SIKORE-Note (mit Auf-/Abstieg) oder
