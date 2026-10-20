@@ -1861,6 +1861,25 @@
   .kk-set-zeile span{color:var(--text-muted);font-size:13px;}
   .kk-set-zeile .kk-set-akt{margin-left:auto;display:flex;gap:6px;}
   .kk-liste{display:flex;flex-direction:column;}
+  /* 📥 Fragen-Import */
+  .qi-drop{position:relative;display:flex;align-items:center;justify-content:center;min-height:96px;border:2px dashed var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;text-align:center;padding:14px;margin:6px 0 10px;font-size:15px;}
+  .qi-drop.an{border-color:var(--brand);}
+  .qi-drop input{position:absolute;width:1px;height:1px;opacity:0;}
+  .qi-hilfe{margin:6px 0;}
+  .qi-hilfe summary{cursor:pointer;font-weight:700;font-size:14px;}
+  .qi-issues{font-size:13px;margin:6px 0;padding-left:18px;}
+  .qi-ziel{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 6px;}
+  .qi-format{font:inherit;font-size:13px;}
+  .qi-liste{max-height:46vh;overflow:auto;border:1px solid var(--border);border-radius:var(--radius-sm);}
+  .qi-posten{display:flex;gap:10px;align-items:flex-start;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:14px;}
+  .qi-posten:last-child{border-bottom:0;}
+  .qi-posten input{margin-top:3px;flex:none;}
+  .qi-posten-txt{display:flex;flex-direction:column;gap:3px;min-width:0;overflow-wrap:anywhere;}
+  .qi-posten.qi-fehlt{opacity:.6;cursor:default;}
+  .qi-pfeil{color:var(--text-muted);}
+  .qi-antw{display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--text-muted);font-size:13px;}
+  .qi-antw .ok{color:var(--good);font-weight:700;}
+  .qi-hin,.qi-grund{color:var(--text-muted);font-size:12px;}
   .kk-ueb-row{grid-template-columns:minmax(110px,1.6fr) .9fr .9fr .6fr .8fr .7fr .7fr;}
   @media (max-width:640px){ .kk-ueb-row{grid-template-columns:1fr 1fr;} }
   .kk-karte{position:relative;}
@@ -9754,6 +9773,8 @@ var KIB_WISSEN = [
    a:'⚙️ Einstellungen › «🔑 Passwort einer Schüler:in zurücksetzen»: Anfrage stellen. Das neue Passwort erscheint dort, sobald es gesetzt ist.'},
   {id:'lp-karten', fuer:'lp', f:'Wie lege ich ein Karteikarten-Set an?', w:'karteikarten set karten voci wörter liste excel einfügen voci-test vokabeln erstellen anlegen', ziel:'klassenzimmer',
    a:'🏫 Klassenzimmer › «Karteikarten» › Set pro Fach anlegen. Karten als Liste einfügen («house = Haus», eine pro Zeile; Excel-Listen einfach hineinkopieren, mehrere richtige Antworten mit «/»).\nDie 📊 Klassenübersicht eines Sets zeigt die schwierigsten Wörter. Mit «📝 Voci-Test» wird aus dem Set direkt eine Prüfung.'},
+  {id:'lp-import', fuer:'lp', f:'Kann ich meine Quizlet- oder Kahoot-Sets übernehmen?', w:'import importieren quizlet kahoot blooket moodle gift canvas qti blackboard anki aiken datei übernehmen karteikarten quiz excel vorlage', ziel:'klassenzimmer',
+   a:'Ja. 🏫 Klassenzimmer › «Karteikarten» oder «Klassen-Quiz» › «📥 Importieren». Datei wählen (Kahoot-Excel-Vorlage, Blooket-Vorlage, Moodle GIFT/XML, Canvas-/Blackboard-Export, Anki-Text …) oder bei Quizlet den Export-Text («Tabulator», «Neue Zeile») einfügen. In der Vorschau wählst du, ob es ein Karteikarten-Set oder ein Klassen-Quiz wird, in welches Fach und welchen Ordner, und hakst einzelne Fragen ab. Fragen, die nicht passen (z. B. mehrere richtige Antworten im Quiz), sind ausgegraut und mit Grund markiert.'},
   {id:'lp-trainer', fuer:'lp', f:'Was sind die Übungstrainer?', w:'übungstrainer trainer sikore tipptrainer klassenübersicht automatisch aufgaben',
    a:'⚡ Übungstrainer stehen in fast jedem Fach zuoberst. Die Aufgaben entstehen automatisch, du musst nichts pflegen. Pro Trainer gibt es eine 📊 Klassenübersicht. 🧮 SIKORE (Mathematik) und ⌨️ Tipptrainer (Medien und Informatik) funktionieren gleich.'},
   {id:'lp-klassenzimmer', fuer:'lp', f:'Welche Werkzeuge gibt es im Klassenzimmer?', w:'klassenzimmer werkzeuge beamer ruhephase lärmampel countdown würfel glücksrad stadt land fluss gruppen partner ämtliplan vergessen-zähler', ziel:'klassenzimmer',
@@ -21344,12 +21365,14 @@ function renderQuizVerwaltung(){
   html += '<h2 class="page-welcome" style="margin-bottom:10px;">🎮 Klassen-Quiz</h2>';
   html += '<div class="back-row"><button class="btn btn-primary btn-sm" id="qzNew" type="button">➕ Neues Quiz</button>'
         + '<button class="btn btn-ghost btn-sm" id="qzImport" type="button">📋 Aus Text erstellen</button>'
+        + '<button class="btn btn-ghost btn-sm" id="qzDatei" type="button" title="Kahoot, Blooket, Quizlet, Moodle, Canvas …">📥 Datei importieren (Kahoot …)</button>'
         + '<button class="btn btn-ghost btn-sm" id="qzMaterial" type="button">🗃️ Nach Fach & Ordner</button></div>';
   html += '<div id="qzList"><div class="empty-state">Wird geladen …</div></div>';
   renderChrome(html);
   document.getElementById('backBtn').addEventListener('click', function(){ state.route = {name:'klassenzimmer'}; render(); });
   document.getElementById('qzNew').addEventListener('click', function(){ openQuizEditor(null); });
   document.getElementById('qzImport').addEventListener('click', function(){ openQuizImport(); });
+  document.getElementById('qzDatei').addEventListener('click', function(){ openFragenImport({ziel:'quiz', onDone:loadQuizList}); });
   document.getElementById('qzMaterial').addEventListener('click', function(){ state.route = {name:'kzmaterial'}; render(); });
   loadQuizList();
 }
@@ -22544,6 +22567,7 @@ const NEUIGKEITEN = [
   {id:'2026-10-20-eins-gegen-alle-lp', datum:'2026-10-20', fuer:'lehrer', text:'🔦 Klassenzimmer › 🎮 Spiele › «Eins gegen alle» (auch über «🎲 Anderes Spiel» bei jedem Spiel-Set oder Klassen-Quiz): Spotlight auslosen oder selbst wählen, Fragen pro Runde, Chancen und Zeit einstellbar. Antwortet die Person im Spotlight mündlich, tippst du ihre Antwort am Beamer an.'},
   {id:'2026-10-20-rechen-cafe', datum:'2026-10-20', fuer:'alle', text:'☕ Mathe › ⚡ Übungstrainer › «Rechen-Café»: Du stehst an der Kasse – Bestellung eintippen, Aktion in %, MWST, Trinkgeld, auf 5 Rappen runden und das Rückgeld mit Noten und Münzen geben. 10 Level, du kontrollierst sofort selbst.'},
   {id:'2026-10-20-stille-safari', datum:'2026-10-20', fuer:'lehrer', text:'🦒 Neu in der ⏱ Ruhephase: «Stille Safari» statt Lärmampel (Umschalter in der Mitte). Am Beamer ist eine ruhige Savanne, ein Korallenriff oder ein Wald. Solange der Timer läuft und es leise ist, kommen nach und nach Tiere hervor; wird es zu laut, wird es neblig und die Tiere verstecken sich. Keine Punkte, kein Rot. Pausierst du den Timer, drehen sich die Tiere zur Klasse und hören zu. ⚙️ unten: Ruhe-Grenze, Tempo und was bei Lärm passiert. Verändert nach teacher.dev/shy-safari (Apache-2.0).'},
+  {id:'2026-10-20-fragen-import', datum:'2026-10-20', fuer:'lehrer', text:'📥 Fragen aus Quizlet, Kahoot, Blooket, Moodle (GIFT/XML), Canvas, Blackboard, Anki u. a. importieren: Klassenzimmer › Karteikarten bzw. Klassen-Quiz › «📥 Importieren» (auch im Unterrichtsmaterial und im Fach unter «🏫 Aus dem Klassenzimmer»). Datei wählen oder den Quizlet-Export einfügen, in der Vorschau Fragen an- und abwählen, dann als Karteikarten-Set oder Klassen-Quiz ins Fach speichern. Die Datei wird nur im Browser gelesen, nichts wird hochgeladen.'},
   {id:'2026-10-20-pruefung-download', datum:'2026-10-20', fuer:'lehrer', text:'📄 Prüfungen: «Abgaben herunterladen» speichert pro Person ein PDF mit allen Aufgaben samt Bildern, Antworten, Punkten, der Note und einer Zeile für die Unterschrift der Eltern in einen Ordner deiner Wahl (Chrome, Edge, Desktop-App). Dazu kommt ein Sammel-PDF zum Drucken in einem Rutsch, in dem jede Person auf einem neuen Blatt beginnt. Neu ist auch «✍️ Note von Hand» unter «Details»: Damit überschreibst du die berechnete Note, z. B. nach einer Korrektur auf Papier. Die Note gilt dann überall.'},
   {id:'2026-10-20-notenrechner-anpassen', datum:'2026-10-20', fuer:'alle', text:'🎶 Notenrechner: Die Note einer Online-Prüfung kannst du jetzt selbst anpassen, falls deine Lehrperson sie auf Papier noch korrigiert hat. Daneben steht weiterhin die Note der Lehrperson, und mit ↺ stellst du sie wieder her.'},
   {id:'2026-10-20-spiel-vor-aemtli', datum:'2026-10-20', fuer:'alle', text:'🎮 Startet deine Lehrperson ein Live-Spiel, während der Hinweis «Heute bist du mit dem Ämtli dran» offen ist, öffnet sich das Spiel jetzt trotzdem von selbst. Dein Ämtli siehst du weiterhin auf der Startseite.'},
@@ -30134,7 +30158,8 @@ function kzmMaterialZeichnen(){
     '<option value="'+KZM_TRIVIA.id+'"'+(fach === KZM_TRIVIA.id ? ' selected' : '')+'>'+esc(kzmFachName(KZM_TRIVIA.id))+(zahl[KZM_TRIVIA.id] ? ' ('+zahl[KZM_TRIVIA.id]+')' : '')+'</option>'+
     (zahl[''] || fach === '' ? '<option value=""'+(fach === '' ? ' selected' : '')+'>Ohne Fach ('+(zahl[''] || 0)+')</option>' : '')+
     '</select>'+(fach && fach !== KZM_TRIVIA.id ? '<button class="btn btn-ghost btn-sm" id="kzmZumFach" type="button">📂 Im Fach öffnen</button>' : '')+
-    '<button class="btn btn-ghost btn-sm" id="kzmPaket" type="button" title="Quizze, Umfragen, Wortwolken und Karteikarten aus einer .json-Datei (z. B. aus einer Unterrichtsplanung) auf einmal anlegen">📥 Paket importieren</button></div>';
+    '<button class="btn btn-ghost btn-sm" id="kzmPaket" type="button" title="Quizze, Umfragen, Wortwolken und Karteikarten aus einer .json-Datei (z. B. aus einer Unterrichtsplanung) auf einmal anlegen">📥 Paket importieren</button>'+
+    '<button class="btn btn-ghost btn-sm" id="kzmFragenImport" type="button" title="Quizlet-, Kahoot-, Blooket-, Moodle-Dateien … als Karteikarten oder Klassen-Quiz">📥 Quizlet, Kahoot …</button></div>';
   if(fach && !trivia){
     var pfad = [], f = kzmFolder(ordner), g = 0;
     while(f && g++ < 10){ pfad.unshift(f); f = kzmFolder(f.parentId); }
@@ -30187,6 +30212,9 @@ function kzmMaterialZeichnen(){
   var zumFach = document.getElementById('kzmZumFach');
   if(zumFach) zumFach.addEventListener('click', function(){ goSubject(fach, ordner); });
   document.getElementById('kzmPaket').addEventListener('click', function(){ kzmPaketDialog(fach, ordner); });
+  document.getElementById('kzmFragenImport').addEventListener('click', function(){
+    openFragenImport({ziel:fach && !trivia ? 'kk' : 'quiz', fach:fach, ordner:ordner, onDone:kzmNachAenderung});
+  });
   box.onclick = function(e){
     var b = e.target.closest('button'); if(!b || !box.contains(b)) return;
     if(b.hasAttribute('data-kzmcrumb')){ r.ordner = b.getAttribute('data-kzmcrumb') || null; kzmMaterialZeichnen(); }
@@ -30446,6 +30474,7 @@ function kzmHolenDialog(subject, here){
     var h = '<h3>🏫 Aus dem Klassenzimmer</h3><p class="kk-ed-info">Neu erstellen oder Vorhandenes hierher holen: <b>'+esc(ort)+'</b></p>';
     h += '<div class="back-row" style="flex-wrap:wrap;margin:0 0 12px;">';
     Object.keys(KZM_TYPEN).forEach(function(t){ h += '<button class="btn btn-primary btn-sm" data-kzmhneu="'+t+'" type="button">➕ '+KZM_TYPEN[t].icon+' '+esc(KZM_TYPEN[t].name)+'</button>'; });
+    h += '<button class="btn btn-ghost btn-sm" data-kzmhimport="1" type="button">📥 Aus Quizlet, Kahoot …</button>';
     h += '</div>';
     var andere = items.filter(function(it){ return !(it.fach === subject && (it.ordner || null) === (here || null)); });
     andere.sort(function(a, b){
@@ -30465,6 +30494,7 @@ function kzmHolenDialog(subject, here){
     modalEl.querySelector('.modal').addEventListener('click', function(e){
       var b = e.target.closest('button'); if(!b) return;
       if(b.hasAttribute('data-kzmhneu')){ closeModal(); kzmNeu(b.getAttribute('data-kzmhneu'), subject, here); }
+      else if(b.hasAttribute('data-kzmhimport')){ closeModal(); openFragenImport({ziel:'kk', fach:subject, ordner:here, onDone:kzmNachAenderung}); }
       else if(b.hasAttribute('data-kzmhol')){
         var t = b.getAttribute('data-kzmhol').split('|'), it = kzmItemById(t[0], t.slice(1).join('|'));
         if(!it) return;
@@ -39399,7 +39429,8 @@ function paintKkVerwaltung(){
   var sets = (kkDaten.sets || []).slice().sort(function(a, b){ return a.titel.localeCompare(b.titel, 'de'); });
   var h = '<h3>🗂️ Karteikarten</h3>';
   h += '<p class="kk-ed-info">Pro Fach beliebig viele Sets. Die Klasse findet sie im jeweiligen Fach zuoberst unter «🗂️ Karteikarten» und übt sie mit fünf Leitner-Boxen – liegt ein Set in einem Ordner, steht es zusätzlich direkt in diesem Ordner.</p>';
-  h += '<div class="back-row"><button class="btn btn-primary btn-sm" id="kkVwNeu" type="button">➕ Neues Set</button></div>';
+  h += '<div class="back-row"><button class="btn btn-primary btn-sm" id="kkVwNeu" type="button">➕ Neues Set</button>'+
+    '<button class="btn btn-ghost btn-sm" id="kkVwImport" type="button" title="Quizlet, Kahoot, Blooket, Moodle, Anki …">📥 Importieren (Quizlet, Kahoot …)</button></div>';
   if(!sets.length) h += '<div class="empty-state">Noch keine Sets. Leg oben das erste an.</div>';
   h += '<div class="kk-liste">'+kzmGruppiert('kk', sets.map(function(set){
     return {fach:set.fach || '', ordner:set.ordner || null, html:'<div class="kk-set-zeile"><b>'+esc(set.titel)+'</b> <span>'+set.karten.length+' Karten</span>'+
@@ -39411,6 +39442,9 @@ function paintKkVerwaltung(){
   document.getElementById('kkVwClose').addEventListener('click', closeModal);
   document.getElementById('kkVwNeu').addEventListener('click', function(){
     openKkEditor(null, 'englisch', paintKkVerwaltung);
+  });
+  document.getElementById('kkVwImport').addEventListener('click', function(){
+    openFragenImport({ziel:'kk', onDone:paintKkVerwaltung});
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-kked]'), function(b){
     b.addEventListener('click', function(){
@@ -39424,6 +39458,409 @@ function paintKkVerwaltung(){
       if(set) kkUebersicht(set);
     });
   });
+}
+
+/* ===================== 📥 FRAGEN-IMPORT (Quizlet, Kahoot, Moodle …) =====================
+   Eine Lehrperson holt eine Fragensammlung aus einem anderen Werkzeug in die
+   Library: Datei wählen (oder Quizlet-Text einfügen) → Vorschau mit Häkchen →
+   als 🗂️ Karteikarten-Set oder 🎮 Klassen-Quiz speichern.
+   Gelesen wird mit «Question Commons» (teacher.dev, Apache-2.0, selbst gehostet
+   in assets/vendor/, siehe LIZENZEN.txt) — nur im Browser, die Datei wird nie
+   hochgeladen. Das Paket liefert «Question Banks» mit Fragetypen (multiple-
+   choice, true-false, short-answer, matching …); qiKarten/qiQuiz übersetzen sie
+   in Karten {v,r} bzw. Quizfragen {q,a,c,sec}. Gespeichert wird an den
+   bestehenden Orten (klasseninfo/karteikarten, quizzes/{id}) — darum keine
+   neue Regel in firestore.rules. Quizlet-Exporte (zwei Spalten) erkennt das
+   Paket nur auf Wunsch: klappt das automatische Erkennen bei .txt/.csv/.tsv
+   nicht, wird darum als Quizlet-Export gelesen. */
+
+var QC_URL = './assets/vendor/question-commons-0.3.1.mjs';   // selbst gehostet, siehe assets/vendor/LIZENZEN.txt
+var QI_MAX_BYTES = 20 * 1024 * 1024;
+var qcLaden = null;
+function ladeQc(){
+  if(qcLaden) return qcLaden;
+  qcLaden = import(QC_URL).catch(function(err){ qcLaden = null; throw err; });
+  return qcLaden;
+}
+
+// Die Fehler des Pakets sind englisch — für die Lehrperson auf Deutsch.
+function qiFehlerText(err){
+  var c = err && err.code;
+  if(c === 'not-recognized') return 'Diese Datei kennt der Import nicht. Er liest Exporte bzw. Vorlagen von Quizlet, Kahoot, Blooket, Moodle (GIFT/XML), Canvas/QTI, Blackboard, Brightspace, Respondus, Aiken und Anki.';
+  if(c === 'no-questions') return 'In dieser Datei wurden keine Fragen gefunden.';
+  if(c === 'unsafe-archive') return 'Diese ZIP-Datei ist zu gross oder ungewöhnlich gebaut und wird darum nicht geöffnet.';
+  return 'Die Datei konnte nicht gelesen werden.';
+}
+function qiLesen(name, bytes, format){
+  return ladeQc().catch(function(err){ throw {qiLaden:true, err:err}; }).then(function(qc){
+    var opt = format ? {format:format} : {};
+    return qc.readQuestionFile({name:name, bytes:bytes}, opt).catch(function(err){
+      if(!format && err && err.code === 'not-recognized' && /\.(txt|tsv|csv)$/i.test(name)){
+        return qc.readQuestionFile({name:name, bytes:bytes}, {format:'quizlet'});
+      }
+      throw err;
+    }).then(function(lesung){ return {qc:qc, lesung:lesung}; });
+  });
+}
+
+/* ---------- Übersetzen: Question Bank → Library ---------- */
+
+function qiText(qc, rt){ return rt ? String(qc.plainText(rt) || '').replace(/\s*\n\s*/g, ' ').replace(/\s+/g, ' ').trim() : ''; }
+function qiHatBild(rt){
+  var ja = false;
+  (function lauf(l){ (l || []).forEach(function(n){ if(!n) return; if(n.type === 'block-image') ja = true; lauf(n.content); }); })(rt);
+  return ja;
+}
+function qiAlleFragen(lesung){
+  var out = [];
+  (lesung.banks || []).forEach(function(b){ (b.questions || []).forEach(function(f){ out.push(f); }); });
+  return out;
+}
+function qiKurz(s, n, hin){
+  if(s.length <= n) return s;
+  if(hin) hin.push('gekürzt');
+  return s.slice(0, n - 1).trim() + '…';
+}
+
+// Karteikarten: eine Frage gibt meist eine Karte, eine Zuordnung pro Paar eine.
+function qiKarten(qc, fragen){
+  var out = [];
+  fragen.forEach(function(f, nr){
+    var v = qiText(qc, f.stem), hin = [], r = '', grund = '';
+    if(qiHatBild(f.stem)) hin.push('Bild fehlt');
+    function karte(vv, rr, h){
+      var hh = (h || hin).slice();
+      out.push({nr:nr, v:qiKurz(vv, 200, hh), r:qiKurz(rr, 200, hh), hin:hh});
+    }
+    if(f.type === 'matching'){
+      var paare = (f.pairs || []).filter(function(p){ return p.left && p.right; });
+      if(!paare.length){ out.push({nr:nr, v:v, fehlt:'Zuordnung ohne vollständige Paare'}); return; }
+      paare.forEach(function(p){
+        var h = qiHatBild(p.left) || qiHatBild(p.right) ? ['Bild fehlt'] : [];
+        var l = qiText(qc, p.left), rr = qiText(qc, p.right);
+        if(l && rr) karte(l, rr, h);
+      });
+      return;
+    }
+    if(f.type === 'short-answer'){
+      if(f.suggestedAnswer) r = qiText(qc, f.suggestedAnswer); else grund = 'keine Antwort in der Datei';
+    } else if(f.type === 'multiple-choice' || f.type === 'multiple-answer'){
+      var ok = (f.choices || []).filter(function(c){ return c.correct; }).map(function(c){ return qiText(qc, c.content); }).filter(Boolean);
+      if(!ok.length) grund = 'keine richtige Antwort markiert';
+      else if(f.type === 'multiple-answer'){ r = ok.join(', '); hin.push('mehrere richtige'); }
+      else r = ok[0];
+    } else if(f.type === 'true-false'){
+      r = f.answer ? 'richtig' : 'falsch';
+    } else if(f.type === 'fill-in-the-blank'){
+      var bl = f.blanks || [];
+      if(!bl.length || !bl[0].accepted || !bl[0].accepted.length) grund = 'Lücke ohne Lösung';
+      else if(bl.length === 1) r = bl[0].accepted.join(' / ');
+      else r = bl.map(function(b){ return (b.accepted || [])[0] || '?'; }).join(', ');
+    } else if(f.type === 'numeric'){
+      r = (f.answers || []).map(function(a){ return a.value + (a.tolerance ? ' (±' + a.tolerance + ')' : ''); }).join(' / ');
+      if(!r) grund = 'keine Zahl als Lösung';
+    } else if(f.type === 'ordering'){
+      r = (f.items || []).map(function(x){ return qiText(qc, x); }).join(' → ');
+    } else grund = 'Fragetyp wird nicht unterstützt';
+    if(!v && !grund) grund = qiHatBild(f.stem) ? 'Frage besteht nur aus einem Bild' : 'Frage ohne Text';
+    if(!grund && !r) grund = 'leere Antwort';
+    if(grund){ out.push({nr:nr, v:v, fehlt:grund}); return; }
+    karte(v, r);
+  });
+  return out;
+}
+
+// Klassen-Quiz: genau eine richtige von 2–4 Antworten. Fragen ohne
+// Auswahlantworten (Quizlet-Karten, Lücken, Zahlen, Zuordnungen) bekommen
+// falsche Antworten aus den Lösungen der anderen Fragen derselben Datei.
+function qiQuiz(qc, fragen, sec){
+  var out = [], offen = [];
+  fragen.forEach(function(f, nr){
+    var q = qiText(qc, f.stem), hin = [];
+    if(qiHatBild(f.stem)) hin.push('Bild fehlt');
+    if(!q){ out.push({nr:nr, q:'', fehlt:qiHatBild(f.stem) ? 'Frage besteht nur aus einem Bild' : 'Frage ohne Text'}); return; }
+    if(f.type === 'multiple-choice'){
+      var ch = (f.choices || []).map(function(c){ return {t:qiText(qc, c.content), ok:c.correct}; }).filter(function(c){ return c.t; });
+      var richtig = ch.filter(function(c){ return c.ok; })[0];
+      if(!richtig || ch.length < 2){ out.push({nr:nr, q:q, fehlt:'braucht eine richtige und eine falsche Antwort'}); return; }
+      if(ch.length > 4){
+        hin.push('nur 4 von ' + ch.length + ' Antworten');
+        var falsch = ch.filter(function(c){ return c !== richtig; }).slice(0, 3);
+        ch = ch.filter(function(c){ return c === richtig || falsch.indexOf(c) >= 0; });
+      }
+      var a = ch.map(function(c){ return qiKurz(c.t, 120, hin); });
+      out.push({nr:nr, q:qiKurz(q, 300, hin), a:a, c:ch.indexOf(richtig), sec:sec, hin:hin});
+    } else if(f.type === 'true-false'){
+      out.push({nr:nr, q:qiKurz(q, 300, hin), a:['Richtig', 'Falsch'], c:f.answer ? 0 : 1, sec:sec, hin:hin});
+    } else if(f.type === 'multiple-answer'){
+      out.push({nr:nr, q:q, fehlt:'mehrere richtige Antworten – das Klassen-Quiz kennt nur eine'});
+    } else if(f.type === 'matching'){
+      var paare = (f.pairs || []).filter(function(p){ return p.left && p.right; });
+      if(!paare.length){ out.push({nr:nr, q:q, fehlt:'Zuordnung ohne vollständige Paare'}); return; }
+      paare.forEach(function(p){
+        var l = qiText(qc, p.left), rr = qiText(qc, p.right);
+        if(l && rr) offen.push({nr:nr, q:qiKurz(l, 300, []), loesung:qiKurz(rr, 120, []), hin:[]});
+      });
+    } else {
+      var lsg = '';
+      if(f.type === 'short-answer' && f.suggestedAnswer) lsg = qiText(qc, f.suggestedAnswer);
+      else if(f.type === 'fill-in-the-blank' && (f.blanks || []).length === 1) lsg = ((f.blanks[0].accepted || [])[0]) || '';
+      else if(f.type === 'numeric' && (f.answers || []).length) lsg = f.answers[0].value;
+      if(!lsg){ out.push({nr:nr, q:q, fehlt:f.type === 'ordering' ? 'Reihenfolge – geht im Klassen-Quiz nicht' : 'keine eindeutige Lösung in der Datei'}); return; }
+      offen.push({nr:nr, q:qiKurz(q, 300, hin), loesung:qiKurz(lsg, 120, hin), hin:hin});
+    }
+  });
+  // Falsche Antworten aus den anderen Lösungen ziehen (ohne Doppelte).
+  var pool = [], gesehen = {};
+  offen.forEach(function(o){ var k = o.loesung.toLowerCase(); if(!gesehen[k]){ gesehen[k] = 1; pool.push(o.loesung); } });
+  offen.forEach(function(o){
+    var andere = kkMisch(pool.filter(function(x){ return x.toLowerCase() !== o.loesung.toLowerCase(); })).slice(0, 3);
+    if(!andere.length){ out.push({nr:o.nr, q:o.q, fehlt:'keine anderen Antworten in der Datei, aus denen falsche gebildet werden könnten'}); return; }
+    var a = kkMisch(andere.concat([o.loesung]));
+    out.push({nr:o.nr, q:o.q, a:a, c:a.indexOf(o.loesung), sec:sec, hin:o.hin.concat(['falsche Antworten aus anderen Fragen'])});
+  });
+  out.sort(function(x, y){ return x.nr - y.nr; });
+  return out;
+}
+
+/* ---------- Dialog ---------- */
+
+// opt: {ziel:'kk'|'quiz', fach, ordner, onDone}
+function openFragenImport(opt){
+  opt = opt || {};
+  var st = {ziel:opt.ziel === 'quiz' ? 'quiz' : 'kk', datei:null, lesung:null, qc:null, format:'', posten:[], aus:{}, sec:20};
+
+  function schritt1(meldung){
+    var h = '<h3>📥 Fragen importieren</h3>';
+    h += '<p class="kk-ed-info">Aus Quizlet, Kahoot, Blooket, Moodle (GIFT oder XML), Canvas/QTI, Blackboard, Brightspace, Aiken oder Anki. Die Datei wird nur hier im Browser gelesen, nichts wird hochgeladen. Vor dem Speichern siehst du alle Fragen und wählst aus.</p>';
+    h += '<label class="qi-drop" id="qiDrop"><input type="file" id="qiFile"><span>📄 <b>Datei wählen</b> oder hierher ziehen</span></label>';
+    h += '<details class="qi-hilfe"><summary>Quizlet: Text einfügen</summary>'+
+      '<p class="kk-ed-info">In Quizlet beim Set auf «…» › «Exportieren», «Tabulator» und «Neue Zeile» wählen, Text kopieren und hier einfügen.</p>'+
+      '<textarea class="modal-input" id="qiText" rows="6" spellcheck="false" placeholder="house&#9;Haus&#10;to run&#9;rennen"></textarea>'+
+      '<div class="back-row" style="margin-top:6px;"><button class="btn btn-primary btn-sm" id="qiTextOk" type="button">Text lesen</button></div></details>';
+    h += '<details class="qi-hilfe"><summary>Kahoot und andere: Welche Datei?</summary><p class="kk-ed-info">'+
+      '<b>Kahoot:</b> die Excel-Vorlage (.xlsx), mit der man bei Kahoot Fragen importiert (Spalten «Question», «Answer 1–4», «Time limit», «Correct answer(s)»).<br>'+
+      '<b>Blooket:</b> die CSV- bzw. Excel-Vorlage. <b>Moodle:</b> Fragensammlung als GIFT oder Moodle-XML exportieren. '+
+      '<b>Canvas, Brightspace, Blackboard:</b> den Quiz- bzw. Pool-Export (.zip oder .xml). <b>Anki:</b> «Notizen als Text» (.txt).</p></details>';
+    h += '<p class="kk-ed-info" id="qiStatus">'+(meldung ? '<span style="color:var(--bad);">'+esc(meldung)+'</span>' : '')+'</p>';
+    h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="qiCancel" type="button">Abbrechen</button></div>';
+    openModal(h, 'pr-modal pr-modal-breit');
+    document.getElementById('qiCancel').addEventListener('click', closeModal);
+    var inp = document.getElementById('qiFile'), drop = document.getElementById('qiDrop');
+    ladeQc().then(function(qc){ if(document.body.contains(inp)) inp.setAttribute('accept', qc.QUESTION_FILE_EXTENSIONS.concat(['.csv', '.tsv']).join(',')); }).catch(function(){});
+    inp.addEventListener('change', function(){ if(inp.files && inp.files[0]) dateiNehmen(inp.files[0]); });
+    drop.addEventListener('dragover', function(e){ e.preventDefault(); drop.classList.add('an'); });
+    drop.addEventListener('dragleave', function(){ drop.classList.remove('an'); });
+    drop.addEventListener('drop', function(e){
+      e.preventDefault(); drop.classList.remove('an');
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if(f) dateiNehmen(f);
+    });
+    document.getElementById('qiTextOk').addEventListener('click', function(){
+      var t = document.getElementById('qiText').value;
+      if(!t.trim()){ toast('Bitte zuerst den Text aus Quizlet einfügen.'); return; }
+      st.datei = {name:'Quizlet.txt', bytes:new TextEncoder().encode(t)};
+      lesen('quizlet');
+    });
+  }
+
+  function status(t){ var el = document.getElementById('qiStatus'); if(el) el.textContent = t; }
+
+  function dateiNehmen(file){
+    if(file.size > QI_MAX_BYTES){ status('Die Datei ist grösser als 20 MB.'); return; }
+    status('Wird gelesen …');
+    file.arrayBuffer().then(function(buf){
+      st.datei = {name:file.name, bytes:new Uint8Array(buf)};
+      lesen('');
+    }).catch(function(){ status('Die Datei konnte nicht geöffnet werden.'); });
+  }
+
+  function lesen(format){
+    status('Wird gelesen …');
+    qiLesen(st.datei.name, st.datei.bytes, format).then(function(r){
+      st.qc = r.qc; st.lesung = r.lesung; st.format = r.lesung.format;
+      if(!qiAlleFragen(r.lesung).length) throw {code:'no-questions'};
+      st.titel = ((r.lesung.banks || [])[0] || {}).name || st.datei.name.replace(/\.[^.]+$/, '');
+      st.kopf = /^(quizlet|anki)$/.test(st.format) ? {v:'Begriff', r:'Definition'} : {v:'Frage', r:'Antwort'};
+      umrechnen();
+      schritt2();
+    }).catch(function(err){
+      console.error('Fragen-Import', err);
+      schritt1(err && err.qiLaden
+        ? 'Der Import konnte nicht geladen werden – keine Verbindung oder ein älterer Browser. Bitte mit einem aktuellen Chrome, Edge oder Safari nochmals versuchen.'
+        : qiFehlerText(err));
+    });
+  }
+
+  function umrechnen(){
+    var fragen = qiAlleFragen(st.lesung);
+    st.posten = st.ziel === 'kk' ? qiKarten(st.qc, fragen) : qiQuiz(st.qc, fragen, st.sec);
+    st.aus = {};
+  }
+
+  function formatName(id){
+    var f = (st.qc.FORMATS || []).filter(function(x){ return x.id === id; })[0];
+    return f ? f.label : id;
+  }
+
+  function postenHtml(p, i){
+    var an = !p.fehlt && !st.aus[i];
+    var h = '<label class="qi-posten'+(p.fehlt ? ' qi-fehlt' : '')+'">';
+    h += '<input type="checkbox" data-qi="'+i+'"'+(an ? ' checked' : '')+(p.fehlt ? ' disabled' : '')+'>';
+    h += '<span class="qi-posten-txt">';
+    if(st.ziel === 'kk'){
+      h += '<b>'+esc(p.v || '(ohne Text)')+'</b>'+(p.fehlt ? '' : ' <span class="qi-pfeil">→</span> '+esc(p.r));
+    } else {
+      h += '<b>'+esc(p.q || '(ohne Text)')+'</b>';
+      if(!p.fehlt) h += '<span class="qi-antw">'+p.a.map(function(a, j){ return '<span class="'+(j === p.c ? 'ok' : '')+'">'+(j === p.c ? '✓ ' : '')+esc(a)+'</span>'; }).join('')+'</span>';
+    }
+    if(p.fehlt) h += '<small class="qi-grund">⛔ '+esc(p.fehlt)+'</small>';
+    else if(p.hin && p.hin.length) h += '<small class="qi-hin">⚠️ '+esc(p.hin.join(' · '))+'</small>';
+    h += '</span></label>';
+    return h;
+  }
+
+  function zaehlen(){
+    var n = st.posten.filter(function(p, i){ return !p.fehlt && !st.aus[i]; }).length;
+    var el = document.getElementById('qiZahl');
+    var txt = n + ' von ' + st.posten.filter(function(p){ return !p.fehlt; }).length + ' ' + (st.ziel === 'kk' ? 'Karten' : 'Fragen') + ' ausgewählt';
+    if(st.ziel === 'kk' && n > KK_MAX_KARTEN) txt += ' – wird auf ' + Math.ceil(n / KK_MAX_KARTEN) + ' Sets zu höchstens ' + KK_MAX_KARTEN + ' Karten verteilt';
+    if(el) el.textContent = txt;
+    var ok = document.getElementById('qiSave');
+    if(ok){ ok.disabled = !n; ok.textContent = '📥 ' + n + ' übernehmen'; }
+  }
+
+  function eingabenLesen(){
+    var t = document.getElementById('qiTitel'); if(t) st.titel = t.value;
+    var v = document.getElementById('qiKopfV'), r = document.getElementById('qiKopfR');
+    if(v && r) st.kopf = {v:v.value, r:r.value};
+    var s = document.getElementById('qiSec'); if(s){ var x = parseInt(s.value, 10); st.sec = x >= 5 && x <= 180 ? x : 20; }
+    var ab = kzmAblageLesen(); if(ab){ opt.fach = ab.fach; opt.ordner = ab.ordner; }
+  }
+
+  function schritt2(){
+    var l = st.lesung, fehler = l.issues || [];
+    var andere = (l.candidates || []).filter(function(c){ return c.format !== st.format; }).map(function(c){ return c.format; });
+    if(st.format !== 'quizlet' && /\.(txt|tsv|csv)$/i.test(st.datei.name)) andere.push('quizlet');
+    var h = '<h3>📥 Fragen importieren</h3>';
+    h += '<p class="kk-ed-info">📄 <b>'+esc(st.datei.name)+'</b> · gelesen als <b>'+esc(formatName(st.format))+'</b>';
+    if(andere.length){
+      h += ' · <select class="qi-format" id="qiFormat"><option value="">anders lesen …</option>'+
+        andere.filter(function(x, i){ return andere.indexOf(x) === i; }).map(function(id){ return '<option value="'+esc(id)+'">'+esc(formatName(id))+'</option>'; }).join('')+'</select>';
+    }
+    h += '</p>';
+    h += '<div class="qi-ziel" role="radiogroup">'+
+      '<button type="button" class="btn btn-sm '+(st.ziel === 'kk' ? 'btn-primary' : 'btn-ghost')+'" data-qiziel="kk">🗂️ als Karteikarten-Set</button>'+
+      '<button type="button" class="btn btn-sm '+(st.ziel === 'quiz' ? 'btn-primary' : 'btn-ghost')+'" data-qiziel="quiz">🎮 als Klassen-Quiz</button></div>';
+    h += '<label class="modal-label">Titel</label><input class="modal-input" id="qiTitel" maxlength="'+(st.ziel === 'kk' ? 60 : 80)+'" value="'+esc(String(st.titel || '').slice(0, st.ziel === 'kk' ? 60 : 80))+'">';
+    h += kzmAblageHtml(opt.fach || (st.ziel === 'kk' ? 'englisch' : ''), opt.ordner || null, st.ziel === 'kk');
+    if(st.ziel === 'kk'){
+      h += '<div class="pr-grid2"><div><label class="modal-label">Vorderseite heisst</label><input class="modal-input" id="qiKopfV" maxlength="30" value="'+esc(st.kopf.v)+'"></div>'+
+        '<div><label class="modal-label">Rückseite heisst</label><input class="modal-input" id="qiKopfR" maxlength="30" value="'+esc(st.kopf.r)+'"></div></div>';
+    } else {
+      h += '<label class="qz-sec">Zeit pro Frage <input type="number" id="qiSec" min="5" max="180" value="'+st.sec+'"> Sekunden</label>';
+    }
+    if(fehler.length){
+      h += '<details class="qi-hilfe"><summary>⚠️ '+fehler.length+' Stelle'+(fehler.length === 1 ? '' : 'n')+' in der Datei konnte'+(fehler.length === 1 ? '' : 'n')+' nicht gelesen werden</summary><ul class="qi-issues">'+
+        fehler.slice(0, 30).map(function(x){ return '<li>'+esc(x.message)+(x.excerpt ? ' <i>«'+esc(x.excerpt)+'»</i>' : '')+'</li>'; }).join('')+
+        (fehler.length > 30 ? '<li>…</li>' : '')+'</ul><p class="kk-ed-info">Meldungen des Lese-Programms (englisch).</p></details>';
+    }
+    h += '<div class="back-row" style="margin:12px 0 6px;"><button class="btn btn-ghost btn-sm" id="qiAlle" type="button">Alle</button>'+
+      '<button class="btn btn-ghost btn-sm" id="qiKeine" type="button">Keine</button><span class="kk-ed-info" id="qiZahl" style="margin:0 0 0 6px;"></span></div>';
+    h += '<div class="qi-liste" id="qiListe">'+st.posten.map(postenHtml).join('')+'</div>';
+    h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="qiZurueck" type="button">← Andere Datei</button>'+
+      '<button class="btn btn-ghost btn-sm" id="qiCancel" type="button">Abbrechen</button>'+
+      '<button class="btn btn-primary btn-sm" id="qiSave" type="button">📥 übernehmen</button></div>';
+    openModal(h, 'pr-modal pr-modal-breit');
+    kzmAblageVerdrahten();
+    zaehlen();
+    document.getElementById('qiCancel').addEventListener('click', closeModal);
+    document.getElementById('qiZurueck').addEventListener('click', function(){ eingabenLesen(); schritt1(); });
+    var fmt = document.getElementById('qiFormat');
+    if(fmt) fmt.addEventListener('change', function(){ if(fmt.value){ eingabenLesen(); lesen(fmt.value); } });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-qiziel]'), function(b){
+      b.addEventListener('click', function(){
+        var z = b.getAttribute('data-qiziel'); if(z === st.ziel) return;
+        eingabenLesen(); st.ziel = z; umrechnen(); schritt2();
+      });
+    });
+    var sec = document.getElementById('qiSec');
+    if(sec) sec.addEventListener('change', function(){ eingabenLesen(); st.posten.forEach(function(p){ if(!p.fehlt) p.sec = st.sec; }); });
+    document.getElementById('qiListe').addEventListener('change', function(e){
+      var c = e.target.closest('[data-qi]'); if(!c) return;
+      st.aus[c.getAttribute('data-qi')] = !c.checked;
+      zaehlen();
+    });
+    function alle(an){
+      st.posten.forEach(function(p, i){ st.aus[i] = !an; });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-qi]'), function(c){ if(!c.disabled) c.checked = an; });
+      zaehlen();
+    }
+    document.getElementById('qiAlle').addEventListener('click', function(){ alle(true); });
+    document.getElementById('qiKeine').addEventListener('click', function(){ alle(false); });
+    document.getElementById('qiSave').addEventListener('click', speichern);
+  }
+
+  function speichern(){
+    eingabenLesen();
+    var titel = String(st.titel || '').trim();
+    var wahl = st.posten.filter(function(p, i){ return !p.fehlt && !st.aus[i]; });
+    if(!titel){ toast('Bitte einen Titel eingeben.'); return; }
+    if(!wahl.length){ toast('Keine Frage ausgewählt.'); return; }
+    var knopf = document.getElementById('qiSave'); if(knopf) knopf.disabled = true;
+    var p = st.ziel === 'kk' ? kkSpeichern(titel, wahl) : quizSpeichern(titel, wahl);
+    p.then(function(msg){
+      closeModal(); toast(msg);
+      if(opt.onDone) opt.onDone();
+    }).catch(function(err){
+      if(knopf) knopf.disabled = false;
+      if(err && err.qiMeldung){ toast(err.qiMeldung); return; }
+      console.error('Fragen-Import speichern', err); toast('Konnte nicht gespeichert werden.');
+    });
+  }
+
+  function kkSpeichern(titel, wahl){
+    var fach = opt.fach;
+    if(!fach || fach === KZM_TRIVIA.id) return Promise.reject({qiMeldung:'Karteikarten brauchen ein Fach.'});
+    // Doppelte Vorderseiten zusammenlegen: der Lernstand hängt an der Vorderseite (kkKarteKey).
+    var karten = [], idx = {};
+    wahl.forEach(function(p){
+      var k = p.v.trim().toLowerCase();
+      if(idx[k] != null){ var a = karten[idx[k]]; if(a.r.split(' / ').indexOf(p.r) < 0) a.r = qiKurz(a.r + ' / ' + p.r, 200, []); return; }
+      idx[k] = karten.length; karten.push({v:p.v, r:p.r});
+    });
+    var teile = [];
+    for(var i=0;i<karten.length;i+=KK_MAX_KARTEN) teile.push(karten.slice(i, i + KK_MAX_KARTEN));
+    return kkLoad(true).then(function(sets){
+      sets = (sets || []).slice();
+      if(sets.length + teile.length > KK_MAX_SETS) throw {qiMeldung:'Mehr als '+KK_MAX_SETS+' Sets sind nicht vorgesehen.'};
+      teile.forEach(function(k, n){
+        sets.push({
+          id: 'kk'+Date.now().toString(36)+Math.random().toString(36).slice(2, 6),
+          fach: fach, titel: (teile.length > 1 ? titel.slice(0, 50) + ' (Teil ' + (n + 1) + ')' : titel).slice(0, 60),
+          kopf: {v:String(st.kopf.v || '').trim() || 'Vorderseite', r:String(st.kopf.r || '').trim() || 'Rückseite'},
+          karten: k, ordner: opt.ordner || '',
+          von: (state.profile && state.profile.displayName) || '',
+          vonUid: (state.user && state.user.uid) || '',
+          geaendert: Date.now()
+        });
+      });
+      return kkSetsSpeichern(sets);
+    }).then(function(){
+      return karten.length + ' Karten importiert' + (teile.length > 1 ? ' (' + teile.length + ' Sets)' : '') + '.';
+    });
+  }
+
+  function quizSpeichern(titel, wahl){
+    var fach = opt.fach || '';
+    return setDoc(doc(kcol('quizzes')), {
+      title: titel.slice(0, 80), subject: fach, folderId: fach ? (opt.ordner || null) : null,
+      questions: wahl.map(function(p){ return {q:p.q, a:p.a.slice(0, 4), c:p.c, sec:st.sec}; }),
+      createdBy: state.profile.displayName, createdAt: serverTimestamp()
+    }).then(function(){ return wahl.length + ' Fragen als Klassen-Quiz importiert.'; });
+  }
+
+  schritt1();
 }
 
 /* ---------- Klassenübersicht ---------- */
