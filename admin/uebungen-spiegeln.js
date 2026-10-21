@@ -17,6 +17,8 @@
  *    angefasst; bei Jan gelöschte Übungen bleiben in den anderen Seiten stehen
  *    (werden nur im Log genannt), damit keine Verknüpfung ins Leere zeigt.
  *  - 🗂️ Karteikarten-Sets (klasseninfo/karteikarten): Jans Sets per ID ergänzt/ersetzt.
+ *  - 🎲 Trivia-Quizze (quizzes mit subject 'trivia', auch Spiel- und Schätz-Sets): gleiche ID = Kopie,
+ *    fehlende anlegen, geänderte nachführen. Quizze anderer Fächer bleiben auf Jans Seite.
  * Lehrerbereich wird nicht gespiegelt (Jans persönliche Unterlagen).
  * Inhalte (resourceContent) sind global und werden nur verlinkt, nicht kopiert.
  */
@@ -30,16 +32,19 @@ const NICHT_SPIEGELN = ['lehrerbereich'];
 const LOKAL = ['current', 'prevOrder', 'version', 'empfohlen', 'prevContentId'];
 
 // Nur beim Anlegen übernommen, bei bestehenden Kopien nicht nachgeführt.
-const NUR_NEU = ['uploadedAt', 'uploadedBy'];
+const NUR_NEU = ['uploadedAt', 'uploadedBy', 'createdAt'];
+const QUIZ_FAECHER = ['trivia'];
 
 function gleich(a, b) { return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b); }
 function ohneLokal(d) { const x = Object.assign({}, d); LOKAL.forEach(function (f) { delete x[f]; }); return x; }
 
 (async function () {
   const src = db.collection('klassen').doc(QUELLE);
-  const [resSnap, folSnap, kkSnap] = await Promise.all([
-    src.collection('resources').get(), src.collection('folders').get(), src.collection('klasseninfo').doc('karteikarten').get()
+  const [resSnap, folSnap, kkSnap, qzSnap] = await Promise.all([
+    src.collection('resources').get(), src.collection('folders').get(), src.collection('klasseninfo').doc('karteikarten').get(),
+    src.collection('quizzes').get()
   ]);
+  const quizze = qzSnap.docs.filter(function (d) { return QUIZ_FAECHER.indexOf(d.data().subject) >= 0; });
   const res = resSnap.docs.filter(function (d) { return NICHT_SPIEGELN.indexOf(d.data().subject) < 0; });
   const fol = folSnap.docs.filter(function (d) { return NICHT_SPIEGELN.indexOf(d.data().subject) < 0; });
   const kkSets = kkSnap.exists ? (kkSnap.data().sets || []) : [];
@@ -47,19 +52,20 @@ function ohneLokal(d) { const x = Object.assign({}, d); LOKAL.forEach(function (
 
   const seiten = (await db.collection('klassen').listDocuments()).map(function (r) { return r.id; })
     .filter(function (k) { return k !== QUELLE; }).sort();
-  console.log((PROBE ? '[PROBE] ' : '') + 'Quelle ' + QUELLE + ': ' + res.length + ' Übungen, ' + fol.length + ' Ordner, ' + kkSets.length + ' Karteikarten-Sets → ' + seiten.length + ' Seiten');
+  console.log((PROBE ? '[PROBE] ' : '') + 'Quelle ' + QUELLE + ': ' + res.length + ' Übungen, ' + fol.length + ' Ordner, ' + kkSets.length + ' Karteikarten-Sets, ' + quizze.length + ' Trivia-Quizze → ' + seiten.length + ' Seiten');
 
-  let total = { neu: 0, akt: 0, ordner: 0, kk: 0 };
+  let total = { neu: 0, akt: 0, ordner: 0, kk: 0, quiz: 0 };
   // Stand nach der Spiegelung für den 🔒-Abgleich (lehrer-inhalte-schuetzen.js), ohne neu zu lesen.
   const nachher = resSnap.docs.map(function (d) { return { id: d.id, data: d.data() }; });
   for (const k of seiten) {
     const kref = db.collection('klassen').doc(k);
-    const [zr, zf, zk] = await Promise.all([kref.collection('resources').get(), kref.collection('folders').get(), kref.collection('klasseninfo').doc('karteikarten').get()]);
+    const [zr, zf, zk, zq] = await Promise.all([kref.collection('resources').get(), kref.collection('folders').get(), kref.collection('klasseninfo').doc('karteikarten').get(),
+      quizze.length ? kref.collection('quizzes').get() : null]);
     const hatR = {}; zr.forEach(function (d) { hatR[d.id] = d.data(); });
     const nachherK = {}; zr.forEach(function (d) { nachherK[d.id] = d.data(); });
     const hatF = {}; zf.forEach(function (d) { hatF[d.id] = d.data(); });
     const w = PROBE ? null : db.bulkWriter();
-    let n = { neu: 0, akt: 0, ordner: 0, kk: 0 };
+    let n = { neu: 0, akt: 0, ordner: 0, kk: 0, quiz: 0 };
 
     fol.forEach(function (d) {
       const q = d.data(), z = hatF[d.id];
@@ -105,16 +111,27 @@ function ohneLokal(d) { const x = Object.assign({}, d); LOKAL.forEach(function (
       if (n.kk && w) w.set(kref.collection('klasseninfo').doc('karteikarten'), { sets: neu }, { merge: true });
     }
 
+    if (quizze.length) {
+      const hatQ = {}; zq.forEach(function (d) { hatQ[d.id] = d.data(); });
+      quizze.forEach(function (d) {
+        const q = Object.assign({}, d.data(), { originKlasse: QUELLE }), z = hatQ[d.id];
+        if (!z) { n.quiz++; if (w) w.set(kref.collection('quizzes').doc(d.id), q); return; }
+        const upd = {};
+        Object.keys(q).forEach(function (f) { if (NUR_NEU.indexOf(f) < 0 && !gleich(q[f], z[f])) upd[f] = q[f]; });
+        if (Object.keys(upd).length) { n.quiz++; if (w) w.update(kref.collection('quizzes').doc(d.id), upd); }
+      });
+    }
+
     Object.keys(nachherK).forEach(function (id) { nachher.push({ id: id, data: nachherK[id] }); });
     const weg = Object.keys(hatR).filter(function (id) { return hatR[id].originKlasse === QUELLE && !quellIds[id] && NICHT_SPIEGELN.indexOf(hatR[id].subject) < 0; });
     if (w) await w.close();
-    if (n.neu || n.akt || n.ordner || n.kk || weg.length) {
-      console.log(k + ': ' + n.neu + ' neu, ' + n.akt + ' aktualisiert, ' + n.ordner + ' Ordner, ' + n.kk + ' Karteikarten-Sets' +
+    if (n.neu || n.akt || n.ordner || n.kk || n.quiz || weg.length) {
+      console.log(k + ': ' + n.neu + ' neu, ' + n.akt + ' aktualisiert, ' + n.ordner + ' Ordner, ' + n.kk + ' Karteikarten-Sets, ' + n.quiz + ' Trivia-Quizze' +
         (weg.length ? ' · bei Jan gelöscht (bleiben stehen): ' + weg.map(function (id) { return hatR[id].title || id; }).join(', ') : ''));
     }
     Object.keys(total).forEach(function (f) { total[f] += n[f]; });
   }
-  console.log('Fertig: ' + total.neu + ' neu, ' + total.akt + ' aktualisiert, ' + total.ordner + ' Ordner, ' + total.kk + ' Karteikarten-Sets.');
+  console.log('Fertig: ' + total.neu + ' neu, ' + total.akt + ' aktualisiert, ' + total.ordner + ' Ordner, ' + total.kk + ' Karteikarten-Sets, ' + total.quiz + ' Trivia-Quizze.');
   // 🔒 Kopien haben ein nurLehrer eben erst übernommen: Schutz der Inhalte nachführen.
   // Ein Fehler hier soll die Spiegelung nicht als gescheitert melden.
   try { await require('./lehrer-inhalte-schuetzen').inhalteSchuetzen(db, !PROBE, nachher); }
