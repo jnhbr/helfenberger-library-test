@@ -6199,13 +6199,15 @@ function earlybirdDrucken(datum, alle){
   var zeilen = alle.map(function(x, i){
     return '<tr><td class="nr">'+(i+1)+'</td><td>'+esc(earlybirdName(x))+'</td><td>'+esc(x.klasse || '')+'</td><td>'+esc(x.vonName || '')+'</td><td>'+esc(x.auftrag || '')+'</td><td class="box">'+(x.anwesend ? '☒' : '☐')+'</td></tr>';
   }).join('');
+  // 3 leere Zeilen für Schüler:innen, die jemand einzutragen vergessen hat
+  for(var i = 0; i < 3; i++) zeilen += '<tr class="leer"><td class="nr">'+(alle.length+i+1)+'</td><td></td><td></td><td></td><td></td><td class="box">☐</td></tr>';
   var css = '@page{size:A4;margin:2cm;'+DRUCK_OHNE_KOPF+'}' +
     'body{font-family:Calibri,Carlito,"Segoe UI",Arial,sans-serif;font-size:11pt;line-height:1.4;color:#000;background:#fff;margin:0;}' +
     '.blatt{max-width:17cm;margin:0 auto;padding:16px;} @media print{.blatt{padding:0;max-width:none;} .werkzeug{display:none;}}' +
     'table{border-collapse:collapse;width:100%;} .kopf td{vertical-align:middle;padding:0;} .kopf .logo{width:4.2cm;} .kopf td + td{padding-left:10pt;}' +
     '.k1{font-size:10pt;} .k2{font-size:16pt;font-weight:bold;}' +
     '.liste{margin-top:14pt;} .liste th,.liste td{border:0.5pt solid #000;padding:5pt 6pt;text-align:left;} .liste th{background:#F2F2F2;}' +
-    '.liste tr{break-inside:avoid;} .nr{width:1cm;text-align:right!important;} .box{width:2.2cm;text-align:center!important;font-size:15pt;line-height:1;}' +
+    '.liste tr{break-inside:avoid;} .liste tr.leer td{height:22pt;} .nr{width:1cm;text-align:right!important;} .box{width:2.2cm;text-align:center!important;font-size:15pt;line-height:1;}' +
     '.fuss{margin-top:14pt;font-size:10pt;display:flex;justify-content:space-between;}' +
     '.werkzeug{position:sticky;top:0;background:#fffbe6;border-bottom:1px solid #e5d58a;padding:10px 16px;font-family:system-ui,sans-serif;font-size:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}' +
     '.werkzeug button{font:inherit;font-weight:600;padding:7px 14px;border-radius:8px;border:0;background:#4361EE;color:#fff;cursor:pointer;}';
@@ -22861,6 +22863,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-21-earlybird-leerzeilen', datum:'2026-10-21', fuer:'lehrer', text:'🐦 Earlybird: Die gedruckte Liste hat unten 3 leere Zeilen – für alle, die jemand einzutragen vergessen hat.'},
   {id:'2026-10-21-earlybird-kacheln', datum:'2026-10-21', fuer:'lehrer', text:'🐦 Earlybird: Eintragen geht jetzt mit denselben Namens-Kacheln wie bei der Abgabe-Checkliste – antippen, und sie wird grün mit Haken.'},
   {id:'2026-10-21-eigene-aenderungen', datum:'2026-10-21', fuer:'lehrer', text:'🪞 Übungen, Quizze, Spiel-Sets, Karteikarten, Wortwolken und Blitzumfragen von Jan kommen jede Nacht automatisch auf deine Seite – neu auch alle Klassen-Quizze und 50 🎲 Trivia-Quizze. Was du an einer Kopie änderst (Inhalt ersetzen, umbenennen, verschieben, ausblenden, Fragen bearbeiten) oder löschst, bleibt jetzt nur bei dir und wird nicht mehr überschrieben.'},
   {id:'2026-10-21-bleistift-weg', datum:'2026-10-21', fuer:'alle', text:'✏️ Der versteckte Bleistift unten rechts ist weg – das Rätsel ist gelöst.'},
