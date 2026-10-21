@@ -13750,7 +13750,8 @@ function svaKopfHtml(isTeacher){
     }).join('')+'</table></details>';
   html += '<div class="sva-knoepfe"><a class="btn btn-ghost btn-sm" href="sva/SVA-Leitfaden-2026-27.pdf" target="_blank" rel="noopener">📄 Leitfaden SVA (PDF)</a>'+
     '<a class="btn btn-ghost btn-sm" href="https://youtu.be/nVc2cYSEgpA" target="_blank" rel="noopener">▶️ Erklärvideo Arbeitsdossier</a>'+
-    '<a class="btn btn-ghost btn-sm" href="sva/SVA-Arbeitsdossier-Praesentation.pdf" target="_blank" rel="noopener" title="Die Folien aus dem Erklärvideo zum Nachlesen">🖼️ Präsentation Arbeitsdossier (PDF)</a>';
+    '<a class="btn btn-ghost btn-sm" href="sva/SVA-Arbeitsdossier-Praesentation.pdf" target="_blank" rel="noopener" title="Die Folien aus dem Erklärvideo zum Nachlesen">🖼️ Präsentation Arbeitsdossier (PDF)</a>'+
+    '<a class="btn btn-ghost btn-sm" href="sva/Logo_Sek_Altnau.png" download="Logo_Sek_Altnau.png" title="Für Titelseite und Fusszeile deines Dossiers">⬇️ Logo Sek Altnau</a>';
   if(isTeacher){
     html += '<button class="btn btn-ghost btn-sm" id="svaStandBtn" type="button">📊 Wer steht wo?</button>'+
       '<button class="btn btn-ghost btn-sm" id="svaProjBtn" type="button">📋 Projekte der Klasse</button>'+
@@ -22947,6 +22948,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-21-sva-logo', datum:'2026-10-21', fuer:'alle', text:'🎓 SVA: Das Logo der Sek Altnau für Titelseite und Fusszeile deines Dossiers kannst du jetzt im Fach SVA mit «⬇️ Logo Sek Altnau» herunterladen.'},
   {id:'2026-10-21-sva-praesentation', datum:'2026-10-21', fuer:'alle', text:'🎓 SVA: Die Präsentation zum Arbeitsdossier (die Folien aus dem Erklärvideo) findest du jetzt im Fach SVA unter «🖼️ Präsentation Arbeitsdossier (PDF)». So kannst du alles in Ruhe nachlesen.'},
   {id:'2026-10-21-neue-version-offen', datum:'2026-10-21', fuer:'alle', text:'🔄 Neues kommt jetzt schneller in die Library – nicht mehr erst über Nacht. Ist die Library schon offen, erscheint unten «🔄 Neue Version der Library». Antippen, und du hast die neueste Fassung. Während einer Prüfung kommt der Hinweis nie.'},
   {id:'2026-10-21-safari-ohne-timer', datum:'2026-10-21', fuer:'lehrer', text:'🦒 Stille Safari geht jetzt auch ohne Timer: unten in der Leiste «🌿 Ohne Timer» antippen. Die Szene läuft ohne Countdown, bleibt es ruhig, kommen die Tiere. Nochmals tippen = Pause (die Tiere hören zu). Startest du doch den Timer, übernimmt er.'},
