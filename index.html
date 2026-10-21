@@ -5945,7 +5945,8 @@ function renderKalender(){
    Schule» (alle eines Termins, Anwesenheit abhaken, drucken mit Logo).
    `auftrag` = was die Person in der Stunde macht (für die Aufsicht); wird nur
    in der Lehrpersonen-Ansicht angezeigt, nie bei Schüler:innen.
-   Im 📅 Kalender stehen für alle die nächsten zwei Termine. */
+   Im 📅 Kalender: Lehrpersonen sehen die nächsten zwei Termine, Schüler:innen
+   nur die Termine, für die sie eingetragen sind. */
 var EARLYBIRD_DATEN = [
   '2026-09-09','2026-09-23','2026-10-28','2026-11-11','2026-11-25','2026-12-09',
   '2027-01-06','2027-01-20','2027-02-17','2027-03-10','2027-03-17','2027-04-14',
@@ -5973,12 +5974,22 @@ function earlybirdLadenDatum(datum){
   });
 }
 
-// Kalender: die nächsten zwei Termine. Schüler:innen sehen, ob sie eingetragen
-// sind, Lehrpersonen wie viele (aus der offenen Klasse / total).
+// Kalender: Lehrpersonen sehen die nächsten zwei Termine (wie viele eingetragen,
+// aus der offenen Klasse / total). Schüler:innen sehen nur die kommenden Termine,
+// für die sie eingetragen sind – sonst gar keinen Earlybird.
 function earlybirdKalenderLaden(){
-  var daten = earlybirdKommende(2);
-  if(!daten.length || !state.user) return Promise.resolve([]);
+  if(!state.user) return Promise.resolve([]);
   var lehrer = state.profile.role === 'teacher';
+  if(!lehrer){
+    var kommend = earlybirdKommende();
+    return getDocs(query(earlybirdCol(), where('uid','==',state.user.uid))).then(function(snap){
+      var meine = {};
+      snap.forEach(function(d){ meine[d.data().datum] = true; });
+      return kommend.filter(function(d){ return meine[d]; }).map(function(d){ return {datum:d, liste:[{uid:state.user.uid}]}; });
+    }).catch(function(err){ console.error('Earlybird nicht lesbar', err); return []; });
+  }
+  var daten = earlybirdKommende(2);
+  if(!daten.length) return Promise.resolve([]);
   var job = lehrer
     ? Promise.all(daten.map(earlybirdLadenDatum))
     : getDocs(query(earlybirdCol(), where('uid','==',state.user.uid))).then(function(snap){
@@ -9868,7 +9879,7 @@ var KIB_WISSEN = [
   {id:'gruppen', fuer:'sus', f:'Wo finde ich die Übungen einer anderen Lehrperson?', w:'gruppe gruppen andere lehrperson niveau niveaugruppe halbklasse wahlfach andere klasse mathe englisch',
    a:'Bist du in einer Gruppe einer anderen Lehrperson (z. B. Mathe in einer anderen Klasse), siehst du im Fach auch ihre Übungen und im Kalender ihre Hausaufgaben. Fehlt etwas, sag es dieser Lehrperson: Sie muss dich in ihre Gruppe aufnehmen.'},
   {id:'earlybird', fuer:'sus', f:'Was ist Earlybird?', w:'earlybird early bird mittwoch morgen früh eingetragen nachholen',
-   a:'🐦 Earlybird ist jeweils am Mittwoch von 06:30 bis 07:30. Die nächsten Termine stehen im Kalender. Bist du eingetragen, steht es dort.', ziel:'kalender'},
+   a:'🐦 Earlybird ist jeweils am Mittwoch von 06:30 bis 07:30. Bist du eingetragen, steht der Termin in deinem Kalender. Steht nichts dort, musst du nicht kommen.', ziel:'kalender'},
   {id:'rechner', fuer:'sus', f:'Gibt es einen Taschenrechner?', w:'taschenrechner rechner rechnen tastatur mathe lehrmittel mathematik kapitel niveau',
    a:'In den Mathe-Übungen gibt es den Taschenrechner 🧮. Du kannst ihn auch mit der Tastatur bedienen.\nIn Mathe findest du zudem alle Online-Übungen der Lehrmittel Mathematik 1, 2 und 3, geordnet nach Kapitel und Niveau.'},
   {id:'werkstatt', fuer:'sus', f:'Was ist die Rechtschreib-Werkstatt?', w:'rechtschreib-werkstatt werkstatt posten pass werkstatt-pass hördiktat diktat langsamer schneller tempo abspielen',
@@ -22948,6 +22959,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-21-earlybird-nur-eingetragen', datum:'2026-10-21', fuer:'alle', text:'🐦 Earlybird steht jetzt nur noch in deinem Kalender, wenn du dafür eingetragen bist. Siehst du keinen Earlybird, musst du nicht kommen.'},
   {id:'2026-10-21-sva-logo', datum:'2026-10-21', fuer:'alle', text:'🎓 SVA: Das Logo der Sek Altnau für Titelseite und Fusszeile deines Dossiers kannst du jetzt im Fach SVA mit «⬇️ Logo Sek Altnau» herunterladen.'},
   {id:'2026-10-21-sva-praesentation', datum:'2026-10-21', fuer:'alle', text:'🎓 SVA: Die Präsentation zum Arbeitsdossier (die Folien aus dem Erklärvideo) findest du jetzt im Fach SVA unter «🖼️ Präsentation Arbeitsdossier (PDF)». So kannst du alles in Ruhe nachlesen.'},
   {id:'2026-10-21-neue-version-offen', datum:'2026-10-21', fuer:'alle', text:'🔄 Neues kommt jetzt schneller in die Library – nicht mehr erst über Nacht. Ist die Library schon offen, erscheint unten «🔄 Neue Version der Library». Antippen, und du hast die neueste Fassung. Während einer Prüfung kommt der Hinweis nie.'},
