@@ -603,7 +603,9 @@
   .eb-feld select{width:auto;max-width:100%;}
   .eb-zahl{color:var(--text-muted);font-size:14px;font-weight:600;margin-right:auto;}
   .eb-von{color:var(--text-muted);}
-  .eb-liste{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:2px 14px;}
+  .submission-list.eb-liste{max-height:none;overflow:visible;align-items:start;}
+  .sub-kachel .eb-von{color:inherit;opacity:.8;font-weight:600;}
+  .sub-kachel:has(input:disabled){cursor:default;}
   .eb-card{overflow-x:auto;}
   .eb-tab{width:100%;border-collapse:collapse;font-size:14.5px;}
   .eb-tab th,.eb-tab td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:left;}
@@ -611,7 +613,7 @@
   .eb-tab td:first-child,.eb-tab th:first-child{width:80px;text-align:center;}
   .eb-tab input[type=checkbox]{width:20px;height:20px;cursor:pointer;}
   .eb-tab tr.eb-da td{background:color-mix(in srgb, var(--good, #2E8B57) 10%, transparent);}
-  .eb-zeile{display:flex;flex-direction:column;gap:2px;min-width:0;padding-bottom:4px;}
+  .eb-zeile{display:flex;flex-direction:column;gap:5px;min-width:0;}
   .eb-auftrag{width:100%;font-size:13.5px;padding:5px 8px;}
   .eb-tab .eb-auftrag{min-width:180px;}
   /* 🚪 Räume */
@@ -6077,10 +6079,10 @@ function earlybirdEintragenZeigen(body, alle, schueler){
   var inKlasse = schueler.filter(function(s){ return drin[s.uid]; }).length;
   h += '<span class="eb-zahl">'+inKlasse+' von '+schueler.length+' eingetragen</span></div>';
   if(!schueler.length) h += '<div class="empty-state">Keine Schüler:innen gefunden.</div>';
-  else h += '<div class="submission-list eb-liste">'+schueler.map(function(s){
+  else h += '<div class="submission-list sub-kacheln eb-liste">'+schueler.map(function(s){
     var e = drin[s.uid];
     var von = e && e.vonUid !== state.user.uid && e.vonName ? ' <small class="eb-von">von '+esc(e.vonName)+'</small>' : '';
-    return '<div class="eb-zeile"><label class="submission-row"><input type="checkbox" class="eb-check" value="'+esc(s.uid)+'"'+(e ? ' checked' : '')+(isLeitung() ? ' disabled' : '')+'> <span>'+esc(s.n)+' '+esc(s.nn)+von+'</span></label>'+(e ? earlybirdAuftragFeld(e) : '')+'</div>';
+    return '<div class="eb-zeile"><label class="sub-kachel"><input type="checkbox" class="eb-check" value="'+esc(s.uid)+'"'+(e ? ' checked' : '')+(isLeitung() ? ' disabled' : '')+'><span>'+esc(s.n)+' '+esc(s.nn)+von+'</span></label>'+(e ? earlybirdAuftragFeld(e) : '')+'</div>';
   }).join('')+'</div>';
   h += '</div>';
   body.innerHTML = h;
@@ -22859,6 +22861,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-21-earlybird-kacheln', datum:'2026-10-21', fuer:'lehrer', text:'🐦 Earlybird: Eintragen geht jetzt mit denselben Namens-Kacheln wie bei der Abgabe-Checkliste – antippen, und sie wird grün mit Haken.'},
   {id:'2026-10-21-eigene-aenderungen', datum:'2026-10-21', fuer:'lehrer', text:'🪞 Übungen, Quizze, Spiel-Sets, Karteikarten, Wortwolken und Blitzumfragen von Jan kommen jede Nacht automatisch auf deine Seite – neu auch alle Klassen-Quizze und 50 🎲 Trivia-Quizze. Was du an einer Kopie änderst (Inhalt ersetzen, umbenennen, verschieben, ausblenden, Fragen bearbeiten) oder löschst, bleibt jetzt nur bei dir und wird nicht mehr überschrieben.'},
   {id:'2026-10-21-bleistift-weg', datum:'2026-10-21', fuer:'alle', text:'✏️ Der versteckte Bleistift unten rechts ist weg – das Rätsel ist gelöst.'},
   {id:'2026-10-21-earlybird-nur-eingetragen', datum:'2026-10-21', fuer:'alle', text:'🐦 Earlybird steht jetzt nur noch in deinem Kalender, wenn du dafür eingetragen bist. Siehst du keinen Earlybird, musst du nicht kommen.'},
