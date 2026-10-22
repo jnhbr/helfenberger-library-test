@@ -10649,6 +10649,7 @@ function renderHome(){
   html += '<button class="btn btn-ghost btn-sm" id="toolsBtn" type="button" title="PDFs und Bilder komprimieren, zusammenführen, Seiten bearbeiten">🧰 Tools</button>';
   html += '<button class="btn btn-ghost btn-sm" id="anordnenBtn" type="button" title="Kacheln und Symbole verschieben (oder lange auf eine Kachel drücken) – nochmals klicken beendet das Anordnen">✏️ Anordnen</button>';
   html += '<button class="btn btn-ghost btn-sm anordnen-widgets" id="anordnenWidgetsBtn" type="button" title="Ausgeblendetes zurückholen">🧩 Widgets</button>';
+  if(istJan()) html += '<button class="btn btn-ghost btn-sm" id="fehlerKopierBtn" type="button" title="Alle gemeldeten Fehler kopieren" aria-label="Fehler kopieren">🐞</button>';
   html += '</div>';
   html += '<div id="aemtliBanner"></div>';
   html += '<div id="stpJetzt"></div>';
@@ -10687,6 +10688,8 @@ function renderHome(){
   document.getElementById('toolsBtn').addEventListener('click', function(){ state.route = {name:'tools'}; render(); });
   document.getElementById('anordnenBtn').addEventListener('click', function(){ wackelnUmschalten(); });
   document.getElementById('anordnenWidgetsBtn').addEventListener('click', openWidgetDrawer);
+  var fkb = document.getElementById('fehlerKopierBtn');
+  if(fkb) fkb.addEventListener('click', function(){ fehlerSchnellKopieren(fkb); });
   initKachelSort();
   renderStpJetzt();
   renderHomeworkWidget();
@@ -11404,6 +11407,55 @@ function openSettings(){
    also einige hundert Dokumente): pro Klasse, wie viele in den letzten 7 Tagen
    geübt haben (streaks/{uid}.days), und pro Lehrperson der belegte Speicher
    (resourceContent.ownerUid/bytes, wie «💾 Mein Speicher»). */
+/* 🐞 Fehlerprotokoll (nur Jan): gleiche Meldungen zusammengefasst, neueste zuerst;
+   Text zum Einfügen im Chat. Gebraucht von den Einstellungen und vom 🐞-Knopf neben «Anordnen». */
+function fehlerGruppieren(snap){
+  var gruppen = {}, reihenfolge = [];
+  snap.forEach(function(d){
+    var x = d.data(), g = gruppen[x.msg];
+    if(!g){ g = gruppen[x.msg] = {msg:x.msg, ids:[], wer:{}, letzt:0, stack:x.stack || '', quellen:{}, seiten:{}, infos:{}, test:0, ua:x.ua || ''}; reihenfolge.push(x.msg); }
+    g.ids.push(d.id);
+    g.wer[(x.name || '?') + (x.klasse ? ' (' + x.klasse + ')' : '')] = 1;
+    var ms = pruefMs(x.am) || 0;
+    if(ms >= g.letzt){ g.letzt = ms; g.stack = x.stack || g.stack; g.ua = x.ua || g.ua; }
+    if(x.quelle) g.quellen[x.quelle] = 1;
+    if(x.seite) g.seiten[x.seite] = 1;
+    if(x.info) g.infos[x.info] = 1;
+    if(x.test) g.test++;
+  });
+  return reihenfolge.map(function(k){ return gruppen[k]; }).sort(function(a, b){ return b.letzt - a.letzt; });
+}
+function fehlerKopierText(snap, liste){
+  return 'Fehler aus der Library (' + snap.size + ' Meldungen, ' + liste.length + ' verschiedene), kopiert ' + rmZeit(Date.now()) + '\n\n' +
+    liste.map(function(g, i){
+      return '#' + (i + 1) + ' (' + g.ids.length + '×, zuletzt ' + rmZeit(g.letzt) + (g.test === g.ids.length ? ', nur Testseite' : '') + ')\n' +
+        g.msg + '\n' +
+        'Wer: ' + Object.keys(g.wer).join(', ') + '\n' +
+        'Quelle: ' + Object.keys(g.quellen).join('/') + (Object.keys(g.seiten).length ? ' · Seite: ' + Object.keys(g.seiten).join(', ') : '') + '\n' +
+        (Object.keys(g.infos).length ? 'Info: ' + Object.keys(g.infos).join('\n      ') + '\n' : '') +
+        'Stack:\n' + (g.stack || '(kein Stack)') + '\n' +
+        'Browser: ' + (g.ua || '?');
+    }).join('\n\n----------\n\n');
+}
+function textKopieren(text, ok){
+  var alt = function(){
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); ok(); }catch(e){ toast('Kopieren hat nicht geklappt.'); }
+    ta.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, alt);
+  else alt();
+}
+function fehlerSchnellKopieren(knopf){
+  knopf.disabled = true;
+  getDocs(collection(db, 'fehlerLog')).then(function(snap){
+    knopf.disabled = false;
+    if(snap.empty){ toast('Keine Fehler gemeldet. 🎉'); return; }
+    textKopieren(fehlerKopierText(snap, fehlerGruppieren(snap)), function(){ toast('Alle ' + snap.size + ' Fehler kopiert.'); });
+  }, function(err){ knopf.disabled = false; console.error(err); toast('Fehler konnten nicht geladen werden.'); });
+}
 function istJan(){ return !!(state.profile && state.profile.role === 'teacher' && !isLeitung() && state.profile.username === 'helfenberger'); }
 function darfSchulStatistik(){ return isLeitung() || istJan(); }
 
@@ -11702,20 +11754,7 @@ function openRueckmeldungen(reiter){
     ladeFehler();
     getDocs(collection(db, 'fehlerLog')).then(function(snap){
       if(!document.getElementById('rmInhalt')) return;
-      var gruppen = {}, reihenfolge = [];
-      snap.forEach(function(d){
-        var x = d.data(), g = gruppen[x.msg];
-        if(!g){ g = gruppen[x.msg] = {msg:x.msg, ids:[], wer:{}, letzt:0, stack:x.stack || '', quellen:{}, seiten:{}, infos:{}, test:0, ua:x.ua || ''}; reihenfolge.push(x.msg); }
-        g.ids.push(d.id);
-        g.wer[(x.name || '?') + (x.klasse ? ' (' + x.klasse + ')' : '')] = 1;
-        var ms = pruefMs(x.am) || 0;
-        if(ms >= g.letzt){ g.letzt = ms; g.stack = x.stack || g.stack; g.ua = x.ua || g.ua; }
-        if(x.quelle) g.quellen[x.quelle] = 1;
-        if(x.seite) g.seiten[x.seite] = 1;
-        if(x.info) g.infos[x.info] = 1;
-        if(x.test) g.test++;
-      });
-      var liste = reihenfolge.map(function(k){ return gruppen[k]; }).sort(function(a, b){ return b.letzt - a.letzt; });
+      var liste = fehlerGruppieren(snap);
       box.innerHTML = '<p class="pr-hinweis">Fehler, die in den Browsern aufgetreten sind (höchstens 5 pro Seitenaufruf, gleiche nur einmal). Behoben? Einfach löschen.</p>'+
         (liste.length ? '<div class="settings-actions" style="margin-bottom:8px;"><button type="button" class="btn btn-primary btn-sm" id="flKopie">📋 Alle kopieren</button> <button type="button" class="btn btn-danger btn-sm" id="flAlle">Alle '+snap.size+' löschen</button></div>' : '')+
         '<div class="settings-list rm-liste">'+(liste.length ? liste.map(function(g, i){
@@ -11744,16 +11783,7 @@ function openRueckmeldungen(reiter){
       // 📋 Alles als Text (zum Einfügen im Chat mit Claude), inkl. Details.
       var kopie = document.getElementById('flKopie');
       if(kopie) kopie.addEventListener('click', function(){
-        var text = 'Fehler aus der Library (' + snap.size + ' Meldungen, ' + liste.length + ' verschiedene), kopiert ' + rmZeit(Date.now()) + '\n\n' +
-          liste.map(function(g, i){
-            return '#' + (i + 1) + ' (' + g.ids.length + '×, zuletzt ' + rmZeit(g.letzt) + (g.test === g.ids.length ? ', nur Testseite' : '') + ')\n' +
-              g.msg + '\n' +
-              'Wer: ' + Object.keys(g.wer).join(', ') + '\n' +
-              'Quelle: ' + Object.keys(g.quellen).join('/') + (Object.keys(g.seiten).length ? ' · Seite: ' + Object.keys(g.seiten).join(', ') : '') + '\n' +
-              (Object.keys(g.infos).length ? 'Info: ' + Object.keys(g.infos).join('\n      ') + '\n' : '') +
-              'Stack:\n' + (g.stack || '(kein Stack)') + '\n' +
-              'Browser: ' + (g.ua || '?');
-          }).join('\n\n----------\n\n');
+        var text = fehlerKopierText(snap, liste);
         var ok = function(){ toast('Alle Fehler kopiert.'); };
         var altKopie = function(){
           var ta = document.createElement('textarea');
