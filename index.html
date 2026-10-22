@@ -10963,7 +10963,7 @@ function lmvzMerge(){
   var v = state.lmvzV;
   state.folders = state.folders.filter(function(f){ return !f.virtual; });
   state.resources = state.resources.filter(function(r){ return !r.virtual; }).concat(tippVirtuell(state.route.subject))
-    .concat(mtVirtuell(state.route.subject)).concat(kkVirtuell(state.route.subject)).concat(kzmVirtuell(state.route.subject)).concat(svaVirtuell(state.route.subject)).concat(schachVirtuell(state.route.subject)).concat(jassenVirtuell(state.route.subject)).concat(raetselVirtuell(state.route.subject));
+    .concat(mtVirtuell(state.route.subject)).concat(kkVirtuell(state.route.subject)).concat(kzmVirtuell(state.route.subject)).concat(svaVirtuell(state.route.subject)).concat(schachVirtuell(state.route.subject)).concat(jassenVirtuell(state.route.subject)).concat(raetselVirtuell(state.route.subject)).concat(hallenplanerVirtuell(state.route.subject));
   if(state.route.subject !== LMVZ_SUBJECT) return;
   var sv = sikoreVirtuell();
   state.folders = state.folders.concat(sv.folders);
@@ -13684,6 +13684,15 @@ function raetselVirtuell(subject){
   if(subject !== 'raetsel-logik') return [];
   return [{id:RAETSEL_ID, subject:'raetsel-logik', folderId:null, order:-2000, virtual:true, schach:true, statisch:'raetsel/raetsel.html',
     title:'🧩 Sudoku, Logikrätsel und Kreuzworträtsel', meta:'Sudoku von 4×4 bis Profi · Wer sitzt wo? · Wahrheit oder Lüge? · Codeschloss · Kreuzworträtsel in drei Stufen · im Unterricht gesperrt, die Lehrperson kann freischalten'}];
+}
+/* 🏟️ HALLENPLANER – Werkzeug im Fach Sport (nur Lehrperson): statische Seite hallenplaner/ im Link-Viewer (iframe src).
+   Grundriss der Dreifachhalle Altnau, Geräte-Baukasten, Materialliste, Druck, 3D (three.js aus assets/vendor). Kein Firestore:
+   Aufbauten liegen im Browser (localStorage hallenplaner_v1) und lassen sich als Datei weitergeben. */
+var HALLENPLANER_VERSION = 1;   // nach jeder Änderung an hallenplaner/index.html erhöhen (Browser-Cache)
+function hallenplanerVirtuell(subject){
+  if(subject !== 'sport' || !(state.profile && state.profile.role === 'teacher')) return [];
+  return [{id:'hallenplaner', subject:'sport', folderId:null, order:-2000, virtual:true, werkzeug:true, linkUrl:'hallenplaner/?v='+HALLENPLANER_VERSION, linkLabel:'Werkzeug',
+    title:'🏟️ Hallenplaner – Aufbauten in der Dreifachhalle', meta:'Geräte, Personen und Laufwege per Ziehen · Einfach-, Doppel- oder Dreifachhalle · Linien pro Sportart · Materialliste · Drucken · 3D-Ansicht · Vorlagen'}];
 }
 function svaDatum(t){
   var wt = ['So','Mo','Di','Mi','Do','Fr','Sa'], a = new Date(t.d+'T12:00:00');
@@ -22998,6 +23007,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-22-hallenplaner', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Neu im Fach Sport: der Hallenplaner. Geräte, Personen und Laufwege in die Dreifachhalle ziehen (Einfach-, Doppel- oder ganze Halle), Linien pro Sportart ein- und ausblenden, Materialliste, Drucken und eine 3D-Ansicht. Mit Vorlagen (Volleyball 3:3, Zirkeltraining, Brennball, Prüfung + Fussball). Nur für Lehrpersonen sichtbar.'},
   {id:'2026-10-22-trivia-40', datum:'2026-10-22', fuer:'lehrer', text:'🎲 Die 50 Trivia-Quizze haben jetzt je 40 Fragen. Beim Starten wählst du 10 oder 20 Fragen – die Library merkt sich pro Klasse, welche schon gekommen sind, und zieht zuerst die neuen. Erst wenn alle 40 dran waren, beginnt es von vorne. Das gilt für jedes Klassen-Quiz mit mehr als 10 Fragen; «Alle Fragen» spielt wie bisher alles in der gespeicherten Reihenfolge.'},
   {id:'2026-10-22-listener-neustart', datum:'2026-10-22', fuer:'alle', text:'🔧 Klassen-Quiz, Umfrage und Spiele: Klappt die Verbindung direkt nach dem Öffnen nicht, versucht es die Library jetzt von selbst nochmals.'},
   {id:'2026-10-22-lernphase-fenster', datum:'2026-10-22', fuer:'alle', text:'📚 Lernphase: Wenn du eine Übung im «🪟 Neuen Fenster» machst, zählt das jetzt auch als «in der Library» – du leuchtest bei der Lehrperson nicht mehr rot.'},
