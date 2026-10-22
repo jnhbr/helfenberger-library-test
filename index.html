@@ -3642,7 +3642,8 @@ if(EMULATOR) connectFirestoreEmulator(db, '127.0.0.1', 8080);
    und Browser-Erweiterungen werden ignoriert. Geschrieben wird direkt mit
    fsSetDoc (ohne Klassen-/Schulleitungs-Wrapper) und ohne selbst zu loggen. */
 var FEHLER_MAX = 5, fehlerGesendet = 0, fehlerGesehen = {};
-var FEHLER_IGNORIEREN = /ResizeObserver loop|^Script error\.?$|Load failed|Failed to fetch|NetworkError|network-request-failed|unavailable|offline|AbortError|aborted|QuotaExceeded|abgebrochen|extension:\/\/|Could not reach Cloud Firestore/i;
+// NotAllowedError / «denied»: Mikrofon oder Mitteilungen von der Person selbst abgelehnt.
+var FEHLER_IGNORIEREN = /NotAllowedError|Permission dismissed|(^|\s)denied$|ResizeObserver loop|^Script error\.?$|Load failed|Failed to fetch|NetworkError|network-request-failed|unavailable|offline|AbortError|aborted|QuotaExceeded|abgebrochen|extension:\/\/|Could not reach Cloud Firestore/i;
 var konsoleFehler = console.error.bind(console);
 function fehlerText(x){
   if(!x) return '';
@@ -3684,6 +3685,23 @@ function fehlerMelden(quelle, err, zusatz){
         ', angemeldet ' + (c.auth_time ? Math.round(Date.now() / 1000 - c.auth_time) + ' s' : '?') + ' zuvor';
     }, function(){ info += ' · Token nicht lesbar'; }).then(senden, senden);
   }catch(e){}
+}
+/* Live-Listener (Quiz, Umfrage, Spiele, Wortwolke, Lernphase): Am 21.10.2026 lehnte
+   Firestore bei einer Lehrperson direkt nach dem Laden ALLE gleichzeitig ab — samt dem
+   eigenen Einführungs-Status, den jede angemeldete Person lesen darf. Die Anmeldung war
+   für Firestore also kurz nicht bereit. Ein abgelehnter Listener bleibt sonst bis zum
+   Neuladen tot (kein Quiz-Banner). Darum einmal pro Listener und Seitenaufruf mit
+   frischem Token neu starten; gemeldet wird erst, wenn es dann wieder scheitert. */
+var listenerNeustart = {};
+function listenerFehler(name, err, stop, start){
+  if(err && err.code === 'permission-denied' && !listenerNeustart[name] && auth.currentUser){
+    listenerNeustart[name] = 1;
+    stop();
+    var nochmal = function(){ setTimeout(function(){ if(state.user && state.profile) start(); }, 2000); };
+    auth.currentUser.getIdToken(true).then(nochmal, nochmal);
+    return;
+  }
+  console.error(name, err);
 }
 window.addEventListener('error', function(e){
   if(e && e.error) fehlerMelden('error', e.error);
@@ -21681,7 +21699,7 @@ function startQuizWatcher(){
     quizLive.session = snap.exists() ? snap.data() : null;
     updateQuizBanner();
     if(state.route.name === 'quizplay') renderQuizPlay();
-  }, function(err){ console.error('Quiz-Listener', err); });
+  }, function(err){ listenerFehler('Quiz-Listener', err, stopQuizWatcher, startQuizWatcher); });
 }
 function stopQuizWatcher(){
   if(quizLive.unsub){ quizLive.unsub(); quizLive.unsub = null; }
@@ -22913,6 +22931,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-22-listener-neustart', datum:'2026-10-22', fuer:'alle', text:'🔧 Klassen-Quiz, Umfrage und Spiele: Klappt die Verbindung direkt nach dem Öffnen nicht, versucht es die Library jetzt von selbst nochmals.'},
   {id:'2026-10-22-lernphase-fenster', datum:'2026-10-22', fuer:'alle', text:'📚 Lernphase: Wenn du eine Übung im «🪟 Neuen Fenster» machst, zählt das jetzt auch als «in der Library» – du leuchtest bei der Lehrperson nicht mehr rot.'},
   {id:'2026-10-22-fehler-kopieren', datum:'2026-10-22', fuer:'lehrer', text:'🐞 Fehlerliste (nur Jan): «📋 Alle kopieren» kopiert alle Fehler samt Details auf einmal.'},
   {id:'2026-10-21-druck-ohne-leiste', datum:'2026-10-21', fuer:'lehrer', text:'🖨️ Earlybird-Liste und gedruckte Prüfungen: Die gelbe Leiste mit «Drucken / Als PDF sichern» erscheint nicht mehr auf dem Ausdruck.'},
@@ -23301,7 +23320,8 @@ var EINFUEHRUNG_ALTE_KLASSEN = ['G3b', 'G3a', 'E1c'];
 var HILFE_URL = 'hilfe.html';
 function einfuehrungRef(){ return doc(db, 'progress', state.user.uid, 'einstellungen', 'einfuehrung'); }
 function einfuehrungPruefen(){
-  if(!state.profile || !state.user || isLeitung() || EINFUEHRUNG_ALTE_KLASSEN.indexOf(state.profile.klasse) >= 0) return;
+  // 🎒 Schüleransicht: den Status der Schüler:in darf die Lehrperson nicht lesen (firestore.rules).
+  if(!state.profile || !state.user || isLeitung() || alsSchueler() || EINFUEHRUNG_ALTE_KLASSEN.indexOf(state.profile.klasse) >= 0) return;
   getDoc(einfuehrungRef()).then(function(snap){
     if(snap.exists() || !state.user) return;
     // Nicht über einen offenen Dialog oder eine Übung legen — dann eben beim nächsten Mal.
@@ -23925,7 +23945,7 @@ function startUmfrageWatcher(){
     updateUmfrageBanner();
     if(umfrage.voteOpen) paintUmfrageVote();
     if(umfrage.overlay) paintUmfrageHost();
-  }, function(err){ console.error('Umfrage-Listener', err); });
+  }, function(err){ listenerFehler('Umfrage-Listener', err, stopUmfrageWatcher, startUmfrageWatcher); });
 }
 function stopUmfrageWatcher(){
   if(umfrage.unsub){ umfrage.unsub(); umfrage.unsub = null; }
@@ -24412,7 +24432,7 @@ function startMioWatcher(){
     mioAuto();
     if(mio.voteOpen) paintMioVote();
     if(mio.overlay) paintMioHost();
-  }, function(err){ console.error('Millionär-Listener', err); });
+  }, function(err){ listenerFehler('Millionär-Listener', err, stopMioWatcher, startMioWatcher); });
 }
 function stopMioWatcher(){
   if(mio.unsub){ mio.unsub(); mio.unsub = null; }
@@ -25618,7 +25638,7 @@ function startLspWatcher(){
     lspAuto();
     if(lsp.offen) lspPaintS();
     if(lsp.overlay) lspPaintHost();
-  }, function(err){ console.error('Spiel-Listener', err); });
+  }, function(err){ listenerFehler('Spiel-Listener', err, stopLspWatcher, startLspWatcher); });
 }
 function stopLspWatcher(){
   if(lsp.unsub){ lsp.unsub(); lsp.unsub = null; }
@@ -27463,7 +27483,7 @@ function startWolkeWatcher(){
     // Tippen unter den Fingern weggerissen.
     if(wolke.voteOpen && (!wolke.session || !wolke.session.aktiv || !prev || prev.startedAt !== wolke.session.startedAt)) paintWolkeVote();
     if(wolke.overlay) paintWolkeHost();
-  }, function(err){ console.error('Wortwolken-Listener', err); });
+  }, function(err){ listenerFehler('Wortwolken-Listener', err, stopWolkeWatcher, startWolkeWatcher); });
 }
 function stopWolkeWatcher(){
   if(wolke.unsub){ wolke.unsub(); wolke.unsub = null; }
@@ -33005,7 +33025,7 @@ function lphLehrerWatch(){
       }, function(err){ console.error('Lernphase: Präsenz', err); });
     }
     lphPaint();
-  }, function(err){ console.error('Lernphase', err); });
+  }, function(err){ listenerFehler('Lernphase', err, stopLernphaseWatcher, startLernphaseWatcher); });
 }
 
 function lphErledigt(uid){ return ((lph.phase && lph.phase.erledigt) || {})[uid] || 0; }
