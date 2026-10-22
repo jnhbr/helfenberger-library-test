@@ -588,9 +588,10 @@ function festeTeile(){
     if(k % 2 === 0) t.push({art:'sprosse', x:Math.min(Math.max(x, SPR_B / 2), HALLE.W - SPR_B / 2), w:SPR_B});
     else t.push({art:'tor', x:x, w:TOR_B});
   }
+  [0, 3, 6].forEach(function(kk){ t.push({art:'korb', x:Math.min(Math.max(kk * P6, SPR_B / 2), HALLE.W - SPR_B / 2), wand:'o'}); });
   for(i = 0; i < 3; i++){
     var c = drittelMitte(i);
-    t.push({art:'glas', x:c - 5.6, w:2.8}, {art:'glas', x:c - 2.4, w:2.8});
+    t.push({art:'glas', x:c - 5.6, w:2.8}, {art:'glas', x:c - 2.4, w:2.8}, {art:'korbtafel', x:c + 3.4, w:3.0, wand:'u'});
     var rz = i === 0 ? 6 : i === 1 ? 5 : 0, rab = i === 0 ? 2.6 : 3;
     for(var rk = 0; rk < rz; rk++) t.push({art:'ringe', x:c + (rk - (rz - 1) / 2) * rab, y:1.6, key:'r' + (i + 1) + '-' + (rk + 1)});
   }
@@ -598,7 +599,6 @@ function festeTeile(){
   t.push({art:'tafel', y:14}, {art:'reck', y:4.2, n:6});
   if(kn > 0) t.push({art:'kletter', y:8.6, n:kn});
   t.push({art:'taue', y:12.6, n:3});
-  [10.5, 16.5, 20, 24.5].forEach(function(y){ t.push({art:'wandkorb', y:y}); });
   t.push({art:'tuer', y:24, w:2.0});
   return t;
 }
