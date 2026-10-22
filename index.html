@@ -13742,7 +13742,7 @@ function raetselVirtuell(subject){
 /* 🏟️ HALLENPLANER – Werkzeug im Fach Sport (nur Lehrperson): statische Seite hallenplaner/ im Link-Viewer (iframe src).
    Grundriss der Dreifachhalle Altnau, Geräte-Baukasten, Materialliste, Druck, 3D (three.js aus assets/vendor). Kein Firestore:
    Aufbauten liegen im Browser (localStorage hallenplaner_v1) und lassen sich als Datei weitergeben. */
-var HALLENPLANER_VERSION = 4;   // nach jeder Änderung an hallenplaner/index.html erhöhen (Browser-Cache)
+var HALLENPLANER_VERSION = 5;   // nach jeder Änderung an hallenplaner/index.html erhöhen (Browser-Cache)
 function hallenplanerVirtuell(subject){
   if(subject !== 'sport' || !(state.profile && state.profile.role === 'teacher')) return [];
   return [{id:'hallenplaner', subject:'sport', folderId:null, order:-2000, virtual:true, werkzeug:true, linkUrl:'hallenplaner/?v='+HALLENPLANER_VERSION, linkLabel:'Werkzeug',
@@ -23061,6 +23061,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-22-hallenplaner-5', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Hallenplaner: Namen korrigiert – das Reck besteht aus den Pfählen (in der Wand, höchstens 4) und den Reckstangen dazwischen. Die schrägen Stangen sind die Kletterstangen.'},
   {id:'2026-10-22-hallenplaner-4', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Hallenplaner: Reck korrigiert – die Reckpfähle stecken in der Wand und lassen sich mit «⇥ Reckpfähle ausfahren» als Reck in eine Linie ziehen (höchstens 4 Pfähle, Stangenhöhen einstellbar). Die schrägen Stangen heissen jetzt Kletterstangen.'},
   {id:'2026-10-22-hallenplaner-3', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Hallenplaner: Bodenlinien nach den Fotos der Halle (Sportart aus der Farbe abgeleitet), Reck- und Kletterstangen, Geräte auf den Kopf stellen, 3D-Ansicht direkt bearbeiten, Ablauf in Phasen mit Abspielen und Druck, Massband, eigene Geräte merken, Ringe heruntergelassen mit Fallzone – und Klassen laden (eigene Listen oder Library-Gruppen), Teams bilden und Namen im Plan zeigen.'},
   {id:'2026-10-22-hallenplaner-2', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Hallenplaner: Türen, Tore, Sprossenwände, Ringe, Stangen und Taue sind eingezeichnet, Trennvorhänge als Stoff markiert. Bodenlinien pro Sportart ein-/ausblenden, Geräte aufeinander stapeln, Bänke in die Sprossenwand einhängen, Gruppen bilden und Linien mit Biegepunkten zu Bögen formen.'},
