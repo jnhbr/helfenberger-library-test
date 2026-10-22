@@ -609,6 +609,7 @@ function sprossenFelder(){ return festeTeile().filter(function(f){ return f.art 
 function festSichtbar(f, b){
   if(f.art === 'tuer') return b.x1 >= HALLE.W;
   if(f.x == null) return f.art === 'schiene' ? true : b.x0 <= 0;
+  if(f.art === 'sprosse') return f.x - f.w / 2 >= b.x0 - 0.01 && f.x + f.w / 2 <= b.x1 + 0.01;   // an der Ansichtsgrenze nicht halb abgeschnitten zeigen
   return f.x >= b.x0 - 1 && f.x <= b.x1 + 1;
 }
 function festSvg(druck){
