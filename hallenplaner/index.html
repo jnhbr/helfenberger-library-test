@@ -1743,14 +1743,16 @@ var reckLaeuft = false;
 function reckAusfahren(recke){
   if(reckLaeuft) return;
   var it = S.items.filter(function(i){ return i.t === 'reckreihe'; })[0], neuIt = !it;
-  var fin = it ? {x:it.x, y:it.y, ab:it.ab || 2.4} : {x:3.5, y:12, ab:2.4};
-  if(!it){ it = beispiel('reckreihe', 3.5, 12); it.r = 90; S.items.push(it); }
-  it.n = recke + 1; it.ab = fin.ab; S.sel = [it.id]; reckLaeuft = true;
+  // Das Reck steht rechtwinklig zur Wand: die Pfähle stehen in einer Reihe von der Wand weg (x), die Reckstangen laufen in dieser Richtung
+  var ab0 = it ? (it.ab || 2.4) : 2.4, n0 = recke + 1;
+  var fin = {x:r2(1.5 + (n0 - 1) * ab0 / 2), y:8.6, r:0, ab:ab0};
+  if(!it){ it = beispiel('reckreihe', fin.x, fin.y); it.r = 90; S.items.push(it); }
+  it.n = n0; it.ab = fin.ab; S.sel = [it.id]; reckLaeuft = true;
   var t0 = performance.now(), dauer = 1500, letzter = 0;
   function schritt(now){
     var p = Math.min(1, (now - t0) / dauer), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-    it.x = r2(0.3 + (fin.x - 0.3) * e); it.y = r2(8.6 + (fin.y - 8.6) * e); it.ab = 0.5 + (fin.ab - 0.5) * e;
-    if(p >= 1){ it.x = fin.x; it.y = fin.y; it.ab = fin.ab; reckLaeuft = false; merken(); allesZeichnen(); toast('Reck ausgefahren – Abstand und Reckstangen-Höhen rechts einstellen'); return; }
+    it.x = r2(0.3 + (fin.x - 0.3) * e); it.y = r2(8.6 + (fin.y - 8.6) * e); it.ab = 0.5 + (fin.ab - 0.5) * e; it.r = Math.round(90 + (fin.r - 90) * e);
+    if(p >= 1){ it.x = fin.x; it.y = fin.y; it.ab = fin.ab; it.r = fin.r; reckLaeuft = false; merken(); allesZeichnen(); toast('Reck ausgefahren – Abstand und Reckstangen-Höhen rechts einstellen'); return; }
     if(now - letzter > 40){ letzter = now; allesZeichnen(); }
     requestAnimationFrame(schritt);
   }
