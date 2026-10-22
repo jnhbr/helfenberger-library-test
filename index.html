@@ -16997,6 +16997,7 @@ function libFensterOeffnen(r, src){
     catch(e){ console.error(e); try{ w.close(); }catch(e2){} toast('Das Fenster konnte nicht geöffnet werden.'); return; }
   }
   try{ w.focus(); }catch(e){}
+  libFensterLphHoeren(w);
   if(isPseudoFsActive()) exitPseudoFullscreen();
   var f = {win:w, rid:r.id, uebung:src.html != null, tracked:{}, lastWritten:null, lastWriteAt:0, writeTimer:null, sek:0, tickAt:Date.now()};
   libFensterListe[r.id] = f;
@@ -17012,6 +17013,15 @@ function libFensterOeffnen(r, src){
     libFensterPlatzhalter(r.id);
   }
 }
+// Lernphase: Fokuswechsel im Fenster sofort melden (nach document.write, das
+// vorher angehängte Listener wieder entfernt; fremder Origin → geht nicht).
+function libFensterLphHoeren(w){
+  try{
+    w.addEventListener('focus', function(){ lphWechsel(); });
+    w.addEventListener('blur', function(){ lphBlur(); });
+    w.document.addEventListener('visibilitychange', function(){ lphWechsel(); });
+  }catch(e){}
+}
 // Fenster schliessen (oder wurde geschlossen): letzter Stand + Lernzeit sichern.
 function libFensterZu(rid){
   var f = libFensterListe[rid];
@@ -17020,6 +17030,7 @@ function libFensterZu(rid){
   if(f.uebung){ clearTimeout(f.writeTimer); libFensterSpeichern(f); libFensterZeit(f); }
   try{ if(f.win && !f.win.closed) f.win.close(); }catch(e){}
   if(!Object.keys(libFensterListe).length){ clearInterval(libFensterTakt); libFensterTakt = null; }
+  if(lph.aktiv) lphWechsel();
   // Steht die Library gerade auf dieser Übung: Viewer neu laden (zeigt den Stand aus dem Fenster).
   if(f.uebung && libFensterDarf() && state.route.name === 'resource' && state.route.resource && state.route.resource.id === rid) render();
 }
@@ -17076,6 +17087,7 @@ function libFensterTick(){
     if(sichtbar) f.sek += dt;
     if(f.sek >= TIME_FLUSH_MS / 1000) libFensterZeit(f);
   });
+  if(lph.aktiv) lphWechsel();   // meldet nur, wenn sich «drin» geändert hat
 }
 window.addEventListener('pagehide', function(){
   Object.keys(libFensterListe).forEach(function(rid){
@@ -22863,6 +22875,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-22-lernphase-fenster', datum:'2026-10-22', fuer:'alle', text:'📚 Lernphase: Wenn du eine Übung im «🪟 Neuen Fenster» machst, zählt das jetzt auch als «in der Library» – du leuchtest bei der Lehrperson nicht mehr rot.'},
   {id:'2026-10-21-druck-ohne-leiste', datum:'2026-10-21', fuer:'lehrer', text:'🖨️ Earlybird-Liste und gedruckte Prüfungen: Die gelbe Leiste mit «Drucken / Als PDF sichern» erscheint nicht mehr auf dem Ausdruck.'},
   {id:'2026-10-21-earlybird-leerzeilen', datum:'2026-10-21', fuer:'lehrer', text:'🐦 Earlybird: Die gedruckte Liste hat unten 3 leere Zeilen – für alle, die jemand einzutragen vergessen hat.'},
   {id:'2026-10-21-earlybird-kacheln', datum:'2026-10-21', fuer:'lehrer', text:'🐦 Earlybird: Eintragen geht jetzt mit denselben Namens-Kacheln wie bei der Abgabe-Checkliste – antippen, und sie wird grün mit Haken.'},
@@ -32779,13 +32792,28 @@ function stopLernphaseWatcher(){
 
 /* ---------- Schüler:in: Lebenszeichen ---------- */
 
-function lphImFenster(){ return document.visibilityState === 'visible' && document.hasFocus(); }
+// 🪟 Übung im eigenen Fenster (libFensterListe) zählt auch als «in der Library»,
+// solange dieses Fenster den Fokus hat. Fremde Seiten (anderer Origin) lassen
+// sich nicht abfragen und zählen darum nicht.
+function lphBibFokus(){ return document.visibilityState === 'visible' && document.hasFocus(); }
+function lphFensterFokus(){
+  for(var rid in libFensterListe){
+    var f = libFensterVon(rid);
+    try{ if(f && f.win.document.visibilityState === 'visible' && f.win.document.hasFocus()) return f; }catch(e){}
+  }
+  return null;
+}
+function lphImFenster(){ return lphBibFokus() || !!lphFensterFokus(); }
 function lphAmOrt(){
   var n = lph.aktiv && lph.aktiv.nurUebung;
   if(!n || !n.id) return true;
   return state.route && state.route.name === 'resource' && state.route.resource && state.route.resource.id === n.id;
 }
-function lphIstDrin(){ return lphImFenster() && lphAmOrt(); }
+function lphIstDrin(){
+  if(lphBibFokus()) return lphAmOrt();
+  var f = lphFensterFokus(), n = lph.aktiv && lph.aktiv.nurUebung;
+  return !!f && (!n || !n.id || String(f.rid) === String(n.id));
+}
 function lphMelden(heartbeat, erzwungenRaus){
   if(!lph.aktiv || !state.user || alsSchueler()) return;
   var drin = erzwungenRaus ? false : lphIstDrin();
