@@ -259,7 +259,7 @@ function lfarbe(id){ return (S.lfarbe && S.lfarbe[id]) || LINIEN.filter(function
 // Feste Einrichtungen der Halle: Ebenen einzeln ein-/ausblendbar.
 var EBENEN = [
   {id:'spr', n:'Sprossenwände'}, {id:'tueren', n:'Türen & Tore (mit Freihalte-Zone)'}, {id:'korb', n:'Basketballkörbe'},
-  {id:'ringe', n:'Ringe, Taue, Kletterstangen, Reckpfähle'}, {id:'runter', n:'Ringe heruntergelassen (zeigt Fallzone)'}, {id:'vorhang', n:'Trennvorhänge (Stoff)'}
+  {id:'ringe', n:'Ringe, Taue, Kletterstangen, Reckstangen & Reck'}, {id:'runter', n:'Ringe heruntergelassen (zeigt Fallzone)'}, {id:'vorhang', n:'Trennvorhänge (Stoff)'}
 ];
 var SPR_B = 4.2, TOR_B = 3.2;
 var TEAMS = [
@@ -339,7 +339,7 @@ var K = {
     svg:function(){ return rect(-1.1, -0.7, 2.2, 1.4, '#adb5bd', '#495057', 0.04, ' rx="0.06" fill-opacity="0.55"') + rect(-1.5, -0.3, 3, 0.07, '#d9a86c', HOLZ2, 0.02) + rect(-1.5, 0.23, 3, 0.07, '#d9a86c', HOLZ2, 0.02); }},
   reck:{n:'Reck', g:'turnen', w:2.4, d:1.8, e:2, h:function(){ return 2.4; },
     svg:function(){ return linie(-1.05, 0, -1.05, -0.9, '#868e96', 0.02, ' stroke-dasharray="0.1 0.08"') + linie(-1.05, 0, -1.05, 0.9, '#868e96', 0.02, ' stroke-dasharray="0.1 0.08"') + linie(1.05, 0, 1.05, -0.9, '#868e96', 0.02, ' stroke-dasharray="0.1 0.08"') + linie(1.05, 0, 1.05, 0.9, '#868e96', 0.02, ' stroke-dasharray="0.1 0.08"') + linie(-1.2, 0, 1.2, 0, '#495057', 0.06) + kreis(-1.05, 0, 0.07, '#343a40') + kreis(1.05, 0, 0.07, '#343a40'); }},
-  reckreihe:{n:'Reck (Pfähle ausgefahren)', g:'turnen', w:7.5, d:0.35, e:2, h:function(){ return 2.6; },
+  reckreihe:{n:'Reck (ausgefahren)', g:'turnen', w:7.5, d:0.35, e:2, h:function(){ return 2.6; },
     svg:function(it){
       var n = it.n || 4, ab = it.ab || 2.4, x0 = -(n - 1) * ab / 2, s = '';
       for(var i = 0; i < n - 1; i++){
@@ -607,10 +607,10 @@ function festSvg(druck){
       // Wand-Reckstangen: an der Wandhalterung eingehängt, im Plan als Stangen, die von der Wand abstehen
       s += rect(0, f.y - 1.3, 0.12, 2.6, blau, null, 0);
       for(i = 0; i < f.n; i++){ var ry = f.y + (i - (f.n - 1) / 2) * 0.42; s += linie(0.1, ry, 1.0, ry, blau, 0.07) + kreis(1.0, ry, 0.06, blau, '#fff', 0.015); }
-      s += drehTxt(-0.25, f.y, -90, 'Kletterstangen', 0.28, druck ? '#555' : '#1f3f94');
+      s += drehTxt(-0.25, f.y, -90, 'Reckstangen', 0.28, druck ? '#555' : '#1f3f94');
     } else if(a === 'kletter' && E.ringe){
       for(i = 0; i < f.n; i++) s += rect(0.2, f.y + (i - (f.n - 1) / 2) * 0.5 - 0.09, 0.18, 0.18, druck ? '#e9ecef' : '#dde1e6', blau, 0.025) + kreis(0.29, f.y + (i - (f.n - 1) / 2) * 0.5, 0.03, blau);
-      s += drehTxt(-0.25, f.y, -90, 'Reckpfähle (' + f.n + ')', 0.28, druck ? '#555' : '#1f3f94');
+      s += drehTxt(-0.25, f.y, -90, 'Reck (' + f.n + ' Pfähle)', 0.28, druck ? '#555' : '#1f3f94');
     } else if(a === 'taue' && E.ringe){
       for(i = 0; i < f.n; i++) s += kreis(0.3, f.y + (i - (f.n - 1) / 2) * 0.45, 0.09, druck ? '#ced4da' : '#c8a46a', druck ? '#868e96' : '#7a5c00', 0.02);
       s += drehTxt(-0.25, f.y, -90, 'Taue', 0.28, druck ? '#555' : '#6b5332');
@@ -1326,7 +1326,7 @@ function eigenschaftenZeichnen(){
     }
     if(it.t === 'posten') h += '<label for="eNr">Posten-Nummer</label><input class="feld" id="eNr" type="number" min="1" max="99" value="' + esc(it.nr || 1) + '">';
     if(it.t === 'reckreihe'){
-      h += '<label for="eRn">Anzahl Pfähle (höchstens 4 in der Halle)</label><select class="feld" id="eRn">' + [2, 3, 4].map(function(n){ return '<option' + (n === (it.n || 4) ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select>';
+      h += '<label for="eRn">Anzahl Reck-Pfähle (höchstens 4 in der Halle)</label><select class="feld" id="eRn">' + [2, 3, 4].map(function(n){ return '<option' + (n === (it.n || 4) ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select>';
       h += '<label for="eRab">Abstand der Pfähle</label><select class="feld" id="eRab">' + [1.5, 2, 2.4, 3].map(function(a){ return '<option value="' + a + '"' + (a === (it.ab || 2.4) ? ' selected' : '') + '>' + a + ' m</option>'; }).join('') + '</select>';
       for(var rb = 0; rb < (it.n || 4) - 1; rb++) h += '<label for="eRh' + rb + '">Höhe Stange ' + (rb + 1) + '</label><select class="feld" data-rh="' + rb + '" id="eRh' + rb + '">' + [0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4].map(function(v){ return '<option value="' + v + '"' + (Math.abs(v - ((it.hoehen || [])[rb] || 1.4)) < 0.01 ? ' selected' : '') + '>' + v.toFixed(1) + ' m</option>'; }).join('') + '</select>';
     }
@@ -1410,7 +1410,7 @@ function materialDaten(){
     if(k.pfeil || it.t === 'zone' || it.t === 'text' || it.t === 'posten') return;
     if(it.t === 'spieler'){ personen[it.team] = (personen[it.team] || 0) + 1; return; }
     if(it.t === 'lehrer'){ lp++; return; }
-    if(it.t === 'reckreihe'){ z['Reckpfähle'] = (z['Reckpfähle'] || 0) + (it.n || 4); z['Reckstangen (quer)'] = (z['Reckstangen (quer)'] || 0) + (it.n || 4) - 1; return; }
+    if(it.t === 'reckreihe'){ z['Reck (Pfähle)'] = (z['Reck (Pfähle)'] || 0) + (it.n || 4); z['Reckstangen'] = (z['Reckstangen'] || 0) + (it.n || 4) - 1; return; }
     var name = k.n;
     if(it.t === 'kasten') name = 'Schwedenkasten (' + (it.teile || 5) + ' Teile)';
     if(it.t === 'ball') name = (BAELLE[it.sorte] || BAELLE.volleyball).n;
@@ -1429,8 +1429,8 @@ function materialZeichnen(){
     h += '<li><span>Schüler:innen (' + pers.map(function(t){ return m.personen[t] + ' ' + t; }).join(', ') + ')</span><b>' + total + '</b></li>';
   }
   if(m.posten) h += '<li><span>Posten</span><b>' + m.posten + '</b></li>';
-  var rp = m.geraete.filter(function(g){ return g[0] === 'Reckpfähle'; })[0];
-  if(rp && rp[1] > 4) h += '<li style="color:var(--bad)"><span>⚠️ In der Halle gibt es nur 4 Reckpfähle</span><b></b></li>';
+  var rp = m.geraete.filter(function(g){ return g[0] === 'Reck (Pfähle)'; })[0];
+  if(rp && rp[1] > 4) h += '<li style="color:var(--bad)"><span>⚠️ In der Halle gibt es nur 4 Reck-Pfähle</span><b></b></li>';
   document.getElementById('material').innerHTML = h || '<li class="leer">Noch keine Geräte in der Halle.</li>';
 }
 function leibchenText(m){
@@ -1666,14 +1666,14 @@ function ebenenZeichnen(){
   ];
   document.getElementById('ebenenKarte').innerHTML = '<h3>🧭 Halle &amp; Ebenen</h3>' +
     EBENEN.map(function(e){ return '<label style="display:flex;gap:7px;align-items:center;margin:4px 0;font-size:13px;color:var(--text)"><input type="checkbox" data-eb="' + e.id + '"' + (S.ebenen[e.id] ? ' checked' : '') + '>' + esc(e.n) + '</label>'; }).join('') +
-    '<div class="zeile" style="margin:8px 0 2px"><button class="btn klein" id="reckAusBtn" type="button" title="Die 4 Pfähle aus der Wand ziehen und als Reck in eine Linie stellen">⇥ Reckpfähle ausfahren</button></div>' +
+    '<div class="zeile" style="margin:8px 0 2px"><button class="btn klein" id="reckAusBtn" type="button" title="Das Reck aus der Wand ziehen: die 4 Pfähle in eine Linie stellen, Reckstangen dazwischen">⇥ Reck ausfahren</button></div>' +
     '<div class="pg-titel" style="margin-top:10px">Legende</div>' +
     leg.map(function(l){ return '<div style="display:flex;gap:7px;align-items:center;font-size:12px;margin:3px 0">' + l[0] + '<span>' + esc(l[1]) + '</span></div>'; }).join('') +
     '<p class="leer" style="margin-top:8px">Lage der festen Einrichtungen nach den Fotos geschätzt.</p>';
   document.getElementById('reckAusBtn').addEventListener('click', function(){
     if(S.items.some(function(i){ return i.t === 'reckreihe'; })){ toast('Das Reck steht schon in der Halle – die Pfähle gibt es nur einmal (höchstens 4).'); return; }
     var it = beispiel('reckreihe', 3.5, 12); it.r = 90; it.n = 4;
-    hinzufuegen(it); toast('Reckpfähle aus der Wand gezogen – Anzahl, Abstand und Höhen rechts einstellen');
+    hinzufuegen(it); toast('Reck aus der Wand gezogen – Anzahl, Abstand und Reckstangen-Höhen rechts einstellen');
   });
   document.querySelectorAll('#ebenenKarte [data-eb]').forEach(function(c){
     c.addEventListener('change', function(){ S.ebenen[c.getAttribute('data-eb')] = c.checked; bodenZeichnen(); autosave(); if(S.ansicht3d) drei.neu(); });
