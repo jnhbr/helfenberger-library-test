@@ -21708,7 +21708,7 @@ function openStreakModal(){
    Kinder können ihren eigenen Punktestand nicht selbst setzen. */
 
 var QUIZ_SESSION = ['quizSessions', 'aktiv'];
-var quizLive = { session:null, unsub:null, overlay:null, unsubAnswers:null, unsubPlayers:null, tick:null, answered:{}, players:[], sig:null, busy:{} };
+var quizLive = { klasse:null, session:null, unsub:null, overlay:null, unsubAnswers:null, unsubPlayers:null, tick:null, answered:{}, players:[], sig:null, busy:{} };
 
 /* Kurzer Klickschutz fuer die Knoepfe am Beamer: er ueberbrueckt nur den Moment,
    bis Firestore die Aenderung zurueckspiegelt. Bewusst zeitbasiert und nicht an
@@ -21721,9 +21721,17 @@ function quizBusy(key){
   return false;
 }
 
-function quizSessionRef(){ return kdoc(QUIZ_SESSION[0], QUIZ_SESSION[1]); }
-function quizAnswersCol(){ return kcol(QUIZ_SESSION[0], QUIZ_SESSION[1], 'antworten'); }
-function quizPlayersCol(){ return kcol(QUIZ_SESSION[0], QUIZ_SESSION[1], 'spieler'); }
+// Lehrperson kann ein Quiz für eine andere Klasse/Gruppe starten: quizLive.klasse überschreibt dann die eigene.
+function quizK(){ return quizLive.klasse || state.klasse; }
+function quizSessionRef(){ return doc(db, 'klassen', quizK(), QUIZ_SESSION[0], QUIZ_SESSION[1]); }
+function quizAnswersCol(){ return collection(db, 'klassen', quizK(), QUIZ_SESSION[0], QUIZ_SESSION[1], 'antworten'); }
+function quizPlayersCol(){ return collection(db, 'klassen', quizK(), QUIZ_SESSION[0], QUIZ_SESSION[1], 'spieler'); }
+function quizWatcherUmstellen(klasse){
+  if(quizLive.unsub){ quizLive.unsub(); quizLive.unsub = null; }
+  quizLive.klasse = (klasse && klasse !== state.klasse) ? klasse : null;
+  quizLive.session = null;
+  startQuizWatcher();
+}
 function quizIsRunning(s){ return !!(s && s.state && s.state !== 'idle'); }
 
 /* Der Countdown darf NICHT aus s.startedAt minus der eigenen Uhr gerechnet
@@ -21771,6 +21779,7 @@ function stopQuizWatcher(){
   if(quizLive.unsubAnswers){ quizLive.unsubAnswers(); quizLive.unsubAnswers = null; }
   clearInterval(quizLive.tick); quizLive.tick = null;
   clearTimeout(quizPlay.tick);
+  quizLive.klasse = null;
   quizLive.session = null;
   quizLive.players = [];
   quizLive.answered = {};
@@ -22015,11 +22024,21 @@ function quizStartDialog(quiz){
     h += '<option value="0"'+(n > 20 ? '' : ' selected')+'>Alle '+n+' Fragen in der gespeicherten Reihenfolge</option></select>'+
       '<p class="pr-hinweis" id="qzRundeInfo"></p>';
   }
+  if(state.profile && (state.profile.role === 'teacher' || isLeitung())){
+    var kwahl = function(art){ return KLASSEN.filter(function(k){ return art === 'klasse' ? k.art === 'klasse' : k.art !== 'klasse'; }).map(function(k){
+      return '<option value="'+esc(k.id)+'"'+(k.id === state.klasse ? ' selected' : '')+'>'+esc(k.art === 'klasse' ? k.id+' · '+k.lp : k.lp+(k.art === 'isf' ? ' · ISF' : k.art === 'flp' ? ' · FLP' : ' · Praktikum'))+'</option>'; }).join(''); };
+    h += '<label class="modal-label">Für welche Klasse / Gruppe?</label><select id="qzKlasse" class="modal-input"><optgroup label="Klassen">'+kwahl('klasse')+'</optgroup><optgroup label="Fachlehrpersonen, ISF, Praktikum">'+kwahl('seite')+'</optgroup></select>'+
+      '<p class="pr-hinweis">Die Schüler:innen dieser Klasse sehen oben «Quiz läuft — mitmachen».</p>';
+  }
   h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button>'+
     '<button class="btn btn-primary btn-sm" id="qzGo" type="button">▶︎ Quiz starten</button></div>';
   openModal(h);
-  if(runden.length){
-    quizGestelltLaden().then(function(g){
+  var kSelEl = document.getElementById('qzKlasse');
+  function infoLaden(){
+    var kl = kSelEl ? kSelEl.value : null;
+    gestellt = null;
+    quizGestelltLaden(kl).then(function(g){
+      if((kSelEl ? kSelEl.value : null) !== kl) return;
       gestellt = g;
       var info = document.getElementById('qzRundeInfo');
       if(!info) return;
@@ -22029,15 +22048,21 @@ function quizStartDialog(quiz){
         : 'Diese Klasse hatte schon alle '+n+' Fragen – es beginnt wieder von vorne.';
     });
   }
+  if(runden.length){
+    infoLaden();
+    if(kSelEl) kSelEl.addEventListener('change', infoLaden);
+  }
   document.getElementById('modalCancel').addEventListener('click', closeModal);
   document.getElementById('qzGo').addEventListener('click', function(){
     var t = +document.getElementById('qzTeams').value || 0;
     var r = runden.length ? +document.getElementById('qzRunde').value || 0 : 0;
     lsSet(LIB_PREFIX + 'quiz_teams', String(t));
+    var kSel = document.getElementById('qzKlasse');
     closeModal();
-    if(!r){ startQuizSession(quiz, t); return; }
-    (gestellt ? Promise.resolve(gestellt) : quizGestelltLaden()).then(function(g){
-      startQuizSession(quizRundeZiehen(quiz, g, r), t);
+    var kz = kSel ? kSel.value : null;
+    if(!r){ startQuizSession(quiz, t, kz); return; }
+    (gestellt ? Promise.resolve(gestellt) : quizGestelltLaden(kz)).then(function(g){
+      startQuizSession(quizRundeZiehen(quiz, g, r), t, kz);
     });
   });
 }
@@ -22047,9 +22072,9 @@ function quizStartDialog(quiz){
    Gezogen wird zuerst aus den noch nie gestellten; erst wenn alle dran waren, beginnt es
    von vorne. Bewusst NICHT im Quiz-Dokument, damit das Spiegeln der Quizze es nie anfasst.
    Als gestellt zählt eine Frage erst, wenn sie am Beamer wirklich gezeigt wurde. */
-function quizGestelltRef(){ return kdoc('appMeta', 'quizGestellt'); }
-function quizGestelltLaden(){
-  return getDoc(quizGestelltRef()).then(function(snap){ return snap.exists() ? snap.data() : {}; })
+function quizGestelltRef(kl){ return doc(db, 'klassen', kl || quizK(), 'appMeta', 'quizGestellt'); }
+function quizGestelltLaden(kl){
+  return getDoc(quizGestelltRef(kl)).then(function(snap){ return snap.exists() ? snap.data() : {}; })
     .catch(function(err){ console.error(err); return {}; });
 }
 function quizFrageKey(f){
@@ -22117,8 +22142,9 @@ function quizTeamsHtml(s, mitPunkten){
   }).join('')+'</div>';
 }
 
-function startQuizSession(quiz, teamN){
+function startQuizSession(quiz, teamN, klasse){
   teamN = Math.max(0, Math.min(TEAM_FARBEN.length, +teamN || 0));
+  if(klasse && klasse !== quizK()) quizWatcherUmstellen(klasse);
   quizLive.busy = {}; quizLive.sig = null; quizClock.key = '';
   /* Reihenfolge ist wichtig: ZUERST die Spieler und Antworten der letzten Runde
      wegräumen, ERST DANN die Lobby öffnen. Früher war es umgekehrt - wer schnell
@@ -22156,6 +22182,7 @@ function openQuizHost(quiz){
     quizLive.busy = {};
     quizLive.overlay = null;
     setDoc(quizSessionRef(), { state:'idle', question:null, updatedAt: serverTimestamp() }, {merge:true}).catch(function(){});
+    if(quizLive.klasse) quizWatcherUmstellen(null);
   }, 'kz-overlay-quiz');
 
   quizLive.overlay.el.querySelector('#qhClose').addEventListener('click', function(){
@@ -23061,6 +23088,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-22-quiz-andere-klasse', datum:'2026-10-22', fuer:'lehrer', text:'🎮 Klassen-Quiz: Beim Starten kannst du jetzt wählen, für welche Klasse oder Gruppe das Quiz läuft – nicht nur für die eigene.'},
   {id:'2026-10-22-hallenplaner-5', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Hallenplaner: Namen korrigiert – das Reck besteht aus den Pfählen (in der Wand, höchstens 4) und den Reckstangen dazwischen. Die schrägen Stangen sind die Kletterstangen.'},
   {id:'2026-10-22-hallenplaner-4', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Hallenplaner: Reck korrigiert – die Reckpfähle stecken in der Wand und lassen sich mit «⇥ Reckpfähle ausfahren» als Reck in eine Linie ziehen (höchstens 4 Pfähle, Stangenhöhen einstellbar). Die schrägen Stangen heissen jetzt Kletterstangen.'},
   {id:'2026-10-22-hallenplaner-3', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Hallenplaner: Bodenlinien nach den Fotos der Halle (Sportart aus der Farbe abgeleitet), Reck- und Kletterstangen, Geräte auf den Kopf stellen, 3D-Ansicht direkt bearbeiten, Ablauf in Phasen mit Abspielen und Druck, Massband, eigene Geräte merken, Ringe heruntergelassen mit Fallzone – und Klassen laden (eigene Listen oder Library-Gruppen), Teams bilden und Namen im Plan zeigen.'},
