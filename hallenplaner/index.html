@@ -415,7 +415,7 @@ function grundflaeche(it){
 /* ===================== Zustand ===================== */
 var S = {
   klasse:null, namen:true, ansicht:'T', linien:{vb:true, bb:false, hb:false, uh:false, bm:false, fb:false}, fest:true, raster:true, magnet:true, druck:false,
-  ebenen:{spr:true, tueren:true, korb:true, ringe:true, vorhang:true, runter:false}, lfarbe:{}, lmodus:'gross', ringeRunter:{}, phasen:[], phase:0,
+  ebenen:{spr:true, tueren:true, korb:true, ringe:false, vorhang:true, runter:false}, lfarbe:{}, lmodus:'gross', ringeRunter:{}, phasen:[], phase:0,
   items:[], titel:'', notizen:'', sel:[], modus:null, ansicht3d:false
 };
 var vb = null;                 // aktuelle viewBox {x,y,w,h}
@@ -437,7 +437,7 @@ function speicherLesen(){ try{ return JSON.parse(lsGet(SPEICHER) || '{}') || {};
 function speicherSchreiben(sp){ if(!lsSet(SPEICHER, JSON.stringify(sp))) toast('Speichern im Browser hat nicht geklappt (Speicher voll?).'); }
 function autosave(){
   var sp = speicherLesen(); sp.aktuell = datenJetzt();
-  sp.einst = {fest:S.fest, raster:S.raster, magnet:S.magnet, druck:S.druck, ebenen:S.ebenen, lfarbe:S.lfarbe, klasse:S.klasse, namen:S.namen};
+  sp.einst = {fest:S.fest, raster:S.raster, magnet:S.magnet, druck:S.druck, ebenen:S.ebenen, lfarbe:S.lfarbe, klasse:S.klasse, namen:S.namen, ebV:2};
   speicherSchreiben(sp);
 }
 function merken(){
@@ -2457,7 +2457,7 @@ var drei = (function(){
   var sp = speicherLesen();
   if(sp.einst){
     S.fest = sp.einst.fest !== false; S.raster = sp.einst.raster !== false; S.magnet = sp.einst.magnet !== false; S.druck = !!sp.einst.druck;
-    S.ebenen = Object.assign(S.ebenen, sp.einst.ebenen || {}); S.lfarbe = sp.einst.lfarbe || {}; S.klasse = sp.einst.klasse || null; S.namen = sp.einst.namen !== false;
+    S.ebenen = Object.assign(S.ebenen, sp.einst.ebenen || {}); if(sp.einst.ebV !== 2) S.ebenen.ringe = false;   // Turngeräte (Ringe, Reck, Kletterstangen) sind standardmässig aus S.lfarbe = sp.einst.lfarbe || {}; S.klasse = sp.einst.klasse || null; S.namen = sp.einst.namen !== false;
   }
   if(sp.aktuell) datenLaden(sp.aktuell);
   document.getElementById('ansicht').value = S.ansicht;
