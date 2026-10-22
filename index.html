@@ -3661,15 +3661,28 @@ function fehlerMelden(quelle, err, zusatz){
     if(fehlerGesehen[sig]) return;
     fehlerGesehen[sig] = 1;
     fehlerGesendet++;
-    var p = null, seite = '';
-    try{ p = state.profile; seite = state.route && state.route.name || ''; }catch(e){}
-    fsSetDoc(doc(collection(db, 'fehlerLog')), {
-      msg:msg, stack:stack, quelle:quelle, uid:u.uid,
-      name:String(p && (p.displayName || p.username) || u.email || '').slice(0, 80),
-      klasse:String(p && p.klasse || ''), rolle:String(p && p.role || ''),
-      ua:String(navigator.userAgent || '').slice(0, 300), seite:String(seite).slice(0, 60),
-      test:/-test\//.test(location.pathname), am:serverTimestamp()
-    }).catch(function(){});
+    var p = null, seite = '', ansicht = '', als = false;
+    try{ p = state.profile; seite = state.route && state.route.name || ''; ansicht = state.klasse || ''; als = alsSchueler(); }catch(e){}
+    // info: womit die Anfrage lief (Rechte im Anmelde-Token, angezeigte Klasse,
+    // Schüleransicht, Sekunden seit Seitenaufruf) — bei «permission-denied»
+    // sieht man so, ob das Konto die Rechte (noch) nicht hatte.
+    var info = 'Ansicht ' + (ansicht || '-') + (als ? ' (Schüleransicht)' : '') +
+      ' · ' + Math.round(performance.now() / 1000) + ' s nach Laden' + (document.hidden ? ' · Tab im Hintergrund' : '');
+    function senden(){
+      fsSetDoc(doc(collection(db, 'fehlerLog')), {
+        msg:msg, stack:stack, quelle:quelle, uid:u.uid,
+        name:String(p && (p.displayName || p.username) || u.email || '').slice(0, 80),
+        klasse:String(p && p.klasse || ''), rolle:String(p && p.role || ''),
+        ua:String(navigator.userAgent || '').slice(0, 300), seite:String(seite).slice(0, 60),
+        test:/-test\//.test(location.pathname), info:info.slice(0, 300), am:serverTimestamp()
+      }).catch(function(){});
+    }
+    // Token aus dem Zwischenspeicher (kein Netz): welche Rechte hatte die Anmeldung?
+    u.getIdTokenResult().then(function(t){
+      var c = t.claims || {};
+      info += ' · Token: ' + (c.teacher ? 'Lehrperson' : c.leitung ? 'Leitung' : 'ohne Lehrer-Recht') + ', Klasse ' + (c.klasse || '-') +
+        ', angemeldet ' + (c.auth_time ? Math.round(Date.now() / 1000 - c.auth_time) + ' s' : '?') + ' zuvor';
+    }, function(){ info += ' · Token nicht lesbar'; }).then(senden, senden);
   }catch(e){}
 }
 window.addEventListener('error', function(e){
@@ -11665,18 +11678,19 @@ function openRueckmeldungen(reiter){
       var gruppen = {}, reihenfolge = [];
       snap.forEach(function(d){
         var x = d.data(), g = gruppen[x.msg];
-        if(!g){ g = gruppen[x.msg] = {msg:x.msg, ids:[], wer:{}, letzt:0, stack:x.stack || '', quellen:{}, seiten:{}, test:0, ua:x.ua || ''}; reihenfolge.push(x.msg); }
+        if(!g){ g = gruppen[x.msg] = {msg:x.msg, ids:[], wer:{}, letzt:0, stack:x.stack || '', quellen:{}, seiten:{}, infos:{}, test:0, ua:x.ua || ''}; reihenfolge.push(x.msg); }
         g.ids.push(d.id);
         g.wer[(x.name || '?') + (x.klasse ? ' (' + x.klasse + ')' : '')] = 1;
         var ms = pruefMs(x.am) || 0;
         if(ms >= g.letzt){ g.letzt = ms; g.stack = x.stack || g.stack; g.ua = x.ua || g.ua; }
         if(x.quelle) g.quellen[x.quelle] = 1;
         if(x.seite) g.seiten[x.seite] = 1;
+        if(x.info) g.infos[x.info] = 1;
         if(x.test) g.test++;
       });
       var liste = reihenfolge.map(function(k){ return gruppen[k]; }).sort(function(a, b){ return b.letzt - a.letzt; });
       box.innerHTML = '<p class="pr-hinweis">Fehler, die in den Browsern aufgetreten sind (höchstens 5 pro Seitenaufruf, gleiche nur einmal). Behoben? Einfach löschen.</p>'+
-        (liste.length ? '<div class="settings-actions" style="margin-bottom:8px;"><button type="button" class="btn btn-danger btn-sm" id="flAlle">Alle '+snap.size+' löschen</button></div>' : '')+
+        (liste.length ? '<div class="settings-actions" style="margin-bottom:8px;"><button type="button" class="btn btn-primary btn-sm" id="flKopie">📋 Alle kopieren</button> <button type="button" class="btn btn-danger btn-sm" id="flAlle">Alle '+snap.size+' löschen</button></div>' : '')+
         '<div class="settings-list rm-liste">'+(liste.length ? liste.map(function(g, i){
           return '<div class="rm-eintrag"><div class="rm-kopf"><span class="rm-tag">'+g.ids.length+'×</span>'+
             (g.test === g.ids.length ? '<span class="rm-tag">🧪 nur Testseite</span>' : '')+
@@ -11684,7 +11698,7 @@ function openRueckmeldungen(reiter){
             '<div class="rm-text rm-code">'+esc(g.msg)+'</div>'+
             '<small class="rm-wer">'+esc(Object.keys(g.wer).slice(0, 12).join(', '))+(Object.keys(g.wer).length > 12 ? ' …' : '')+
             ' · '+esc(Object.keys(g.quellen).join('/'))+(Object.keys(g.seiten).length ? ' · Seite: '+esc(Object.keys(g.seiten).join(', ')) : '')+'</small>'+
-            '<details><summary>Details</summary><pre class="rm-stack">'+esc(g.stack || '(kein Stack)')+'\n\n'+esc(g.ua)+'</pre></details>'+
+            '<details><summary>Details</summary><pre class="rm-stack">'+(Object.keys(g.infos).length ? esc(Object.keys(g.infos).join('\n'))+'\n\n' : '')+esc(g.stack || '(kein Stack)')+'\n\n'+esc(g.ua)+'</pre></details>'+
             '<div class="rm-fuss"><button type="button" class="btn btn-ghost btn-sm" data-flweg="'+i+'">🗑 Löschen</button></div></div>';
         }).join('') : '<div class="empty-state" style="padding:10px;">Keine Fehler gemeldet. 🎉</div>')+'</div>';
       function weg(ids, knopf){
@@ -11699,6 +11713,30 @@ function openRueckmeldungen(reiter){
       }
       box.querySelectorAll('[data-flweg]').forEach(function(b){
         b.addEventListener('click', function(){ weg(liste[+b.getAttribute('data-flweg')].ids, b); });
+      });
+      // 📋 Alles als Text (zum Einfügen im Chat mit Claude), inkl. Details.
+      var kopie = document.getElementById('flKopie');
+      if(kopie) kopie.addEventListener('click', function(){
+        var text = 'Fehler aus der Library (' + snap.size + ' Meldungen, ' + liste.length + ' verschiedene), kopiert ' + rmZeit(Date.now()) + '\n\n' +
+          liste.map(function(g, i){
+            return '#' + (i + 1) + ' (' + g.ids.length + '×, zuletzt ' + rmZeit(g.letzt) + (g.test === g.ids.length ? ', nur Testseite' : '') + ')\n' +
+              g.msg + '\n' +
+              'Wer: ' + Object.keys(g.wer).join(', ') + '\n' +
+              'Quelle: ' + Object.keys(g.quellen).join('/') + (Object.keys(g.seiten).length ? ' · Seite: ' + Object.keys(g.seiten).join(', ') : '') + '\n' +
+              (Object.keys(g.infos).length ? 'Info: ' + Object.keys(g.infos).join('\n      ') + '\n' : '') +
+              'Stack:\n' + (g.stack || '(kein Stack)') + '\n' +
+              'Browser: ' + (g.ua || '?');
+          }).join('\n\n----------\n\n');
+        var ok = function(){ toast('Alle Fehler kopiert.'); };
+        var altKopie = function(){
+          var ta = document.createElement('textarea');
+          ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select();
+          try{ document.execCommand('copy'); ok(); }catch(e){ toast('Kopieren hat nicht geklappt.'); }
+          ta.remove();
+        };
+        if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, altKopie);
+        else altKopie();
       });
       var alle = document.getElementById('flAlle');
       if(alle) alle.addEventListener('click', function(){
@@ -22876,6 +22914,7 @@ function aemtliMeineTermine_(cfg, uid){
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
   {id:'2026-10-22-lernphase-fenster', datum:'2026-10-22', fuer:'alle', text:'📚 Lernphase: Wenn du eine Übung im «🪟 Neuen Fenster» machst, zählt das jetzt auch als «in der Library» – du leuchtest bei der Lehrperson nicht mehr rot.'},
+  {id:'2026-10-22-fehler-kopieren', datum:'2026-10-22', fuer:'lehrer', text:'🐞 Fehlerliste (nur Jan): «📋 Alle kopieren» kopiert alle Fehler samt Details auf einmal.'},
   {id:'2026-10-21-druck-ohne-leiste', datum:'2026-10-21', fuer:'lehrer', text:'🖨️ Earlybird-Liste und gedruckte Prüfungen: Die gelbe Leiste mit «Drucken / Als PDF sichern» erscheint nicht mehr auf dem Ausdruck.'},
   {id:'2026-10-21-earlybird-leerzeilen', datum:'2026-10-21', fuer:'lehrer', text:'🐦 Earlybird: Die gedruckte Liste hat unten 3 leere Zeilen – für alle, die jemand einzutragen vergessen hat.'},
   {id:'2026-10-21-earlybird-kacheln', datum:'2026-10-21', fuer:'lehrer', text:'🐦 Earlybird: Eintragen geht jetzt mit denselben Namens-Kacheln wie bei der Abgabe-Checkliste – antippen, und sie wird grün mit Haken.'},
