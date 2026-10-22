@@ -3694,10 +3694,10 @@ function fehlerMelden(quelle, err, zusatz){
    frischem Token neu starten; gemeldet wird erst, wenn es dann wieder scheitert. */
 var listenerNeustart = {};
 function listenerFehler(name, err, stop, start){
-  if(err && err.code === 'permission-denied' && !listenerNeustart[name] && auth.currentUser){
-    listenerNeustart[name] = 1;
+  if(err && err.code === 'permission-denied' && (listenerNeustart[name] || 0) < 2 && auth.currentUser){
+    var versuch = listenerNeustart[name] = (listenerNeustart[name] || 0) + 1;
     stop();
-    var nochmal = function(){ setTimeout(function(){ if(state.user && state.profile) start(); }, 2000); };
+    var nochmal = function(){ setTimeout(function(){ if(state.user && state.profile) start(); }, versuch === 1 ? 2000 : 15000); };
     auth.currentUser.getIdToken(true).then(nochmal, nochmal);
     return;
   }
@@ -8693,6 +8693,15 @@ async function authGeaendert(user){
     render();
     return;
   }
+  // Gespeicherte Anmeldung (Tab neu geöffnet): Das mitgebrachte Token kann älter sein
+  // und von Firestore noch nicht anerkannt werden - dann lehnt es ALLES ab
+  // (22.10.2026, Vanja E3b: Links, Neuigkeiten, Klassenliste, Ämtliplan … alle
+  // 2 s nach dem Laden «permission-denied»). Darum ein älteres Token vor dem
+  // ersten Lesen erneuern.
+  try{
+    var tr = await user.getIdTokenResult();
+    if(Date.now() - new Date(tr.issuedAtTime).getTime() > 10 * 60 * 1000) await user.getIdToken(true);
+  }catch(e){ /* offline: weiter mit dem Zwischenspeicher */ }
   try{
     // Server nicht erreichbar oder Datenbank-Limit erreicht: das eigene Profil
     // aus dem Zwischenspeicher nehmen, statt ewig bei «Lädt …» zu hängen.
