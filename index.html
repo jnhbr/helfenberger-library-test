@@ -21941,19 +21941,85 @@ function openQuizImport(ablage){
 function quizStartDialog(quiz){
   if(quizLive.overlay){ toast('Es läuft schon ein Quiz.'); return; }
   var std = +lsGet(LIB_PREFIX + 'quiz_teams') || 0, n = (quiz.questions || []).length;
+  var runden = [10, 20].filter(function(x){ return x < n; }), gestellt = null;
   var h = '<h3>🎮 '+esc(quiz.title)+'</h3><p class="pr-hinweis">'+n+' Frage'+(n === 1 ? '' : 'n')+'. In Teams steht am Beamer nur der Team-Stand – die eigenen Punkte sieht jede:r nur auf dem eigenen Gerät.</p>';
   h += '<label class="modal-label">Wer spielt?</label><select id="qzTeams" class="modal-input"><option value="0">Jede:r für sich (Rangliste mit Namen)</option>';
   [2, 3, 4, 5, 6].forEach(function(t){ h += '<option value="'+t+'"'+(t === std ? ' selected' : '')+'>'+t+' Teams – zufällig verteilt, es zählt der Team-Durchschnitt</option>'; });
-  h += '</select><div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button>'+
+  h += '</select>';
+  if(runden.length){
+    h += '<label class="modal-label">Wie viele Fragen?</label><select id="qzRunde" class="modal-input">';
+    runden.forEach(function(r){ h += '<option value="'+r+'"'+(n > 20 && r === 20 ? ' selected' : '')+'>'+r+' Fragen – zuerst die, die diese Klasse noch nicht hatte</option>'; });
+    h += '<option value="0"'+(n > 20 ? '' : ' selected')+'>Alle '+n+' Fragen in der gespeicherten Reihenfolge</option></select>'+
+      '<p class="pr-hinweis" id="qzRundeInfo"></p>';
+  }
+  h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button>'+
     '<button class="btn btn-primary btn-sm" id="qzGo" type="button">▶︎ Quiz starten</button></div>';
   openModal(h);
+  if(runden.length){
+    quizGestelltLaden().then(function(g){
+      gestellt = g;
+      var info = document.getElementById('qzRundeInfo');
+      if(!info) return;
+      var offen = quizOffeneFragen(quiz, g).length;
+      info.textContent = offen === n ? 'Diese Klasse hatte noch keine Frage aus diesem Quiz.'
+        : offen ? 'Noch '+offen+' von '+n+' Fragen hatte diese Klasse noch nicht. Sind alle gekommen, beginnt es von vorne.'
+        : 'Diese Klasse hatte schon alle '+n+' Fragen – es beginnt wieder von vorne.';
+    });
+  }
   document.getElementById('modalCancel').addEventListener('click', closeModal);
   document.getElementById('qzGo').addEventListener('click', function(){
     var t = +document.getElementById('qzTeams').value || 0;
+    var r = runden.length ? +document.getElementById('qzRunde').value || 0 : 0;
     lsSet(LIB_PREFIX + 'quiz_teams', String(t));
     closeModal();
-    startQuizSession(quiz, t);
+    if(!r){ startQuizSession(quiz, t); return; }
+    (gestellt ? Promise.resolve(gestellt) : quizGestelltLaden()).then(function(g){
+      startQuizSession(quizRundeZiehen(quiz, g, r), t);
+    });
   });
+}
+/* 🔁 Fragen-Rotation (21.10.2026): Wird nur ein Teil eines Quiz gespielt (10 oder 20
+   von z. B. 40 Trivia-Fragen), merkt sich die Library pro Seite (Klasse), welche Fragen
+   schon gekommen sind – klassen/{k}/appMeta/quizGestellt = {<quizId>: [Fragen-Schlüssel]}.
+   Gezogen wird zuerst aus den noch nie gestellten; erst wenn alle dran waren, beginnt es
+   von vorne. Bewusst NICHT im Quiz-Dokument, damit das Spiegeln der Quizze es nie anfasst.
+   Als gestellt zählt eine Frage erst, wenn sie am Beamer wirklich gezeigt wurde. */
+function quizGestelltRef(){ return kdoc('appMeta', 'quizGestellt'); }
+function quizGestelltLaden(){
+  return getDoc(quizGestelltRef()).then(function(snap){ return snap.exists() ? snap.data() : {}; })
+    .catch(function(err){ console.error(err); return {}; });
+}
+function quizFrageKey(f){
+  var t = String((f && f.q) || '').trim().toLowerCase(), h = 5381;
+  for(var i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+function quizOffeneFragen(quiz, g){
+  var schon = (g && Array.isArray(g[quiz.id])) ? g[quiz.id] : [];
+  return (quiz.questions || []).filter(function(f){ return schon.indexOf(quizFrageKey(f)) < 0; });
+}
+function quizRundeZiehen(quiz, g, anzahl){
+  var mischen = function(a){ a = a.slice(); for(var i = a.length - 1; i > 0; i--){ var j = Math.floor(Math.random() * (i + 1)), x = a[i]; a[i] = a[j]; a[j] = x; } return a; };
+  var alle = quiz.questions || [], offen = mischen(quizOffeneFragen(quiz, g));
+  var runde = offen.slice(0, anzahl), neuerDurchgang = runde.length < anzahl;
+  // Reicht der Rest nicht mehr: Rest spielen, dann aus dem neuen Durchgang auffüllen.
+  // Nur die Auffüll-Fragen zählen dann schon für den neuen Durchgang.
+  var markieren = neuerDurchgang ? [] : runde.map(quizFrageKey);
+  if(neuerDurchgang){
+    var rest = mischen(alle.filter(function(f){ return runde.indexOf(f) < 0; })).slice(0, anzahl - runde.length);
+    markieren = rest.map(quizFrageKey);
+    runde = mischen(runde.concat(rest));
+  }
+  return Object.assign({}, quiz, {questions:runde, rotation:{neu:neuerDurchgang, markieren:markieren}});
+}
+// Am Beamer gezeigt → für diese Klasse als gestellt merken (bzw. neuen Durchgang beginnen).
+function quizGestelltMerken(quiz, f){
+  var rot = quiz.rotation, k = quizFrageKey(f);
+  if(!rot || !quiz.id || rot.markieren.indexOf(k) < 0) return;
+  var patch = {};
+  if(rot.neu){ rot.neu = false; patch[quiz.id] = [k]; }
+  else patch[quiz.id] = arrayUnion(k);
+  setDoc(quizGestelltRef(), patch, {merge:true}).catch(function(err){ console.error(err); });
 }
 // Stand pro Team: Durchschnitt der Punkte seiner Mitglieder.
 function quizTeamStand(s, players){
@@ -22272,7 +22338,8 @@ function quizNextStep(quiz){
     question: { text: q.q, answers: q.a },
     sec: q.sec || 25, startedAt: Date.now(), stopped:false, stopLeft:0,
     correctIndex: -1, stats: [], updatedAt: serverTimestamp()
-  }, {merge:true}).catch(function(err){ console.error(err); toast('Frage konnte nicht gestartet werden.'); });
+  }, {merge:true}).then(function(){ quizGestelltMerken(quiz, q); })
+    .catch(function(err){ console.error(err); toast('Frage konnte nicht gestartet werden.'); });
 }
 
 // Zeit anhalten, wenn die Sekunden nicht reichen: der Countdown friert überall
@@ -22931,6 +22998,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-22-trivia-40', datum:'2026-10-22', fuer:'lehrer', text:'🎲 Die 50 Trivia-Quizze haben jetzt je 40 Fragen. Beim Starten wählst du 10 oder 20 Fragen – die Library merkt sich pro Klasse, welche schon gekommen sind, und zieht zuerst die neuen. Erst wenn alle 40 dran waren, beginnt es von vorne. Das gilt für jedes Klassen-Quiz mit mehr als 10 Fragen; «Alle Fragen» spielt wie bisher alles in der gespeicherten Reihenfolge.'},
   {id:'2026-10-22-listener-neustart', datum:'2026-10-22', fuer:'alle', text:'🔧 Klassen-Quiz, Umfrage und Spiele: Klappt die Verbindung direkt nach dem Öffnen nicht, versucht es die Library jetzt von selbst nochmals.'},
   {id:'2026-10-22-lernphase-fenster', datum:'2026-10-22', fuer:'alle', text:'📚 Lernphase: Wenn du eine Übung im «🪟 Neuen Fenster» machst, zählt das jetzt auch als «in der Library» – du leuchtest bei der Lehrperson nicht mehr rot.'},
   {id:'2026-10-22-fehler-kopieren', datum:'2026-10-22', fuer:'lehrer', text:'🐞 Fehlerliste (nur Jan): «📋 Alle kopieren» kopiert alle Fehler samt Details auf einmal.'},
