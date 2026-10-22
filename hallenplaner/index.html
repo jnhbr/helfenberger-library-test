@@ -415,19 +415,19 @@ function grundflaeche(it){
 /* ===================== Zustand ===================== */
 var S = {
   klasse:null, namen:true, ansicht:'T', linien:{vb:true, bb:false, hb:false, uh:false, bm:false, fb:false}, fest:true, raster:true, magnet:true, druck:false,
-  ebenen:{spr:true, tueren:true, korb:true, ringe:true, vorhang:true, runter:false}, lfarbe:{}, lmodus:'gross', phasen:[], phase:0,
+  ebenen:{spr:true, tueren:true, korb:true, ringe:true, vorhang:true, runter:false}, lfarbe:{}, lmodus:'gross', ringeRunter:{}, phasen:[], phase:0,
   items:[], titel:'', notizen:'', sel:[], modus:null, ansicht3d:false
 };
 var vb = null;                 // aktuelle viewBox {x,y,w,h}
 var verlauf = [], verlaufPos = -1;
 
-function datenJetzt(){ phasenSichern(); return {v:1, ansicht:S.ansicht, lmodus:S.lmodus, linien:S.linien, items:S.items, titel:S.titel, notizen:S.notizen, phasen:S.phasen, phase:S.phase}; }
+function datenJetzt(){ phasenSichern(); return {v:1, ansicht:S.ansicht, lmodus:S.lmodus, ringeRunter:S.ringeRunter, linien:S.linien, items:S.items, titel:S.titel, notizen:S.notizen, phasen:S.phasen, phase:S.phase}; }
 function datenLaden(d){
   if(!d || !Array.isArray(d.items)) return false;
   S.items = d.items.filter(function(it){ return it && K[it.t]; }).map(function(it){ return Object.assign({}, it, {id:it.id || neueId()}); });
   if(d.ansicht && ANSICHTEN[d.ansicht]) S.ansicht = d.ansicht;
   if(d.linien) S.linien = Object.assign({vb:false, bb:false, hb:false, uh:false, bm:false, fb:false}, d.linien);
-  S.lmodus = d.lmodus === 'klein' ? 'klein' : 'gross';
+  S.lmodus = d.lmodus === 'klein' ? 'klein' : 'gross'; S.ringeRunter = d.ringeRunter || {};
   S.titel = d.titel || ''; S.notizen = d.notizen || ''; S.sel = [];
   S.phasen = Array.isArray(d.phasen) && d.phasen.length > 1 ? d.phasen.filter(function(ph){ return ph && Array.isArray(ph.items); }).map(function(ph){ return {name:String(ph.name || 'Phase'), text:String(ph.text || ''), items:ph.items}; }) : [];
   S.phase = S.phasen.length ? Math.min(Math.max(0, +d.phase || 0), S.phasen.length - 1) : 0;
@@ -591,9 +591,13 @@ function festeTeile(){
   for(i = 0; i < 3; i++){
     var c = drittelMitte(i);
     t.push({art:'glas', x:c - 5.6, w:2.8}, {art:'glas', x:c - 2.4, w:2.8});
-    [-6, -3, 0, 3, 6].forEach(function(dx){ t.push({art:'ringe', x:c + dx, y:1.6}); });
+    var rz = i === 0 ? 6 : i === 1 ? 5 : 0, rab = i === 0 ? 2.6 : 3;
+    for(var rk = 0; rk < rz; rk++) t.push({art:'ringe', x:c + (rk - (rz - 1) / 2) * rab, y:1.6, key:'r' + (i + 1) + '-' + (rk + 1)});
   }
-  t.push({art:'tafel', y:14}, {art:'reck', y:4.2, n:6}, {art:'kletter', y:8.6, n:4}, {art:'taue', y:12.6, n:3});
+  var rr0 = S.items.filter(function(i){ return i.t === 'reckreihe'; })[0], kn = 4 - (rr0 ? Math.min(4, rr0.n || 4) : 0);
+  t.push({art:'tafel', y:14}, {art:'reck', y:4.2, n:6});
+  if(kn > 0) t.push({art:'kletter', y:8.6, n:kn});
+  t.push({art:'taue', y:12.6, n:3});
   [10.5, 16.5, 20, 24.5].forEach(function(y){ t.push({art:'wandkorb', y:y}); });
   t.push({art:'tuer', y:24, w:2.0});
   return t;
@@ -650,8 +654,9 @@ function festSvg(druck){
     } else if(a === 'schiene' && E.ringe){
       s += linie(Math.max(0, b.x0), f.y, Math.min(W, b.x1), f.y, blau, 0.05, ' stroke-dasharray="0.4 0.25" stroke-opacity="0.55"');
     } else if(a === 'ringe' && E.ringe){
-      if(E.runter) s += kreis(f.x, f.y, 1.3, druck ? '#ced4da' : '#e8590c', druck ? '#868e96' : '#e8590c', 0.04, ' fill-opacity="0.16" stroke-dasharray="0.3 0.2"');
-      s += kreis(f.x, f.y - 0.28, E.runter ? 0.17 : 0.13, 'none', druck ? '#868e96' : '#e8590c', E.runter ? 0.07 : 0.045) + kreis(f.x, f.y + 0.28, E.runter ? 0.17 : 0.13, 'none', druck ? '#868e96' : '#e8590c', E.runter ? 0.07 : 0.045);
+      var rn = E.runter || S.ringeRunter[f.key];
+      if(rn) s += kreis(f.x, f.y, 1.3, druck ? '#ced4da' : '#e8590c', druck ? '#868e96' : '#e8590c', 0.04, ' fill-opacity="0.16" stroke-dasharray="0.3 0.2"');
+      s += kreis(f.x, f.y - 0.28, rn ? 0.17 : 0.13, 'none', druck ? '#868e96' : '#e8590c', rn ? 0.07 : 0.045) + kreis(f.x, f.y + 0.28, rn ? 0.17 : 0.13, 'none', druck ? '#868e96' : '#e8590c', rn ? 0.07 : 0.045);
     }
   });
   return s;
@@ -1700,25 +1705,63 @@ function ebenenZeichnen(){
   ];
   document.getElementById('ebenenKarte').innerHTML = '<h3>🧭 Halle &amp; Ebenen</h3>' +
     EBENEN.map(function(e){ return '<label style="display:flex;gap:7px;align-items:center;margin:4px 0;font-size:13px;color:var(--text)"><input type="checkbox" data-eb="' + e.id + '"' + (S.ebenen[e.id] ? ' checked' : '') + '>' + esc(e.n) + '</label>'; }).join('') +
+    ringeKnoepfe() +
     '<div class="zeile" style="margin:8px 0 2px"><button class="btn klein" id="reckAusBtn" type="button" title="Das Reck aus der Wand ziehen: die 4 Pfähle in eine Linie stellen, Reckstangen dazwischen">⇥ Reck ausfahren</button></div>' +
     '<div class="pg-titel" style="margin-top:10px">Legende</div>' +
     leg.map(function(l){ return '<div style="display:flex;gap:7px;align-items:center;font-size:12px;margin:3px 0">' + l[0] + '<span>' + esc(l[1]) + '</span></div>'; }).join('') +
     '<p class="leer" style="margin-top:8px">Lage der festen Einrichtungen nach den Fotos geschätzt.</p>';
   document.getElementById('reckAusBtn').addEventListener('click', function(){
-    if(S.items.some(function(i){ return i.t === 'reckreihe'; })){ toast('Das Reck steht schon in der Halle – die Pfähle gibt es nur einmal (höchstens 4).'); return; }
-    var it = beispiel('reckreihe', 3.5, 12); it.r = 90; it.n = 4;
-    hinzufuegen(it); toast('Reck aus der Wand gezogen – Anzahl, Abstand und Reckstangen-Höhen rechts einstellen');
+    var vor = S.items.filter(function(i){ return i.t === 'reckreihe'; })[0], anz = vor ? (vor.n || 4) - 1 : 3;
+    var dl = dialog('⇥ Reck ausfahren', '<p>Wie viele Recke sollen in der Halle stehen? Die Pfähle werden aus der Wand gezogen (am Pfahl hängen die Reckstangen).</p><div class="zeile">' + [1, 2, 3].map(function(n){ return '<label style="margin:0 12px 0 0"><input type="radio" name="reckAnz" value="' + n + '"' + (n === anz ? ' checked' : '') + '> ' + n + (n === 1 ? ' Reck' : ' Recke') + '</label>'; }).join('') + '</div>',
+      [{t:'Abbrechen'}, {t:'Ausfahren', primaer:true, fn:function(hg){ var c = hg.querySelector('input[name="reckAnz"]:checked'); reckAusfahren(c ? +c.value : 3); }}]);
+  });
+  document.querySelectorAll('#ebenenKarte [data-ring], #ebenenKarte [data-ringalle]').forEach(function(c){
+    c.addEventListener('click', function(){
+      var k = c.getAttribute('data-ring'), al = c.getAttribute('data-ringalle');
+      if(k) S.ringeRunter[k] = !S.ringeRunter[k];
+      else festeTeile().forEach(function(f){ if(f.art === 'ringe'){ if(al === '1') S.ringeRunter[f.key] = true; else delete S.ringeRunter[f.key]; } });
+      ebenenZeichnen(); bodenZeichnen(); autosave(); if(S.ansicht3d) drei.neu();
+    });
   });
   document.querySelectorAll('#ebenenKarte [data-eb]').forEach(function(c){
     c.addEventListener('change', function(){ S.ebenen[c.getAttribute('data-eb')] = c.checked; bodenZeichnen(); autosave(); if(S.ansicht3d) drei.neu(); });
   });
+}
+// Ringe einzeln herunterlassen: hinten (Drittel 1) 6, Mitte (Drittel 2) 5 Ringe
+function ringeKnoepfe(){
+  var b = bereich(), h = '<div class="pg-titel" style="margin-top:10px">Ringe herunterlassen</div>', n = 0;
+  festeTeile().forEach(function(f){
+    if(f.art !== 'ringe' || !festSichtbar(f, b)) return;
+    var dr = +f.key.slice(1, 2), nr = +f.key.split('-')[1];
+    if(nr === 1) h += '<div style="font-size:12px;margin:5px 0 2px;color:var(--text)">' + (dr === 1 ? 'Hinten' : dr === 2 ? 'Mitte' : 'Vorne') + ' (Drittel ' + dr + ')</div>';
+    h += '<button type="button" class="chip' + (S.ringeRunter[f.key] ? ' an' : '') + '" data-ring="' + f.key + '" title="Dieses Ringpaar herunterlassen / hochziehen">' + nr + '</button> '; n++;
+  });
+  return n ? h + '<div class="zeile" style="margin-top:4px"><button type="button" class="chip" data-ringalle="1">alle runter</button> <button type="button" class="chip" data-ringalle="0">alle hoch</button></div>' : '';
+}
+// Reck aus der Wand ziehen: die Pfähle fahren aus der Wandhalterung (x 0.3, y 8.6) in ihre Stellung, in Grundriss und 3D
+var reckLaeuft = false;
+function reckAusfahren(recke){
+  if(reckLaeuft) return;
+  var it = S.items.filter(function(i){ return i.t === 'reckreihe'; })[0], neuIt = !it;
+  var fin = it ? {x:it.x, y:it.y, ab:it.ab || 2.4} : {x:3.5, y:12, ab:2.4};
+  if(!it){ it = beispiel('reckreihe', 3.5, 12); it.r = 90; S.items.push(it); }
+  it.n = recke + 1; it.ab = fin.ab; S.sel = [it.id]; reckLaeuft = true;
+  var t0 = performance.now(), dauer = 1500, letzter = 0;
+  function schritt(now){
+    var p = Math.min(1, (now - t0) / dauer), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+    it.x = r2(0.3 + (fin.x - 0.3) * e); it.y = r2(8.6 + (fin.y - 8.6) * e); it.ab = 0.5 + (fin.ab - 0.5) * e;
+    if(p >= 1){ it.x = fin.x; it.y = fin.y; it.ab = fin.ab; reckLaeuft = false; merken(); allesZeichnen(); toast('Reck ausgefahren – Abstand und Reckstangen-Höhen rechts einstellen'); return; }
+    if(now - letzter > 40){ letzter = now; allesZeichnen(); }
+    requestAnimationFrame(schritt);
+  }
+  allesZeichnen(); requestAnimationFrame(schritt);
 }
 function schalter(id, feld){
   var b = document.getElementById(id);
   b.classList.toggle('aus', !S[feld]);
   b.addEventListener('click', function(){ S[feld] = !S[feld]; b.classList.toggle('aus', !S[feld]); bodenZeichnen(); itemsZeichnen(); autosave(); if(S.ansicht3d) drei.neu(); });
 }
-document.getElementById('ansicht').addEventListener('change', function(){ S.ansicht = this.value; bodenZeichnen(); einpassen(); autosave(); if(S.ansicht3d) drei.neu(); });
+document.getElementById('ansicht').addEventListener('change', function(){ S.ansicht = this.value; ebenenZeichnen(); bodenZeichnen(); einpassen(); autosave(); if(S.ansicht3d) drei.neu(); });
 document.getElementById('undoBtn').addEventListener('click', function(){ zurueck(-1); });
 document.getElementById('redoBtn').addEventListener('click', function(){ zurueck(1); });
 document.getElementById('titelIn').addEventListener('input', function(){ S.titel = this.value; autosave(); });
@@ -1727,7 +1770,7 @@ document.getElementById('notizIn').addEventListener('input', function(){ S.notiz
 document.getElementById('notizIn').addEventListener('change', merken);
 document.getElementById('neuBtn').addEventListener('click', function(){
   bestaetigen('Neuer Aufbau', 'Alle Elemente aus der Halle entfernen? (Rückgängig mit ↶ möglich)', 'Leeren', function(){
-    S.items = []; S.sel = []; S.titel = ''; S.notizen = ''; S.phasen = []; S.phase = 0; phasenZeichnen();
+    S.items = []; S.sel = []; S.ringeRunter = {}; S.titel = ''; S.notizen = ''; S.phasen = []; S.phase = 0; phasenZeichnen();
     document.getElementById('titelIn').value = ''; document.getElementById('notizIn').value = '';
     merken(); allesZeichnen();
   });
@@ -2132,8 +2175,10 @@ var drei = (function(){
     reckreihe:function(it){
       var g = new T.Group(), n = it.n || 4, ab = it.ab || 2.4, x0 = -(n - 1) * ab / 2;
       for(var i = 0; i < n; i++){
-        g.add(kiste(0.12, 2.6, 0.12, '#dde1e6', x0 + i * ab, 1.3));
+        g.add(kiste(0.12, 2.6, 0.12, '#eef0f2', x0 + i * ab, 1.3));
         g.add(kiste(0.3, 0.03, 0.3, '#868e96', x0 + i * ab, 0.015));
+        for(var lk = 0; lk < 12; lk++){ g.add(kiste(0.05, 0.045, 0.002, '#4a4f57', x0 + i * ab, 0.3 + lk * 0.2, 0.061)); g.add(kiste(0.05, 0.045, 0.002, '#4a4f57', x0 + i * ab, 0.3 + lk * 0.2, -0.061)); }
+        g.add(stange(x0 + i * ab, 2.6, 0, x0 + i * ab, HALLE.wandH, 0, 0.008, '#6b7380'));
       }
       for(var j = 0; j < n - 1; j++){
         var hh = (it.hoehen || [])[j] || 1.4, st = rohr(0.016, ab - 0.12, '#ced4da', {metalness:0.8}); st.rotation.z = Math.PI / 2; st.position.set(x0 + (j + 0.5) * ab, hh, 0); g.add(st);
@@ -2360,7 +2405,7 @@ var drei = (function(){
       } else if(a === 'ringe' && E.ringe){
         var wi = rohr(0.11, 0.9, '#1f3f94'); wi.rotation.x = Math.PI / 2; wi.position.set(wx(f.x), hh - 0.4, wz(f.y)); g.add(wi);
         [-0.28, 0.28].forEach(function(dz){
-          var rh = E.runter ? 2.4 : 3.8;
+          var rh = (E.runter || S.ringeRunter[f.key]) ? 2.4 : 3.8;
           g.add(stange(wx(f.x), hh - 0.4, wz(f.y + dz), wx(f.x), rh + 0.1, wz(f.y + dz), 0.008, '#555'));
           var rr = new T.Mesh(new T.TorusGeometry(0.09, 0.012, 8, 24), mat('#c8955a')); rr.position.set(wx(f.x), rh, wz(f.y + dz)); g.add(rr);
         });
