@@ -15044,6 +15044,8 @@ function renderFolderContents(){
       uiPrompt('Ordner umbenennen', null, f.name, 'Speichern', function(name){ renameFolder(f, name); });
     });
     document.getElementById('fmove-'+f.id).addEventListener('click', function(){ askMoveFolder(f); });
+    var nebenBtn = document.getElementById('fneben-'+f.id);
+    if(nebenBtn) nebenBtn.addEventListener('click', function(){ ordnerNebenAufgaben(f); });
     document.getElementById('fdl-'+f.id).addEventListener('click', function(){ ordnerHerunterladen(f.id, f.name); });
     document.getElementById('fdel-'+f.id).addEventListener('click', function(){ askDeleteFolder(f); });
   });
@@ -15187,6 +15189,7 @@ function folderCardHtml(f, index, total, isTeacher){
     html += '<div class="folder-actions">';
     html += '<button class="btn btn-ghost btn-sm" id="frename-'+f.id+'" type="button">Umbenennen</button>';
     html += '<button class="btn btn-ghost btn-sm" id="fmove-'+f.id+'" type="button">Verschieben</button>';
+    if(/\(verdeckt\)\s*$/i.test(f.name)) html += '<button class="btn btn-ghost btn-sm" id="fneben-'+f.id+'" type="button" title="Die Dateien aus diesem Ordner neben die Aufgaben stellen (bleiben verdeckt)">⬆️ Neben Aufgaben</button>';
     html += '<button class="btn btn-ghost btn-sm" id="fdl-'+f.id+'" type="button" title="Alle Dateien dieses Ordners (mit Unterordnern) als ZIP herunterladen">⬇️ Herunterladen</button>';
     html += '<button class="btn btn-danger btn-sm" id="fdel-'+f.id+'" type="button">Löschen</button>';
     html += '</div>';
@@ -15251,6 +15254,33 @@ function maxDepthBelow(folderId){
   var kids = state.folders.filter(function(f){ return (f.parentId||null) === folderId; });
   if(!kids.length) return 0;
   return 1 + Math.max.apply(null, kids.map(function(k){ return maxDepthBelow(k.id); }));
+}
+
+// «Lösungen (verdeckt)»-Ordner auflösen: die Dateien kommen eine Ebene höher, neben die Aufgaben
+// (Reihenfolge G, G-Lösung, E, E-Lösung; die PDFs behalten ihre Plätze), der leere Ordner wird gelöscht.
+function ordnerNebenAufgaben(f){
+  if(state.folders.some(function(k){ return (k.parentId || null) === f.id; })){ uiInfo('Unterordner vorhanden', '«'+f.name+'» enthält noch Unterordner. Verschiebe sie zuerst.'); return; }
+  var eltern = f.parentId || null;
+  var ziel = resourcesIn(eltern).filter(function(x){ return !x.virtual; });
+  var rein = resourcesIn(f.id).filter(function(x){ return !x.virtual; });
+  var n = rein.length;
+  uiConfirm('Neben die Aufgaben stellen?', n+' Datei'+(n===1?'':'en')+' aus «'+f.name+'» kommen auf die Ebene der Aufgaben und bleiben verdeckt. Der Ordner wird danach gelöscht.', 'Ja, verschieben', function(){
+    var alle = ziel.concat(rein);
+    var ist = function(x){ return x.pdf && x.fileName; };
+    var pdfs = alle.filter(ist).sort(function(a, b){
+      var ka = pdfSortKey(a.fileName), kb = pdfSortKey(b.fileName);
+      return ka.base.localeCompare(kb.base, 'de', {numeric:true}) || (ka.niv - kb.niv) || (ka.los - kb.los);
+    });
+    var k = 0;
+    // PDFs übernehmen die Plätze der bisherigen PDFs; die neuen hängen hinten an.
+    var geordnet = ziel.map(function(x){ return ist(x) ? pdfs[k++] : x; }).concat(pdfs.slice(k)).concat(rein.filter(function(x){ return !ist(x); }));
+    var batch = writeBatch(db);
+    geordnet.forEach(function(x, i){ batch.update(kdoc('resources', x.id), {folderId: eltern, order: i}); });
+    batch.delete(kdoc('folders', f.id));
+    batch.commit()
+      .then(function(){ toast('Lösungen stehen jetzt neben den Aufgaben.'); })
+      .catch(function(err){ console.error(err); toast('Verschieben fehlgeschlagen.'); });
+  });
 }
 
 // Löschen bewusst nur, wenn wirklich nichts mehr drin ist — so kann nie
@@ -16562,7 +16592,8 @@ function handleOrdnerUpload(subjectId, parentId, fileList){
   var eintraege = dateien.map(function(f){
     var teile = (f.webkitRelativePath || f.name).split('/');
     var ordner = teile.slice(0,-1);
-    return { file:f, ordner:ordner, verdeckt: pdfIstVerdeckt(ordner, f.name) };
+    // «(verdeckt)»-Ordner gibt es nicht als Library-Ordner: die Datei liegt auf der Ebene der Aufgaben, ist aber verdeckt.
+    return { file:f, ordner:ordner.filter(function(n){ return !/\(verdeckt\)\s*$/i.test(n); }), verdeckt: pdfIstVerdeckt(ordner, f.name) };
   }).sort(function(a,b){
     var pa = a.ordner.join('/'), pb = b.ordner.join('/');
     if(pa !== pb) return pa.localeCompare(pb, 'de', {numeric:true});
@@ -23459,6 +23490,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-23-loesungen-neben', datum:'2026-10-23', fuer:'lehrer', text:'⬆️ PDF-Ordner: Lösungen stehen neben den Aufgaben, nicht mehr in einem eigenen «(verdeckt)»-Ordner. Bei bestehenden «(verdeckt)»-Ordnern gibt es den Knopf «⬆️ Neben Aufgaben», der sie auflöst.'},
   {id:'2026-10-23-uebung-strg-p', datum:'2026-10-23', fuer:'alle', text:'🖨️ Strg/Cmd+P in einer Übung druckt jetzt das Blatt selbst in voller Seitenbreite – nichts mehr rechts abgeschnitten.'},
   {id:'2026-10-23-pdf-drucken', datum:'2026-10-23', fuer:'alle', text:'🖨️ PDFs drucken: Im PDF gibt es oben den Knopf «🖨️ Drucken». Er druckt das PDF in voller Seitengrösse. Strg/Cmd+P im Viewer hat den rechten Rand abgeschnitten.'},
   {id:'2026-10-23-ordner-download', datum:'2026-10-23', fuer:'lehrer', text:'⬇️ Ordner herunterladen: In jedem Fach gibt es bei jedem Ordner «⬇️ Herunterladen» und oben «⬇️ Alles herunterladen» (für den Ordner, in dem du gerade bist, oder das ganze Fach). Du bekommst ein ZIP mit allen PDFs und HTML-Übungen samt Unterordnern, Links stehen in Links.txt. Quizze und andere Klassenzimmer-Einträge sind keine Dateien und fehlen.'},
