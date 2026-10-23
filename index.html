@@ -23207,6 +23207,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-23-lernphase-zuverlaessig', datum:'2026-10-23', fuer:'lehrer', text:'📚 Lernphase: Die Anzeige holt sich alle 30 Sekunden den Stand direkt vom Server und zeigt bei einem Wechsel der Phase «verbindet …» statt «noch nicht da». Das schwebende Fenster friert nicht mehr ein, wenn die Library im Hintergrund liegt.'},
   {id:'2026-10-23-pdf-ordner', datum:'2026-10-23', fuer:'lehrer', text:'📁 PDF-Ordner hochladen: In jedem Fach gibt es unter «Neue Übungsseite oder PDF hinzufügen» jetzt «Ordner mit PDFs hochladen». Du wählst einen ganzen Ordner (auch mit Unterordnern), die Unterordner werden als Ordner angelegt und schon vorhandene PDFs übersprungen. Ordner, die auf «(verdeckt)» enden, zum Beispiel «Lösungen (verdeckt)», werden automatisch ausgeblendet und geschützt: Schüler:innen sehen sie nicht und können sie auch nicht lesen.'},
   {id:'2026-10-23-pip-vollbild', datum:'2026-10-23', fuer:'lehrer', text:'📌 Das schwebende Fenster (Lernphase, Prüfung) bleibt jetzt auch vor Apps im Vollbild sichtbar.'},
   {id:'2026-10-23-lernphase-fach', datum:'2026-10-23', fuer:'lehrer', text:'📚 Lernphase: Neu gibt es «📗 irgendwo in Deutsch» (und jedes andere Fach) — grün ist, wer in einer beliebigen Übung oder auf der Seite dieses Fachs arbeitet.'},
@@ -32849,6 +32850,22 @@ function pipMoeglich(){
   var v = document.createElement('video');
   return !!((document.pictureInPictureEnabled || v.webkitSupportsPresentationMode) && HTMLCanvasElement.prototype.captureStream);
 }
+// Takt für das Fenster: Chrome bremst setInterval, sobald die Library im
+// Hintergrund liegt (dann friert das Bild ein). Ein Worker wird nicht gebremst.
+function pipTakt(fn){
+  try{
+    var url = URL.createObjectURL(new Blob(['setInterval(function(){postMessage(1)},1000)'], {type:'text/javascript'}));
+    var w = new Worker(url);
+    URL.revokeObjectURL(url);
+    w.onmessage = fn;
+    return {worker:w};
+  }catch(e){ return {id:setInterval(fn, 1000)}; }
+}
+function pipTaktStopp(t){
+  if(!t) return;
+  if(t.worker) t.worker.terminate();
+  else if(t.id) clearInterval(t.id);
+}
 function pipRefresh(){
   if(pipv.fenster && pipv.fenster.closed){ pipStoppen(); return; }
   if(!pipv.canvas && !pipv.fenster) return;
@@ -32875,7 +32892,7 @@ function pipStarten(art, id){
   v.addEventListener('webkitpresentationmodechanged', function(){
     if(pipv.video === v && pipv.offen && v.webkitPresentationMode === 'inline') pipStoppen();
   });
-  pipv.timer = setInterval(pipRefresh, 1000);
+  pipv.timer = pipTakt(pipRefresh);
   pipRefresh();
   var pl = v.play(); if(pl && pl.catch) pl.catch(function(){});
   pipAnfordern();
@@ -32919,7 +32936,7 @@ function pipFensterStarten(art, id){
     pipv = { art:art, id:id || null, canvas:null, video:null, timer:null, offen:true, fenster:w, html:null };
     pipFensterAufbauen(w);
     w.addEventListener('pagehide', function(){ if(pipv.fenster === w) pipStoppen(); });
-    pipv.timer = setInterval(pipRefresh, 1000);
+    pipv.timer = pipTakt(pipRefresh);
     pipRefresh();
   };
   if(window.documentPictureInPicture){
@@ -32968,7 +32985,7 @@ function pipHtml(titel, sub, liste, leerText){
 }
 function pipStoppen(){
   var v = pipv.video, f = pipv.fenster;
-  clearInterval(pipv.timer);
+  pipTaktStopp(pipv.timer);
   pipv = { art:null, id:null, canvas:null, video:null, timer:null, offen:false };
   if(f && !f.closed){ try{ f.close(); }catch(e){} }
   if(!v) return;
@@ -33061,7 +33078,7 @@ var LPH_STALE_MS = 75000;     // so lange nichts gehört = «keine Verbindung»
 var LPH_SORT_KEY = 'lib_lernphase_sort';
 var LPH_POLL_MS = 30000;      // Rückfall: so oft direkt beim Server nachfragen
 var lph = { unsub:null, aktiv:null, hb:null, drin:null, erste:false, blurT:null, poll:null, retry:null, hand:0, handBtn:null, handGesehen:{},
-            phase:null, phaseUnsub:null, praes:{}, empfangen:{}, rausLokal:{}, praesUnsub:null,
+            phase:null, phaseUnsub:null, praes:{}, empfangen:{}, rausLokal:{}, praesUnsub:null, praesPoll:null,
             panel:null, tab:null, offen:true, tick:null, gruppen:null };
 
 function lphMs(ts){ return ts && ts.toMillis ? ts.toMillis() : (typeof ts === 'number' ? ts : 0); }
@@ -33136,6 +33153,8 @@ function stopLernphaseWatcher(){
   lphHandBtnZeichnen();
   lphSchuelerStopp();
   if(lph.phaseUnsub){ lph.phaseUnsub(); lph.phaseUnsub = null; }
+  if(lph.praesUnsub){ lph.praesUnsub(); lph.praesUnsub = null; }
+  lphPraesPollStopp();
   lphPanelZu();
   lph.phase = null;
   updateLernphaseBanner();
@@ -33301,6 +33320,7 @@ function lphLehrerWatch(){
     if(!x || !x.aktiv){
       lph.phase = null;
       if(lph.praesUnsub){ lph.praesUnsub(); lph.praesUnsub = null; }
+      lphPraesPollStopp();
       lph.praes = {}; lph.empfangen = {}; lph.rausLokal = {};
       lphPanelZu();
       return;
@@ -33310,28 +33330,58 @@ function lphLehrerWatch(){
     if(neu){ lph.offen = true; lph.praes = {}; lph.empfangen = {}; lph.rausLokal = {}; lph.handGesehen = {}; }
     if(!lph.praesUnsub){
       lph.praesUnsub = onSnapshot(lphPraesCol(state.user.uid), function(ps){
-        var jetzt = Date.now();
         ps.docChanges().forEach(function(ch){
           var uid = ch.doc.id;
           if(ch.type === 'removed'){ delete lph.praes[uid]; delete lph.empfangen[uid]; delete lph.rausLokal[uid]; return; }
-          var d = ch.doc.data(), alt = lph.praes[uid];
-          lph.praes[uid] = d;
-          lph.empfangen[uid] = jetzt;
-          if(d.hand && lph.phase && d.phase === lph.phase.startMs && d.hand > lphErledigt(uid) && lph.handGesehen[uid] !== d.hand){
-            lph.handGesehen[uid] = d.hand;
-            // Beim ersten Laden (z.B. nach Neuladen) nicht für alte Hände piepsen.
-            if(!ps.metadata.fromCache && jetzt - d.hand < 120000) lphHandMelden(uid);
-          }
-          if(d.drin) delete lph.rausLokal[uid];
-          else if(!alt || alt.drin || !lph.rausLokal[uid]) lph.rausLokal[uid] = (alt && alt.drin) ? jetzt : (lphMs(d.rausSeit) || jetzt);
+          lphPraesAnwenden(uid, ch.doc.data(), ps.metadata.fromCache);
         });
         lphPaint();
       }, function(err){ console.error('Lernphase: Präsenz', err); });
     }
+    if(!lph.praesPoll){
+      lph.praesPoll = setInterval(lphPraesNachfragen, LPH_POLL_MS);
+      document.addEventListener('visibilitychange', lphPraesNachfragen);
+      window.addEventListener('online', lphPraesNachfragen);
+    }
+    if(neu) lphPraesNachfragen();
     lphPaint();
   }, function(err){ listenerFehler('Lernphase', err, stopLernphaseWatcher, startLernphaseWatcher); });
 }
 
+// Eine Präsenzmeldung übernehmen (vom Listener oder von der Server-Nachfrage).
+function lphPraesAnwenden(uid, d, ausCache){
+  var jetzt = Date.now(), alt = lph.praes[uid];
+  if(alt && lphMs(alt.ts) === lphMs(d.ts) && alt.drin === d.drin && alt.phase === d.phase && alt.hand === d.hand && alt.raus === d.raus) return false;
+  lph.praes[uid] = d;
+  lph.empfangen[uid] = jetzt;
+  if(d.hand && lph.phase && d.phase === lph.phase.startMs && d.hand > lphErledigt(uid) && lph.handGesehen[uid] !== d.hand){
+    lph.handGesehen[uid] = d.hand;
+    // Beim ersten Laden (z.B. nach Neuladen) nicht für alte Hände piepsen.
+    if(!ausCache && jetzt - d.hand < 120000) lphHandMelden(uid);
+  }
+  if(d.drin) delete lph.rausLokal[uid];
+  else if(!alt || alt.drin || !lph.rausLokal[uid]) lph.rausLokal[uid] = (alt && alt.drin) ? jetzt : (lphMs(d.rausSeit) || jetzt);
+  return true;
+}
+// Rückfall wie bei den Schüler:innen: der Listener allein kam nicht immer an —
+// darum alle 30 s und beim Zurückkommen direkt beim Server nachfragen.
+var lphPraesFragt = false;
+function lphPraesNachfragen(){
+  if(!lph.phase || !state.user || document.visibilityState === 'hidden' || lphPraesFragt) return;
+  lphPraesFragt = true;
+  getDocsFromServer(lphPraesCol(state.user.uid)).then(function(snap){
+    lphPraesFragt = false;
+    if(!lph.phase) return;
+    var neu = false;
+    snap.docs.forEach(function(dc){ if(lphPraesAnwenden(dc.id, dc.data(), false)) neu = true; });
+    if(neu) lphPaint();
+  }).catch(function(err){ lphPraesFragt = false; console.warn('Lernphase: Präsenz nachfragen', err && err.code); });
+}
+function lphPraesPollStopp(){
+  clearInterval(lph.praesPoll); lph.praesPoll = null;
+  document.removeEventListener('visibilitychange', lphPraesNachfragen);
+  window.removeEventListener('online', lphPraesNachfragen);
+}
 function lphErledigt(uid){ return ((lph.phase && lph.phase.erledigt) || {})[uid] || 0; }
 function lphHandVon(uid){
   var p = lph.praes[uid];
@@ -33377,8 +33427,9 @@ function lphHandErledigt(uid){
 
 function lphStatus(uid){
   var p = lph.praes[uid];
-  if(!p || p.phase !== lph.phase.startMs) return {rot:true, text:'noch nicht da'};
   var jetzt = Date.now();
+  if(p && p.phase !== lph.phase.startMs && jetzt - lphMs(p.ts) < 2 * LPH_STALE_MS) return {rot:true, text:'verbindet …'};
+  if(!p || p.phase !== lph.phase.startMs) return {rot:true, text:'noch nicht da'};
   if(jetzt - (lph.empfangen[uid] || 0) > LPH_STALE_MS || jetzt - lphMs(p.ts) > 5 * LPH_STALE_MS) return {rot:true, text:'keine Verbindung', raus:p.raus || 0};
   if(!p.drin){
     var seit = lph.rausLokal[uid] || lphMs(p.rausSeit) || jetzt;
