@@ -10,7 +10,7 @@
  *
  * --ordner  Zielordner im Fach (Name; wird auf der Hauptebene angelegt, wenn es ihn nicht gibt),
  *           --in "Übergeordneter Ordner" legt ihn darunter an/sucht ihn dort.
- * Titel = Datei ohne Endung, «01_2026-10-22_Wer_bestimmt» → «Wer bestimmt» (--titel-roh lässt es unverändert).
+ * Titel: «01_2026-10-22_Wer_bestimmt» → «Folien 01 · Wer bestimmt», «L02_Berlin_1970er» → «Folien L02 · Berlin 1970er» (--titel-roh lässt den Dateinamen).
  * Vorhandenes (gleicher Titel im Zielordner) wird ersetzt: neuer Inhalt, gleiche ID, alte Fassung wiederherstellbar.
  * Schreibt nur mit --ja.
  */
@@ -45,10 +45,11 @@ function chunks(str, maxBytes){
   return out;
 }
 function titelAus(datei){
-  let t = path.basename(datei).replace(/\.pptx$/i, '');
+  const t = path.basename(datei).replace(/\.pptx$/i, '');
   if(process.argv.includes('--titel-roh')) return t;
-  t = t.replace(/^(\d{1,2}|L\d{1,2})[_ -]+/, '').replace(/^\d{4}-\d{2}-\d{2}[_ -]+/, '');
-  return t.replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim() || path.basename(datei);
+  const m = /^(L?\d{1,2})[_ -]+(?:\d{4}-\d{2}-\d{2}[_ -]+)?(.+)$/.exec(t);
+  const rest = (m ? m[2] : t).replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return m ? 'Folien ' + m[1] + ' · ' + rest : rest;
 }
 
 (async function(){
@@ -96,29 +97,29 @@ function titelAus(datei){
   }
   if(!JA){ console.log('\nNur Vorschau – zum Ablegen denselben Befehl mit --ja.'); return; }
 
-  const batch = db.batch();
-  let n = 0;
-  const op = () => { if(++n > 350) throw new Error('Zu viele Schreibvorgänge für einen Stapel – in Teilen importieren.'); };
-  if(neuerOrdner){ batch.set(kref.collection('folders').doc(neuerOrdner.id), { subject:neuerOrdner.subject, parentId:neuerOrdner.parentId, name:neuerOrdner.name, order:neuerOrdner.order, createdAt:TS, createdBy:jan.uid }); op(); }
+  // Pro Präsentation ein eigener Stapel (Firestore nimmt pro Schreibvorgang höchstens ~10 MB).
+  if(neuerOrdner) await kref.collection('folders').doc(neuerOrdner.id).set({ subject:neuerOrdner.subject, parentId:neuerOrdner.parentId, name:neuerOrdner.name, order:neuerOrdner.order, createdAt:TS, createdBy:jan.uid });
   const neueIds = [];
   let reihe = vorhanden.length;
   for(const p of plan){
     const teile = chunks(p.res.html, MAX_CHUNK_BYTES);
     const stamp = Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
+    const batch = db.batch();
     if(p.alt){
       const neu = p.alt.id + '_' + stamp, cid = p.alt.contentId || p.alt.id;
-      batch.set(db.collection('resourceContent').doc(neu), { chunkCount:teile.length, bytes:p.bytes, ownerUid:jan.uid }); op();
-      teile.forEach((t, i) => { batch.set(db.collection('resourceContent').doc(neu).collection('chunks').doc(String(i)), { html:t }); op(); });
-      batch.set(kref.collection('resources').doc(p.alt.id), { contentId:neu, prevContentId:cid, replacedAt:TS, fileName:path.basename(p.datei), folien:true }, { merge:true }); op();
+      batch.set(db.collection('resourceContent').doc(neu), { chunkCount:teile.length, bytes:p.bytes, ownerUid:jan.uid });
+      teile.forEach((t, i) => batch.set(db.collection('resourceContent').doc(neu).collection('chunks').doc(String(i)), { html:t }));
+      batch.set(kref.collection('resources').doc(p.alt.id), { contentId:neu, prevContentId:cid, replacedAt:TS, fileName:path.basename(p.datei), folien:true }, { merge:true });
     } else {
       const id = fach + '_' + Date.now() + '_' + (reihe++);
-      batch.set(kref.collection('resources').doc(id), { subject:fach, folderId:zielId, title:p.titel, fileName:path.basename(p.datei), uploadedAt:TS, uploadedBy:jan.uid, contentId:id, version:0, folien:true }); op();
-      batch.set(db.collection('resourceContent').doc(id), { chunkCount:teile.length, bytes:p.bytes, ownerUid:jan.uid }); op();
-      teile.forEach((t, i) => { batch.set(db.collection('resourceContent').doc(id).collection('chunks').doc(String(i)), { html:t }); op(); });
+      batch.set(db.collection('resourceContent').doc(id), { chunkCount:teile.length, bytes:p.bytes, ownerUid:jan.uid });
+      teile.forEach((t, i) => batch.set(db.collection('resourceContent').doc(id).collection('chunks').doc(String(i)), { html:t }));
+      batch.set(kref.collection('resources').doc(id), { subject:fach, folderId:zielId, title:p.titel, fileName:path.basename(p.datei), uploadedAt:TS, uploadedBy:jan.uid, contentId:id, version:0, folien:true });
       neueIds.push(id);
     }
+    await batch.commit();
+    console.log('  ✓ ' + p.titel);
   }
-  await batch.commit();
   // Index «wo liegt die Übung» (wie indexDazu in index.html)
   for(const id of neueIds) await db.collection('uebungsIndex').doc(id).set({ klassen: admin.firestore.FieldValue.arrayUnion(klasse) }, { merge:true });
   console.log('✅ ' + plan.length + ' Präsentation(en) abgelegt – in der Library neu laden. Die nächtliche Spiegelung gibt sie an die anderen Lehrpersonen weiter.');
