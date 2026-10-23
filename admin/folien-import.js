@@ -10,6 +10,7 @@
  *
  * --ordner  Zielordner im Fach (Name; wird auf der Hauptebene angelegt, wenn es ihn nicht gibt),
  *           --in "Übergeordneter Ordner" legt ihn darunter an/sucht ihn dort.
+ * Folien sind immer 🔒 nur für Lehrpersonen (Inhalt geschützt) und erscheinen im Fach unter «PPP Folien».
  * Titel: «01_2026-10-22_Wer_bestimmt» → «Folien 01 · Wer bestimmt», «L02_Berlin_1970er» → «Folien L02 · Berlin 1970er» (--titel-roh lässt den Dateinamen).
  * Vorhandenes (gleicher Titel im Zielordner) wird ersetzt: neuer Inhalt, gleiche ID, alte Fassung wiederherstellbar.
  * Schreibt nur mit --ja.
@@ -107,14 +108,14 @@ function titelAus(datei){
     const batch = db.batch();
     if(p.alt){
       const neu = p.alt.id + '_' + stamp, cid = p.alt.contentId || p.alt.id;
-      batch.set(db.collection('resourceContent').doc(neu), { chunkCount:teile.length, bytes:p.bytes, ownerUid:jan.uid });
-      teile.forEach((t, i) => batch.set(db.collection('resourceContent').doc(neu).collection('chunks').doc(String(i)), { html:t }));
-      batch.set(kref.collection('resources').doc(p.alt.id), { contentId:neu, prevContentId:cid, replacedAt:TS, fileName:path.basename(p.datei), folien:true }, { merge:true });
+      batch.set(db.collection('resourceContent').doc(neu), { chunkCount:teile.length, bytes:p.bytes, ownerUid:jan.uid, nurLehrer:true });
+      teile.forEach((t, i) => batch.set(db.collection('resourceContent').doc(neu).collection('chunks').doc(String(i)), { html:t, nurLehrer:true }));
+      batch.set(kref.collection('resources').doc(p.alt.id), { contentId:neu, prevContentId:cid, replacedAt:TS, fileName:path.basename(p.datei), folien:true, nurLehrer:true }, { merge:true });
     } else {
       const id = fach + '_' + Date.now() + '_' + (reihe++);
-      batch.set(db.collection('resourceContent').doc(id), { chunkCount:teile.length, bytes:p.bytes, ownerUid:jan.uid });
-      teile.forEach((t, i) => batch.set(db.collection('resourceContent').doc(id).collection('chunks').doc(String(i)), { html:t }));
-      batch.set(kref.collection('resources').doc(id), { subject:fach, folderId:zielId, title:p.titel, fileName:path.basename(p.datei), uploadedAt:TS, uploadedBy:jan.uid, contentId:id, version:0, folien:true });
+      batch.set(db.collection('resourceContent').doc(id), { chunkCount:teile.length, bytes:p.bytes, ownerUid:jan.uid, nurLehrer:true });
+      teile.forEach((t, i) => batch.set(db.collection('resourceContent').doc(id).collection('chunks').doc(String(i)), { html:t, nurLehrer:true }));
+      batch.set(kref.collection('resources').doc(id), { subject:fach, folderId:zielId, title:p.titel, fileName:path.basename(p.datei), uploadedAt:TS, uploadedBy:jan.uid, contentId:id, version:0, folien:true, nurLehrer:true });
       neueIds.push(id);
     }
     await batch.commit();

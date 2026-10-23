@@ -15120,6 +15120,7 @@ function renderFolderContents(){
    die offenen / mit Resultat). Die Karten sind
    immer im DOM (nur versteckt), damit die Knöpfe normal verdrahtet werden. */
 var ZUSATZ_ARTEN = {
+  folien:    {icon:'🎞️', name:'PPP Folien'},
   pruefung:{icon:'📝', name:'Prüfungen'},
   kk:      {icon:'🗂️', name:'Karteikarten'},
   quiz:    {icon:'🎮', name:'Klassen-Quizze'},
@@ -15130,6 +15131,7 @@ var ZUSATZ_ARTEN = {
 };
 var zusatzOffen = {};   // «Fach|Ordner|Art» → aufgeklappt (nur für diese Sitzung)
 function zusatzArt(r){
+  if(r.folien) return 'folien';
   if(r.kk && r.ausOrdner) return 'kk';
   if(r.kzm && ZUSATZ_ARTEN[r.kzm.typ]) return r.kzm.typ;
   if(r.kzmPruef) return 'pruefung';
@@ -15495,7 +15497,7 @@ function resourceCardHtml(r, index, total, isTeacher){
   }
   html += '<div class="resource-info"><h4>'+esc(r.title || r.fileName)+(r.current?' <span class="chip-current">Aktuell</span>':'')+(lp?' <span class="chip-lehrer">🔒 Nur Lehrpersonen</span>':'')+(aus?' <span class="chip-lehrer">🙈 Ausgeblendet</span>':'')+niveauChipHtml(r, isTeacher)+'</h4>';
   if(!lp && !r.folien) html += '<div class="resource-bar"><span id="pbar-'+r.id+'" style="width:0%;background:var(--brand)"></span></div>';
-  var metaStart = lp ? 'Lehrer-HTML · für Schüler:innen unsichtbar' : r.pdf ? '📄 PDF' : r.folien ? '🎞️ Folien · ▶ Präsentieren, Notizen nur für Lehrpersonen' : r.externalUrl ? '🔗 Link · öffnet in neuem Tab' : 'Noch nicht geübt';
+  var metaStart = lp && r.folien ? '🎞️ Folien · nur Lehrpersonen · Notizen + 🎤 Referentenansicht' : lp ? 'Lehrer-HTML · für Schüler:innen unsichtbar' : r.pdf ? '📄 PDF' : r.folien ? '🎞️ Folien · ▶ Präsentieren, Notizen nur für Lehrpersonen' : r.externalUrl ? '🔗 Link · öffnet in neuem Tab' : 'Noch nicht geübt';
   if(aus) metaStart = 'Für Schüler:innen ausgeblendet · ' + metaStart;
   html += '<div class="resource-meta" id="pmeta-'+r.id+'">'+metaStart+(uploaded?' · hinzugefügt am '+uploaded:'')+'</div>';
   html += '</div>';
@@ -16471,7 +16473,7 @@ function handleUpload(subjectId, folderId, file, nurLehrerVorwahl){
   if(isPptxFile(file)){
     if(file.size > MAX_PPTX_BYTES){ toast('PowerPoint ist zu gross (max. '+Math.round(MAX_PPTX_BYTES/1024/1024)+' MB).'); return; }
     var wo = folderId ? ('Ordner «'+(folderById(folderId) ? folderById(folderId).name : '')+'»') : 'Fach-Hauptebene';
-    uiPrompt('Titel für diese Präsentation', 'Wird als Folien in der '+wo+' abgelegt: normal anschaubar, mit 🎤 Referentenansicht (Notizen nur auf deinem Laptop).', file.name.replace(/\.pptx$/i,'').replace(/[_-]+/g,' '), 'Hochladen', function(title){
+    uiPrompt('Titel für diese Präsentation', 'Wird als Folien in der '+wo+' abgelegt (unter «PPP Folien», nur für Lehrpersonen sichtbar), mit 🎤 Referentenansicht.', file.name.replace(/\.pptx$/i,'').replace(/[_-]+/g,' '), 'Hochladen', function(title){
       doUpload(subjectId, folderId, file, title);
     });
     return;
@@ -16715,6 +16717,7 @@ async function doUpload(subjectId, folderId, file, title, nurLehrer){
   progEl.classList.add('show');
   try{
     var pdf = isPdfFile(file), folien = isPptxFile(file);
+    if(folien) nurLehrer = true;   // PPP-Folien (mit Lehrerkommentar) sind nur für Lehrpersonen
     var content = pdf ? await readFileAsBytes(file) : folien ? (progEl.textContent = 'Wandle «'+file.name+'» in Folien um …', (await pptxZuFolien(file)).html) : await readFileAsText(file);
     var chunks = contentChunkDocs(content);
     var bytes = contentBytes(content);
