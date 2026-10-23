@@ -32948,7 +32948,8 @@ function pipStarten(art, id){
   // Vollbild. Das Dokument-Bild-in-Bild von Chrome tut das auf dem Mac nicht.
   // Nur ohne Video-Weg: HTML-Fenster (Document PiP bzw. kleines eigenes Fenster).
   if(!pipMoeglich()){ pipFensterStarten(art, id); return; }
-  if(pipv.video && pipv.art === art && pipv.id === (id || null)){ pipAnfordern(); return; }
+  if(pipv.video && pipv.art === art && pipv.id === (id || null) && document.pictureInPictureElement !== pipv.video && !pipv.video.webkitPresentationMode){ pipStoppen(); }
+  else if(pipv.video && pipv.art === art && pipv.id === (id || null)){ pipAnfordern(); return; }
   pipStoppen();
   var c = document.createElement('canvas'), v = document.createElement('video');
   c.width = PIP_W; c.height = PIP_H;
@@ -33563,6 +33564,7 @@ function lphPaint(){
   if(!lph.panel){
     lph.panel = document.createElement('aside');
     lph.panel.className = 'lph-panel';
+    lph.panelHtml = null;
     lph.panel.addEventListener('click', lphPanelKlick);
     lph.panel.addEventListener('change', function(e){
       if(e.target.id === 'lphSort'){ lphSortSet(e.target.value); lphPaint(); }
@@ -33622,10 +33624,15 @@ function lphPaint(){
   }
   h += '</div>';
   h += '<div class="lph-foot"><button class="btn btn-ghost btn-sm" data-lph="ende" type="button">⏹ Lernphase beenden</button></div>';
-  var list = lph.panel.querySelector('.lph-list'), scroll = list ? list.scrollTop : 0;
-  lph.panel.innerHTML = h;
-  var neuList = lph.panel.querySelector('.lph-list');
-  if(neuList) neuList.scrollTop = scroll;
+  // Nur neu zeichnen, wenn sich etwas geändert hat: jede Meldung einer Schüler:in löst einen Paint
+  // aus, und ein mitten im Klick ersetzter Knopf (📌, Sortieren …) schluckt den Klick.
+  if(lph.panelHtml !== h || !lph.panel.firstChild){
+    var list = lph.panel.querySelector('.lph-list'), scroll = list ? list.scrollTop : 0;
+    lph.panel.innerHTML = h;
+    lph.panelHtml = h;
+    var neuList = lph.panel.querySelector('.lph-list');
+    if(neuList) neuList.scrollTop = scroll;
+  }
   lphTickStart();
   if(pipv.art === 'lph') pipRefresh();
 }
@@ -33665,7 +33672,7 @@ function lphPanelKlick(e){
   } else if(b.hasAttribute('data-lph-ein')){
     updateDoc(ref, {aus: arrayRemove(b.getAttribute('data-lph-ein'))}).catch(function(err){ console.error(err); toast('Konnte nicht einblenden.'); });
   } else if(b.getAttribute('data-lph') === 'pip'){
-    pipStarten('lph');
+    try{ pipStarten('lph'); }catch(err){ console.error('Bild-in-Bild', err); toast('📌 Das Fenster liess sich nicht öffnen.'); }
   } else if(b.getAttribute('data-lph') === 'zu'){
     lph.offen = false; lphPaint();
   } else if(b.getAttribute('data-lph') === 'ende'){
