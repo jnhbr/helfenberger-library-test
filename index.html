@@ -23116,6 +23116,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-23-pip-vollbild', datum:'2026-10-23', fuer:'lehrer', text:'📌 Das schwebende Fenster (Lernphase, Prüfung) bleibt jetzt auch vor Apps im Vollbild sichtbar.'},
   {id:'2026-10-23-lernphase-fach', datum:'2026-10-23', fuer:'lehrer', text:'📚 Lernphase: Neu gibt es «📗 irgendwo in Deutsch» (und jedes andere Fach) — grün ist, wer in einer beliebigen Übung oder auf der Seite dieses Fachs arbeitet.'},
   {id:'2026-10-22-hallenplaner-11', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Hallenplaner: Die Kletterstangen hängen jetzt senkrecht an der Wand und gleiten per Knopf («⇥ Kletterstangen ausfahren», unter «Halle & Ebenen») mit Animation schräg in die Halle. Das Reck bleibt beim Ändern der Anzahl oder des Abstands bündig an der Wand.'},
   {id:'2026-10-22-hallenplaner-10', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Hallenplaner: Basketballkörbe stehen in der Mitte jeder Einfachhalle (beide Längsseiten), und die Bank lässt sich auch auf den Kopf gestellt in die Sprossenwand einhängen.'},
@@ -32763,10 +32764,10 @@ function pipRefresh(){
   else if(pipv.art === 'pruef') pruefPipZeichnen();
 }
 function pipStarten(art, id){
-  // Chrome/Edge (und Firefox, sobald es das kann): echtes Bild-in-Bild mit
-  // HTML-Inhalt (Document Picture-in-Picture). Firefox ohne diese Funktion
-  // bekommt ein kleines eigenes Fenster. Safari bleibt beim Video-Weg unten.
-  if(window.documentPictureInPicture || !pipMoeglich()){ pipFensterStarten(art, id); return; }
+  // Video-Bild-in-Bild (Canvas-Stream) bevorzugt: Es schwebt auch vor Apps im
+  // Vollbild. Das Dokument-Bild-in-Bild von Chrome tut das auf dem Mac nicht.
+  // Nur ohne Video-Weg: HTML-Fenster (Document PiP bzw. kleines eigenes Fenster).
+  if(!pipMoeglich()){ pipFensterStarten(art, id); return; }
   if(pipv.video && pipv.art === art && pipv.id === (id || null)){ pipAnfordern(); return; }
   pipStoppen();
   var c = document.createElement('canvas'), v = document.createElement('video');
