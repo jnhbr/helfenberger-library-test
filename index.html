@@ -17338,6 +17338,9 @@ function renderPdfResource(r){
     if(tab){ tab.href = pdfViewerUrl; tab.style.display = ''; }
     var pb = document.getElementById('pdfPrintBtn');
     if(pb){ pb.style.display = ''; pb.addEventListener('click', function(){ pdfDrucken(pdfViewerUrl); }); }
+    pdfDruckTasteVerdrahten();
+    // Fokus in den Viewer: dort druckt Strg/Cmd+P das PDF selbst
+    if(frame) frame.addEventListener('load', function(){ try{ frame.contentWindow.focus(); }catch(err){} });
   }).catch(function(err){
     console.error(err);
     var wrap = document.querySelector('.viewer-frame-wrap');
@@ -17347,6 +17350,19 @@ function renderPdfResource(r){
 
 // PDF drucken: das PDF selbst (unsichtbarer Rahmen), nicht die Library-Seite mit dem eingebetteten Viewer —
 // sonst schneidet der Druck den Rand ab und skaliert falsch.
+// Strg/Cmd+P in der PDF-Ansicht druckt das PDF (nicht die Library-Seite drumherum).
+var pdfDruckTasteDa = false;
+function pdfDruckTasteVerdrahten(){
+  if(pdfDruckTasteDa) return;
+  pdfDruckTasteDa = true;
+  window.addEventListener('keydown', function(e){
+    if(!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== 'p') return;
+    var pb = document.getElementById('pdfPrintBtn');
+    if(!pb || pb.style.display === 'none' || !pdfViewerUrl) return;
+    e.preventDefault();
+    pdfDrucken(pdfViewerUrl);
+  }, true);
+}
 function pdfDrucken(url){
   var f = document.createElement('iframe');
   f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
