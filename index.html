@@ -23116,6 +23116,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-23-lernphase-fach', datum:'2026-10-23', fuer:'lehrer', text:'📚 Lernphase: Neu gibt es «📗 irgendwo in Deutsch» (und jedes andere Fach) — grün ist, wer in einer beliebigen Übung oder auf der Seite dieses Fachs arbeitet.'},
   {id:'2026-10-22-hallenplaner-11', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Hallenplaner: Die Kletterstangen hängen jetzt senkrecht an der Wand und gleiten per Knopf («⇥ Kletterstangen ausfahren», unter «Halle & Ebenen») mit Animation schräg in die Halle. Das Reck bleibt beim Ändern der Anzahl oder des Abstands bündig an der Wand.'},
   {id:'2026-10-22-hallenplaner-10', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Hallenplaner: Basketballkörbe stehen in der Mitte jeder Einfachhalle (beide Längsseiten), und die Bank lässt sich auch auf den Kopf gestellt in die Sprossenwand einhängen.'},
   {id:'2026-10-22-hallenplaner-9', datum:'2026-10-22', fuer:'lehrer', text:'🏟️ Hallenplaner: Ringe hängen auf Höhe der Ring-Hilfen, die Reck-Pfähle an der Wand stehen eng beieinander und sind so hoch wie ausgefahren, das Reck fährt bündig an der Wand rechtwinklig aus. Das Badmintonnetz kommt quer über die ganze Hallenbreite in die Mitte (Länge einstellbar: 1 Feld, 3 Felder, ganze Breite).'},
@@ -32945,8 +32946,9 @@ function pipZeichnen(titel, sub, eintraege, leerText){
    es ist nur eine Anzeige. Kranke lassen sich ausblenden (gilt nur für diese
    Lernphase).
 
-   Daten: lernphasen/{uidLehrperson}                -> {aktiv, startMs, titel, mitglieder:[uid], namen:{uid:name}, aus:[uid], nurUebung:{id, titel}|null}
+   Daten: lernphasen/{uidLehrperson}                -> {aktiv, startMs, titel, mitglieder:[uid], namen:{uid:name}, aus:[uid], nurUebung:{id, titel}|null, nurFach:{id, titel}|null}
           lernphasen/{uidLehrperson}/praesenz/{uid} -> {drin, falsch, ts, phase (= startMs), raus (Anzahl), rausSeit}
+   Mit nurFach zählt jede Übung und die Fach-Seite dieses Fachs als «drin» (z. B. «irgendwo in Deutsch»).
    Mit nurUebung zählt nur diese eine Übung als «drin»: wer sonst irgendwo in
    der Library ist, leuchtet auch rot (falsch = true → «nicht in der Übung»).
    Schüler:innen finden ihre Lernphase mit where('mitglieder','array-contains', uid)
@@ -33019,7 +33021,7 @@ function lphVerarbeiten(docs, ausCache){
     lph.aktiv = akt; lph.drin = null; lph.erste = true; lph.hand = 0;
     lphSchuelerStart();
     lphHandLaden(akt);
-    if(!vorher) toast(akt.nurUebung && akt.nurUebung.id ? '📚 Lernphase: Arbeite an «' + (akt.nurUebung.titel || 'der Übung') + '».' : '📚 Lernphase: Bleib hier in der Library.');
+    if(!vorher) toast(akt.nurFach && akt.nurFach.id ? '📚 Lernphase: Arbeite in ' + (akt.nurFach.titel || 'dem Fach') + '.' : akt.nurUebung && akt.nurUebung.id ? '📚 Lernphase: Arbeite an «' + (akt.nurUebung.titel || 'der Übung') + '».' : '📚 Lernphase: Bleib hier in der Library.');
   } else if(akt){
     lph.aktiv = akt;
   } else if(vorher && !ausCache){
@@ -33061,6 +33063,11 @@ function lphFensterFokus(){
 }
 function lphImFenster(){ return lphBibFokus() || !!lphFensterFokus(); }
 function lphAmOrt(){
+  var nf = lph.aktiv && lph.aktiv.nurFach;
+  if(nf && nf.id){
+    var r = state.route || {};
+    return (r.name === 'resource' && !!r.resource && (r.resource.subject || '') === nf.id) || (r.name === 'subject' && r.subject === nf.id);
+  }
   var n = lph.aktiv && lph.aktiv.nurUebung;
   if(!n || !n.id) return true;
   return state.route && state.route.name === 'resource' && state.route.resource && state.route.resource.id === n.id;
@@ -33068,6 +33075,7 @@ function lphAmOrt(){
 function lphIstDrin(){
   if(lphBibFokus()) return lphAmOrt();
   var f = lphFensterFokus(), n = lph.aktiv && lph.aktiv.nurUebung;
+  if(f && lph.aktiv && lph.aktiv.nurFach && lph.aktiv.nurFach.id) return true;
   return !!f && (!n || !n.id || String(f.rid) === String(n.id));
 }
 function lphMelden(heartbeat, erzwungenRaus){
@@ -33110,8 +33118,14 @@ function updateLernphaseBanner(){
   var el = document.getElementById('lernphaseBadge');
   if(!el) return;
   el.hidden = !(lph.aktiv && state.profile && state.profile.role !== 'teacher');
-  var n = lph.aktiv && lph.aktiv.nurUebung;
-  if(n && n.id){
+  var n = lph.aktiv && lph.aktiv.nurUebung, nf = lph.aktiv && lph.aktiv.nurFach;
+  if(nf && nf.id){
+    var daF = lphAmOrt();
+    el.textContent = '📚 Lernphase: ' + (nf.titel || 'Fach') + (daF ? '' : ' ›');
+    el.title = daF ? 'Lernphase: Bleib in diesem Fach' : 'Lernphase: nur dieses Fach — antippen, um es zu öffnen';
+    el.classList.toggle('falsch', !daF);
+    el.onclick = daF ? null : function(){ goSubject(nf.id); };
+  } else if(n && n.id){
     var da = lphAmOrt();
     el.textContent = '📚 Lernphase: ' + (n.titel || 'Übung') + (da ? '' : ' ›');
     el.title = da ? 'Lernphase: Bleib in dieser Übung' : 'Lernphase: nur diese Übung — antippen, um sie zu öffnen';
@@ -33345,7 +33359,7 @@ function lphPaint(){
   var sort = lphSortGet();
   if(sort && faecher.indexOf(sort) < 0) sort = '';
 
-  var h = '<div class="lph-head"><div><b>📚 Lernphase</b><small>'+esc(p.titel || '')+(p.nurUebung && p.nurUebung.id ? '<br>nur: '+esc(p.nurUebung.titel || '') : '')+'</small></div>'+
+  var h = '<div class="lph-head"><div><b>📚 Lernphase</b><small>'+esc(p.titel || '')+(p.nurFach && p.nurFach.id ? '<br>nur: '+esc(p.nurFach.titel || '') : p.nurUebung && p.nurUebung.id ? '<br>nur: '+esc(p.nurUebung.titel || '') : '')+'</small></div>'+
     '<span><button class="lph-mini" data-lph="pip" type="button" title="Immer im Vordergrund — auch wenn du in einem anderen Programm arbeitest">📌</button>'+
     '<button class="lph-mini" data-lph="zu" type="button" title="Einklappen">⟨</button></span></div>';
   h += '<div class="lph-sum"><span class="lph-ok">🟢 '+(sichtbar.length - rot)+' drin</span><span class="lph-bad">🔴 '+rot+' raus</span></div>';
@@ -33465,7 +33479,7 @@ function openLernphase(){
     '<label class="modal-label" for="lphFach">Grün ist, wer …</label>'+
     '<select class="modal-input" id="lphFach"><option value="">📚 irgendwo in der Library ist</option></select>'+
     '<select class="modal-input" id="lphNur" style="margin-top:8px" hidden></select>'+
-    '<p class="pr-hinweis" id="lphNurInfo" style="margin-top:6px">Wählst du eine Übung, leuchtet auch rot, wer in der Library etwas anderes offen hat.</p>'+
+    '<p class="pr-hinweis" id="lphNurInfo" style="margin-top:6px">Wählst du ein Fach oder eine Übung, leuchtet auch rot, wer in der Library etwas anderes offen hat.</p>'+
     '<div class="modal-actions">'+
       '<button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button>'+
       '<button class="btn btn-primary btn-sm" id="modalOk" type="button">Starten</button>'+
@@ -33486,6 +33500,7 @@ function openLernphase(){
   function titelVon(r){ return r.title || r.fileName || r.id; }
   fachSel.addEventListener('change', function(){
     var f = fachSel.value;
+    if(f.indexOf('fach:') === 0) f = '';
     nurSel.innerHTML = '';
     nurSel.hidden = !f;
     if(!f) return;
@@ -33510,6 +33525,9 @@ function openLernphase(){
     SUBJECTS.map(function(f){ return f.id; }).concat(Object.keys(proFach)).filter(function(f, i, a){ return proFach[f] && a.indexOf(f) === i; }).forEach(function(f){
       proFach[f].sort(function(a, b){ return titelVon(a).localeCompare(titelVon(b), 'de'); });
       var o = document.createElement('option');
+      var of = document.createElement('option');
+      of.value = 'fach:' + f; of.textContent = '📗 irgendwo in ' + (subjectName(f) || 'Ohne Fach');
+      fachSel.appendChild(of);
       o.value = f; o.textContent = '📘 nur in einer Übung aus ' + (subjectName(f) || 'Ohne Fach') + ' (' + proFach[f].length + ')';
       fachSel.appendChild(o);
     });
@@ -33517,8 +33535,10 @@ function openLernphase(){
   document.getElementById('modalCancel').addEventListener('click', closeModal);
   document.getElementById('modalOk').addEventListener('click', function(){
     var gid = sel.value, g = meine.filter(function(x){ return x.id === gid; })[0];
-    if(fachSel.value && !nurSel.value){ toast('Bitte noch die Übung wählen.'); nurSel.focus(); return; }
-    var nurOpt = fachSel.value && nurSel.value ? nurSel.options[nurSel.selectedIndex] : null;
+    var nurFach = fachSel.value.indexOf('fach:') === 0 ? {id:fachSel.value.slice(5), titel:fachSel.options[fachSel.selectedIndex].textContent.replace('📗 irgendwo in ', '')} : null;
+    if(nurFach && !nurFach.id) nurFach = null;
+    if(!nurFach && fachSel.value && !nurSel.value){ toast('Bitte noch die Übung wählen.'); nurSel.focus(); return; }
+    var nurOpt = !nurFach && fachSel.value && nurSel.value ? nurSel.options[nurSel.selectedIndex] : null;
     var nurUebung = nurOpt ? {id:nurSel.value, titel:nurOpt.textContent} : null;
     var okBtn = document.getElementById('modalOk');
     okBtn.disabled = true;
@@ -33536,7 +33556,7 @@ function openLernphase(){
       return lphPraesenzLoeschen().catch(function(){}).then(function(){
         return setDoc(lphRef(state.user.uid), {
           aktiv:true, startMs:Date.now(), start:serverTimestamp(), titel:x.titel,
-          mitglieder:x.mitglieder.slice(0, 400), namen:x.namen, aus:[], nurUebung:nurUebung,
+          mitglieder:x.mitglieder.slice(0, 400), namen:x.namen, aus:[], nurUebung:nurUebung, nurFach:nurFach,
           klasse:state.klasse, ownerName:state.profile.displayName || ''
         });
       }).then(function(){ closeModal(); lph.offen = true; toast('📚 Lernphase gestartet.'); });
@@ -46601,7 +46621,7 @@ function render(){
   clearOverviewWatchers();
   if(state.route.name !== 'kalender') kal = { alle:false, vergangenOffen:false };
   // Lernphase mit «nur diese Übung»: jeder Seitenwechsel kann drin/raus ändern.
-  if(lph.aktiv && lph.aktiv.nurUebung){ setTimeout(function(){ lphMelden(false); updateLernphaseBanner(); }, 0); }
+  if(lph.aktiv && (lph.aktiv.nurUebung || lph.aktiv.nurFach)){ setTimeout(function(){ lphMelden(false); updateLernphaseBanner(); }, 0); }
   if(wackelnAktiv() && state.route.name !== 'home' && state.route.name !== 'klassenzimmer') wackelnEnde();
   // Übung verlassen: Stand und Lernzeit ein letztes Mal sichern, Beobachtung stoppen.
   if(state.route.name !== 'resource' && syncState.resourceId){
