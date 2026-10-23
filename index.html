@@ -2162,9 +2162,9 @@
   .vg-hint{color:var(--text-muted);font-size:13px;line-height:1.55;margin:0 2px 14px;}
 
   /* ===== 📚 Lernphase (Seitenleiste der Lehrperson) ===== */
-  .lph-panel{position:fixed;left:0;top:0;bottom:0;width:260px;z-index:1400;display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--border);box-shadow:8px 0 30px -18px rgba(0,0,0,.35);font-size:14px;}
-  body.lph-offen{padding-left:260px;}
-  @media (max-width:900px){ body.lph-offen{padding-left:0;} }
+  .lph-panel{position:fixed;right:0;top:0;bottom:0;width:260px;z-index:1400;display:flex;flex-direction:column;background:var(--surface);border-left:1px solid var(--border);box-shadow:-8px 0 30px -18px rgba(0,0,0,.35);font-size:14px;}
+  body.lph-offen{padding-right:260px;}
+  @media (max-width:900px){ body.lph-offen{padding-right:0;} }
   .lph-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:14px 12px 8px 16px;}
   .lph-head > span{flex:none;display:flex;}
   .lph-head small{display:block;color:var(--text-muted);font-size:12px;margin-top:2px;}
@@ -2189,7 +2189,7 @@
   @media (hover:none){ .lph-row .lph-mini{opacity:1;} }
   .lph-leer{color:var(--text-muted);padding:12px 8px;}
   .lph-foot{padding:10px 12px;border-top:1px solid var(--border);}
-  .lph-tab{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:1400;border:1px solid var(--border);border-left:none;border-radius:0 12px 12px 0;background:var(--surface);padding:12px 8px;cursor:pointer;font-size:20px;display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:4px 0 16px -8px rgba(0,0,0,.35);}
+  .lph-tab{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:1400;border:1px solid var(--border);border-right:none;border-radius:12px 0 0 12px;background:var(--surface);padding:12px 8px;cursor:pointer;font-size:20px;display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:-4px 0 16px -8px rgba(0,0,0,.35);}
   .lph-tab b{font-size:12px;color:#fff;background:var(--bad);border-radius:999px;padding:1px 7px;}
   .lph-tab b.hand{background:#D97706;}
   .lph-hand-btn{position:fixed;left:16px;bottom:16px;z-index:1450;display:flex;align-items:center;gap:8px;border:2px solid #D97706;background:var(--surface);color:var(--text);border-radius:999px;padding:10px 16px 10px 12px;font:inherit;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 8px 24px -10px rgba(0,0,0,.45);}
@@ -23207,6 +23207,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-23-lernphase-rechts', datum:'2026-10-23', fuer:'lehrer', text:'📚 Lernphase: Die Übersicht steht jetzt rechts, damit links alle Knöpfe der Library sichtbar bleiben.'},
   {id:'2026-10-23-lernphase-zuverlaessig', datum:'2026-10-23', fuer:'lehrer', text:'📚 Lernphase: Die Anzeige holt sich alle 30 Sekunden den Stand direkt vom Server und zeigt bei einem Wechsel der Phase «verbindet …» statt «noch nicht da». Das schwebende Fenster friert nicht mehr ein, wenn die Library im Hintergrund liegt.'},
   {id:'2026-10-23-pdf-ordner', datum:'2026-10-23', fuer:'lehrer', text:'📁 PDF-Ordner hochladen: In jedem Fach gibt es unter «Neue Übungsseite oder PDF hinzufügen» jetzt «Ordner mit PDFs hochladen». Du wählst einen ganzen Ordner (auch mit Unterordnern), die Unterordner werden als Ordner angelegt und schon vorhandene PDFs übersprungen. Ordner, die auf «(verdeckt)» enden, zum Beispiel «Lösungen (verdeckt)», werden automatisch ausgeblendet und geschützt: Schüler:innen sehen sie nicht und können sie auch nicht lesen.'},
   {id:'2026-10-23-pip-vollbild', datum:'2026-10-23', fuer:'lehrer', text:'📌 Das schwebende Fenster (Lernphase, Prüfung) bleibt jetzt auch vor Apps im Vollbild sichtbar.'},
@@ -33505,7 +33506,7 @@ function lphPaint(){
 
   var h = '<div class="lph-head"><div><b>📚 Lernphase</b><small>'+esc(p.titel || '')+(p.nurFach && p.nurFach.id ? '<br>nur: '+esc(p.nurFach.titel || '') : p.nurUebung && p.nurUebung.id ? '<br>nur: '+esc(p.nurUebung.titel || '') : '')+'</small></div>'+
     '<span><button class="lph-mini" data-lph="pip" type="button" title="Immer im Vordergrund — auch wenn du in einem anderen Programm arbeitest">📌</button>'+
-    '<button class="lph-mini" data-lph="zu" type="button" title="Einklappen">⟨</button></span></div>';
+    '<button class="lph-mini" data-lph="zu" type="button" title="Einklappen">⟩</button></span></div>';
   h += '<div class="lph-sum"><span class="lph-ok">🟢 '+(sichtbar.length - rot)+' drin</span><span class="lph-bad">🔴 '+rot+' raus</span></div>';
   if(haende.length){
     h += '<div class="lph-fragen"><b>✋ Fragen ('+haende.length+')</b>';
