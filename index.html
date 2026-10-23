@@ -3732,7 +3732,7 @@ function tokenNachlauf(){
   setTimeout(function(){
     auth.currentUser && auth.currentUser.getIdToken(true).then(function(){
       try{
-        if(state.route && state.route.name === 'home' && !modalEl.classList.contains('show')) render();
+        if(state.route && (state.route.name === 'home' || state.route.name === 'subject') && !modalEl.classList.contains('show')) render();
       }catch(e){}
     }, function(){});
   }, 1500);
@@ -14925,8 +14925,24 @@ function renderSubject(subjectId, folderId){
     console.error(err);
     var listEl = document.getElementById('resourceList');
     if(listEl) listEl.innerHTML = '<div class="empty-state">Übungen konnten nicht geladen werden.</div>';
+    // 23.10.2026: kurzes «permission-denied» trotz gültiger Anmeldung (Token noch nicht
+    // anerkannt) liess die Fachseite leer, bis jemand neu lud. Einmal pro Fach frisches
+    // Token holen und die Seite neu aufbauen; sonst bleibt die Meldung stehen.
+    if(err && err.code === 'permission-denied' && fachNachlaufGetan !== subjectId && auth.currentUser){
+      fachNachlaufGetan = subjectId;
+      listEl && (listEl.innerHTML = '<div class="empty-state">Wird neu geladen …</div>');
+      setTimeout(function(){
+        auth.currentUser && auth.currentUser.getIdToken(true).then(function(){
+          if(state.route && state.route.name === 'subject' && state.route.subject === subjectId && !modalEl.classList.contains('show')) render();
+        }, function(){
+          var l = document.getElementById('resourceList');
+          if(l) l.innerHTML = '<div class="empty-state">Übungen konnten nicht geladen werden.</div>';
+        });
+      }, 1500);
+    }
   });
 }
+var fachNachlaufGetan = null;
 
 // Zeichnet Brotkrumen + den Inhalt des gerade offenen Containers neu. Wird bei
 // jeder Snapshot-Änderung und nach jeder Navigation in einen Unterordner
