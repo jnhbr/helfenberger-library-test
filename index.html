@@ -17239,7 +17239,7 @@ function libFensterOeffnen(r, src){
   if(isPseudoFsActive()) exitPseudoFullscreen();
   var f = {win:w, rid:r.id, uebung:src.html != null, tracked:{}, lastWritten:null, lastWriteAt:0, writeTimer:null, sek:0, tickAt:Date.now()};
   libFensterListe[r.id] = f;
-  if(!libFensterTakt) libFensterTakt = setInterval(libFensterTick, 1000);
+  if(!libFensterTakt) libFensterTakt = pipTakt(libFensterTick, 1000);
   if(f.uebung){
     // Die Beobachtung dieser Übung geht von der Library an das Fenster über.
     var bisher = syncState.resourceId === r.id ? syncState.tracked : {};
@@ -17267,7 +17267,7 @@ function libFensterZu(rid){
   delete libFensterListe[rid];
   if(f.uebung){ clearTimeout(f.writeTimer); libFensterSpeichern(f); libFensterZeit(f); }
   try{ if(f.win && !f.win.closed) f.win.close(); }catch(e){}
-  if(!Object.keys(libFensterListe).length){ clearInterval(libFensterTakt); libFensterTakt = null; }
+  if(!Object.keys(libFensterListe).length){ pipTaktStopp(libFensterTakt); libFensterTakt = null; }
   if(lph.aktiv) lphWechsel();
   // Steht die Library gerade auf dieser Übung: Viewer neu laden (zeigt den Stand aus dem Fenster).
   if(f.uebung && libFensterDarf() && state.route.name === 'resource' && state.route.resource && state.route.resource.id === rid) render();
@@ -23207,6 +23207,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-23-lernphase-fenster', datum:'2026-10-23', fuer:'lehrer', text:'📚 Lernphase: Wer in einem eigenen Übungsfenster arbeitet, wird nicht mehr zwischendurch rot — die Library meldet jetzt auch im Hintergrund zuverlässig, und kurzes Flackern beim Klicken zählt nicht als «raus».'},
   {id:'2026-10-23-lernphase-rechts', datum:'2026-10-23', fuer:'lehrer', text:'📚 Lernphase: Die Übersicht steht jetzt rechts, damit links alle Knöpfe der Library sichtbar bleiben.'},
   {id:'2026-10-23-lernphase-zuverlaessig', datum:'2026-10-23', fuer:'lehrer', text:'📚 Lernphase: Die Anzeige holt sich alle 30 Sekunden den Stand direkt vom Server und zeigt bei einem Wechsel der Phase «verbindet …» statt «noch nicht da». Das schwebende Fenster friert nicht mehr ein, wenn die Library im Hintergrund liegt.'},
   {id:'2026-10-23-pdf-ordner', datum:'2026-10-23', fuer:'lehrer', text:'📁 PDF-Ordner hochladen: In jedem Fach gibt es unter «Neue Übungsseite oder PDF hinzufügen» jetzt «Ordner mit PDFs hochladen». Du wählst einen ganzen Ordner (auch mit Unterordnern), die Unterordner werden als Ordner angelegt und schon vorhandene PDFs übersprungen. Ordner, die auf «(verdeckt)» enden, zum Beispiel «Lösungen (verdeckt)», werden automatisch ausgeblendet und geschützt: Schüler:innen sehen sie nicht und können sie auch nicht lesen.'},
@@ -32853,14 +32854,15 @@ function pipMoeglich(){
 }
 // Takt für das Fenster: Chrome bremst setInterval, sobald die Library im
 // Hintergrund liegt (dann friert das Bild ein). Ein Worker wird nicht gebremst.
-function pipTakt(fn){
+function pipTakt(fn, ms){
+  ms = ms || 1000;
   try{
-    var url = URL.createObjectURL(new Blob(['setInterval(function(){postMessage(1)},1000)'], {type:'text/javascript'}));
+    var url = URL.createObjectURL(new Blob(['setInterval(function(){postMessage(1)},'+ms+')'], {type:'text/javascript'}));
     var w = new Worker(url);
     URL.revokeObjectURL(url);
     w.onmessage = fn;
     return {worker:w};
-  }catch(e){ return {id:setInterval(fn, 1000)}; }
+  }catch(e){ return {id:setInterval(fn, ms)}; }
 }
 function pipTaktStopp(t){
   if(!t) return;
@@ -33078,7 +33080,7 @@ var LPH_HB_MS = 30000;        // Lebenszeichen der Schüler:innen
 var LPH_STALE_MS = 75000;     // so lange nichts gehört = «keine Verbindung»
 var LPH_SORT_KEY = 'lib_lernphase_sort';
 var LPH_POLL_MS = 30000;      // Rückfall: so oft direkt beim Server nachfragen
-var lph = { unsub:null, aktiv:null, hb:null, drin:null, erste:false, blurT:null, poll:null, retry:null, hand:0, handBtn:null, handGesehen:{},
+var lph = { entprellt:null, unsub:null, aktiv:null, hb:null, drin:null, erste:false, blurT:null, poll:null, retry:null, hand:0, handBtn:null, handGesehen:{},
             phase:null, phaseUnsub:null, praes:{}, empfangen:{}, rausLokal:{}, praesUnsub:null, praesPoll:null,
             panel:null, tab:null, offen:true, tick:null, gruppen:null };
 
@@ -33196,6 +33198,13 @@ function lphMelden(heartbeat, erzwungenRaus){
   var drin = erzwungenRaus ? false : lphIstDrin();
   var falsch = !erzwungenRaus && !drin && lphImFenster();
   if(!heartbeat && drin === lph.drin && falsch === lph.falsch) return;
+  // Mit eigenem Übungsfenster flackert hasFocus() beim Klicken kurz: «raus» erst
+  // melden, wenn es nach 2 s noch stimmt.
+  if(!drin && lph.drin === true && !erzwungenRaus && !arguments[2] && Object.keys(libFensterListe).length){
+    if(!lph.entprellt){ lph.entprellt = setTimeout(function(){ lph.entprellt = null; lphMelden(false, false, true); }, 2000); }
+    return;
+  }
+  if(drin && lph.entprellt){ clearTimeout(lph.entprellt); lph.entprellt = null; }
   lph.falsch = falsch;
   var data = { drin:drin, falsch:falsch, ts:serverTimestamp(), phase:lph.aktiv.startMs || 0 };
   if(lph.erste){ data.raus = drin ? 0 : 1; if(!drin) data.rausSeit = serverTimestamp(); lph.erste = false; }
@@ -33215,7 +33224,7 @@ function lphSchuelerStart(){
   window.addEventListener('focus', lphWechsel);
   window.addEventListener('blur', lphBlur);
   window.addEventListener('pagehide', lphPagehide);
-  lph.hb = setInterval(function(){ lphMelden(true); }, LPH_HB_MS);
+  lph.hb = pipTakt(function(){ lphMelden(true); }, LPH_HB_MS);
   lphMelden(true);
 }
 function lphSchuelerStopp(nurListener){
@@ -33223,7 +33232,7 @@ function lphSchuelerStopp(nurListener){
   window.removeEventListener('focus', lphWechsel);
   window.removeEventListener('blur', lphBlur);
   window.removeEventListener('pagehide', lphPagehide);
-  if(lph.hb){ clearInterval(lph.hb); lph.hb = null; }
+  if(lph.hb){ pipTaktStopp(lph.hb); lph.hb = null; }
   clearTimeout(lph.blurT);
   if(!nurListener) lph.drin = null;
 }
