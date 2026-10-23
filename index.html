@@ -17053,6 +17053,8 @@ function exerciseHelperScript(rid, mitEnter){
     'window.__libLoadView=function(){try{var v=JSON.parse(localStorage.getItem(K)||"null");return v&&typeof v==="object"?v:null;}catch(e){return null;}};' +
     'window.__libSaveView=function(v){try{if(!v||v.mode==="home")localStorage.removeItem(K);else localStorage.setItem(K,JSON.stringify({mode:v.mode,themeKey:v.themeKey,index:v.index,mDecided:!!v.mDecided}));}catch(e){}};' +
     'window.__libClearView=function(){try{localStorage.removeItem(K);}catch(e){}};' +
+    // Strg/Cmd+P in der Übung druckt die Übung selbst (Seitenbreite = Papierbreite), nicht die Library-Seite mit eingebettetem Rahmen.
+    'document.addEventListener("keydown",function(e){if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&!e.altKey&&String(e.key).toLowerCase()==="p"){e.preventDefault();window.print();}},true);' +
     // Taschenrechner per Tastatur: nur wenn er offen ist und der Fokus nicht in einem Antwortfeld liegt.
     'var MAP={"0":"0","1":"1","2":"2","3":"3","4":"4","5":"5","6":"6","7":"7","8":"8","9":"9",".":".",",":".","+":"+","-":"−","*":"×","x":"×","X":"×","/":"÷",":":"÷","Enter":"=","=":"=","Backspace":"⌫","Delete":"C","Escape":"C","c":"C","C":"C","q":"x²","Q":"x²","²":"x²","w":"√","W":"√"};' +
     'function isField(a){return a&&(a.tagName==="INPUT"||a.tagName==="TEXTAREA"||a.tagName==="SELECT"||a.isContentEditable);}' +
@@ -17214,6 +17216,7 @@ function renderResource(r){
   }, r);
   var liveBtn = document.getElementById('liveBtn');
   if(liveBtn){ liveBtn.addEventListener('click', function(){ openLiveKlasse(r); }); }
+  resourceDruckTasteVerdrahten();
 
   watchProgress(r.id, function(p){ updateViewerProgress(p); });
 
@@ -17377,6 +17380,19 @@ function pdfDruckTasteVerdrahten(){
     if(!pb || pb.style.display === 'none' || !pdfViewerUrl) return;
     e.preventDefault();
     pdfDrucken(pdfViewerUrl);
+  }, true);
+}
+// Strg/Cmd+P mit offener Übung (Fokus ausserhalb des Rahmens): die Übung selbst drucken, nicht die Library-Seite.
+var resourceDruckTasteDa = false;
+function resourceDruckTasteVerdrahten(){
+  if(resourceDruckTasteDa) return;
+  resourceDruckTasteDa = true;
+  window.addEventListener('keydown', function(e){
+    if(!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== 'p') return;
+    var fr = document.getElementById('resourceFrame');
+    if(!fr || !fr.srcdoc || !fr.contentWindow) return;
+    e.preventDefault();
+    try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(err){ console.error(err); window.print(); }
   }, true);
 }
 function pdfDrucken(url){
@@ -23443,6 +23459,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-23-uebung-strg-p', datum:'2026-10-23', fuer:'alle', text:'🖨️ Strg/Cmd+P in einer Übung druckt jetzt das Blatt selbst in voller Seitenbreite – nichts mehr rechts abgeschnitten.'},
   {id:'2026-10-23-pdf-drucken', datum:'2026-10-23', fuer:'alle', text:'🖨️ PDFs drucken: Im PDF gibt es oben den Knopf «🖨️ Drucken». Er druckt das PDF in voller Seitengrösse. Strg/Cmd+P im Viewer hat den rechten Rand abgeschnitten.'},
   {id:'2026-10-23-ordner-download', datum:'2026-10-23', fuer:'lehrer', text:'⬇️ Ordner herunterladen: In jedem Fach gibt es bei jedem Ordner «⬇️ Herunterladen» und oben «⬇️ Alles herunterladen» (für den Ordner, in dem du gerade bist, oder das ganze Fach). Du bekommst ein ZIP mit allen PDFs und HTML-Übungen samt Unterordnern, Links stehen in Links.txt. Quizze und andere Klassenzimmer-Einträge sind keine Dateien und fehlen.'},
   {id:'2026-10-23-gruppen-ordner', datum:'2026-10-23', fuer:'alle', text:'📁 Übungen von anderen Lehrpersonen («👥 Bei …») stehen jetzt in aufklappbaren Ordnern, genau wie auf deiner Klassenseite. Hast du ein Fach bei mehreren Lehrpersonen, wählst du oben, bei wem – dieselbe Übung findest du bei beiden.'},
