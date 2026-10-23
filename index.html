@@ -16451,7 +16451,7 @@ async function ordnerHochladen(subjectId, parentId, eintraege){
   async function ordnerId(pfad){
     var parent = parentId || null, key = '';
     for(var i = 0; i < pfad.length; i++){
-      var name = pfad[i].slice(0,60); key += '/' + name;
+      var name = pfad[i].slice(0,80); key += '/' + name;
       if(ids[key] !== undefined){ parent = ids[key]; continue; }
       var da = foldersIn(parent).filter(function(f){ return f.name === name; })[0];
       if(da){ ids[key] = da.id; parent = da.id; continue; }
