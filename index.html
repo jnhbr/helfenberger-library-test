@@ -17318,6 +17318,7 @@ function renderPdfResource(r){
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn">&larr; '+esc(s ? s.name : 'Fach')+'</button></div>';
   html += '<div class="viewer-head"><h2>'+esc(r.title || r.fileName)+'</h2><span class="viewer-progress">📄 PDF</span>';
   html += '<a class="btn btn-ghost btn-sm" id="pdfTabBtn" target="_blank" rel="noopener" style="display:none;">↗ Neuer Tab</a>';
+  html += '<button class="btn btn-ghost btn-sm" id="pdfPrintBtn" type="button" style="display:none;" title="Das PDF in voller Seitengrösse drucken (Strg/Cmd+P im Viewer schneidet den Rand ab)">🖨️ Drucken</button>';
   html += libFensterBtnHtml('fensterBtn');
   html += '<button class="btn btn-ghost btn-sm btn-fs" id="fsBtn" type="button">'+FS_ICON_ENTER+'</button>';
   html += '</div>';
@@ -17335,11 +17336,27 @@ function renderPdfResource(r){
     var frame = document.getElementById('resourceFrame'), tab = document.getElementById('pdfTabBtn');
     if(frame) frame.src = pdfViewerUrl;
     if(tab){ tab.href = pdfViewerUrl; tab.style.display = ''; }
+    var pb = document.getElementById('pdfPrintBtn');
+    if(pb){ pb.style.display = ''; pb.addEventListener('click', function(){ pdfDrucken(pdfViewerUrl); }); }
   }).catch(function(err){
     console.error(err);
     var wrap = document.querySelector('.viewer-frame-wrap');
     if(wrap) wrap.innerHTML = '<div class="empty-state">Dieses PDF konnte nicht geladen werden.</div>';
   });
+}
+
+// PDF drucken: das PDF selbst (unsichtbarer Rahmen), nicht die Library-Seite mit dem eingebetteten Viewer —
+// sonst schneidet der Druck den Rand ab und skaliert falsch.
+function pdfDrucken(url){
+  var f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  f.onload = function(){
+    try{ f.contentWindow.focus(); f.contentWindow.print(); }
+    catch(err){ console.error(err); window.open(url, '_blank'); }
+    setTimeout(function(){ if(f.parentNode) f.parentNode.removeChild(f); }, 120000);
+  };
+  f.src = url;
+  document.body.appendChild(f);
 }
 
 /* ===================== 🪟 IN NEUEM FENSTER =====================
@@ -23394,6 +23411,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-23-pdf-drucken', datum:'2026-10-23', fuer:'alle', text:'🖨️ PDFs drucken: Im PDF gibt es oben den Knopf «🖨️ Drucken». Er druckt das PDF in voller Seitengrösse. Strg/Cmd+P im Viewer hat den rechten Rand abgeschnitten.'},
   {id:'2026-10-23-ordner-download', datum:'2026-10-23', fuer:'lehrer', text:'⬇️ Ordner herunterladen: In jedem Fach gibt es bei jedem Ordner «⬇️ Herunterladen» und oben «⬇️ Alles herunterladen» (für den Ordner, in dem du gerade bist, oder das ganze Fach). Du bekommst ein ZIP mit allen PDFs und HTML-Übungen samt Unterordnern, Links stehen in Links.txt. Quizze und andere Klassenzimmer-Einträge sind keine Dateien und fehlen.'},
   {id:'2026-10-23-gruppen-ordner', datum:'2026-10-23', fuer:'alle', text:'📁 Übungen von anderen Lehrpersonen («👥 Bei …») stehen jetzt in aufklappbaren Ordnern, genau wie auf deiner Klassenseite. Hast du ein Fach bei mehreren Lehrpersonen, wählst du oben, bei wem – dieselbe Übung findest du bei beiden.'},
   {id:'2026-10-23-lernphase-fenster', datum:'2026-10-23', fuer:'lehrer', text:'📚 Lernphase: Wer in einem eigenen Übungsfenster arbeitet, wird nicht mehr zwischendurch rot — die Library meldet jetzt auch im Hintergrund zuverlässig, und kurzes Flackern beim Klicken zählt nicht als «raus».'},
