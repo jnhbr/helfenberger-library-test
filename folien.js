@@ -38,6 +38,7 @@ async function zipLesen(b, e, inflate){
   throw new Error('ZIP-Komprimierung ' + e.methode + ' wird nicht unterstützt.');
 }
 function standardInflate(roh){
+  if(typeof require === 'function'){ try{ var z = require('zlib'); return Promise.resolve(new Uint8Array(z.inflateRawSync(roh))); }catch(e){} }
   if(typeof DecompressionStream === 'function'){
     var ds = new DecompressionStream('deflate-raw');
     var w = ds.writable.getWriter(); w.write(roh); w.close();
