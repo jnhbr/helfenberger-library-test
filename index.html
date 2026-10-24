@@ -10841,10 +10841,21 @@ function renderHomeworkWidget(){
     // Earlybird nur, wenn er diese Woche ist und (bei Schüler:innen) man selbst drin ist.
     var earlybird = res[3].filter(function(t){ return t.datum <= horizon && t.liste && (isTeacher || t.liste.length); });
     if(!upcoming.length && !earlybird.length){ host.innerHTML=''; return; }
-    var h = '<div class="card homework-card"><h3 style="margin-top:0;">📘 Die nächsten 7 Tage</h3>';
-    h += '<div class="cal-list">'+calendarWithFerienHtml(upcoming, [], isTeacher, roster, false, earlybird)+'</div>';
+    var zu = false;
+    try{ zu = localStorage.getItem('wk7_eingeklappt')==='1'; }catch(e){}
+    var h = '<div class="card homework-card"><h3 style="margin:0;"><button type="button" id="wk7Toggle" aria-expanded="'+(zu?'false':'true')+'" style="all:unset;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;">'+
+      '<span>📘 Die nächsten 7 Tage</span><span id="wk7Pfeil" aria-hidden="true" style="transition:transform .2s;transform:rotate('+(zu?'-90':'0')+'deg);">▾</span></button></h3>';
+    h += '<div class="cal-list" id="wk7Liste" style="margin-top:12px;'+(zu?'display:none;':'')+'">'+calendarWithFerienHtml(upcoming, [], isTeacher, roster, false, earlybird)+'</div>';
     h += '</div>';
     host.innerHTML = h;
+    document.getElementById('wk7Toggle').addEventListener('click', function(){
+      var liste = document.getElementById('wk7Liste');
+      var nowZu = liste.style.display !== 'none';
+      liste.style.display = nowZu ? 'none' : '';
+      this.setAttribute('aria-expanded', nowZu ? 'false' : 'true');
+      document.getElementById('wk7Pfeil').style.transform = 'rotate('+(nowZu?'-90':'0')+'deg)';
+      try{ localStorage.setItem('wk7_eingeklappt', nowZu ? '1' : '0'); }catch(e){}
+    });
     wireCalendarResourceLinks(host);
     earlybirdKalenderVerdrahten(host);
     wireCalendarEntryActions(host, upcoming, isTeacher, renderHomeworkWidget, roster);
@@ -23620,6 +23631,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-24-wk7-einklappen', datum:'2026-10-24', fuer:'alle', text:'📘 «Die nächsten 7 Tage» auf der Startseite lässt sich jetzt mit einem Klick auf den Titel ein- und ausklappen (Handy und Computer).'},
   {id:'2026-10-24-sva-abgleich', datum:'2026-10-24', fuer:'alle', text:'🔄 Handy und Laptop bleiben jetzt im Gleichklang: Hast du auf einem Gerät weitergearbeitet, holt das andere den neuen Stand von selbst – und überschreibt ihn nicht mehr mit dem alten.'},
   {id:'2026-10-23-folien', datum:'2026-10-23', fuer:'lehrer', text:'🎞️ PowerPoints in der Library: im Fach «Datei auswählen» eine .pptx ablegen – sie wird zu Folien (normal anschaubar, ⛶ Vollbild, ▦ Übersicht). Nur für Lehrpersonen gibt es 📝 Notizen und die 🎤 Referentenansicht: ein zweites Fenster mit Notizen, nächster Folie und Uhr auf dem Laptop, während die Klasse im Vollbild nur die Folien sieht (Bildschirme erweitern, nicht spiegeln). Die bestehenden Präsentationen von Geografie, Deutsch und Geschichte sind schon drin.'},
   {id:'2026-10-23-loesungen-neben', datum:'2026-10-23', fuer:'lehrer', text:'📁 PDF-Ordner: Lösungen stehen immer direkt neben den Aufgaben (verdeckt), nie in einem eigenen «(verdeckt)»-Ordner. Bestehende solche Ordner löst die Library von selbst auf.'},
