@@ -7,7 +7,7 @@
 <link rel="icon" href="assets/icon-192.png">
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#1D1D1B">
 <script>
 // Gespeicherte Dark-/Light-Mode-Wahl VOR dem ersten Rendern setzen, sonst blitzt
 // beim Laden kurz das falsche Theme auf (Systemvorgabe statt manueller Wahl).
@@ -8677,10 +8677,10 @@ function toggleTheme(){
   if(btn) btn.textContent = next === 'dark' ? '☀️' : '🌙';
   syncThemeColor();
 }
-// Titelleiste der installierten App (Chrome/Edge): immer schwarz, Schrift wird dadurch automatisch weiss.
+// Titelleiste der installierten App (Chrome/Edge): im Schwarz der Seitenleiste (#1D1D1B), Schrift wird dadurch automatisch weiss.
 function syncThemeColor(){
   var m = document.querySelector('meta[name="theme-color"]');
-  if(m) m.setAttribute('content', '#000000');
+  if(m) m.setAttribute('content', '#1D1D1B');
 }
 syncThemeColor();
 if(window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeColor);
