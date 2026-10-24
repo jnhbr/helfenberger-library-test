@@ -10835,7 +10835,7 @@ function renderHomeworkWidget(){
   var isTeacher = state.profile.role === 'teacher';
   Promise.all([loadMyCalendarEntries(todayStr()), isTeacher ? loadStudentRoster() : Promise.resolve(null), erledigtLoad(), earlybirdKalenderLaden()]).then(function(res){
     var entries = res[0], roster = res[1];
-    if(!document.getElementById('homeworkWidget')) return; // Seite inzwischen gewechselt
+    if(!host.isConnected || document.getElementById('homeworkWidget')!==host) return; // Seite inzwischen gewechselt / neu gerendert
     var today = todayStr(), horizon = addDaysStr(7);
     var upcoming = entries.filter(function(e){ return e.dueDate>=today && e.dueDate<=horizon; });
     // Earlybird nur, wenn er diese Woche ist und (bei Schüler:innen) man selbst drin ist.
@@ -10848,7 +10848,8 @@ function renderHomeworkWidget(){
     h += '<div class="cal-list" id="wk7Liste" style="margin-top:12px;'+(zu?'display:none;':'')+'">'+calendarWithFerienHtml(upcoming, [], isTeacher, roster, false, earlybird)+'</div>';
     h += '</div>';
     host.innerHTML = h;
-    document.getElementById('wk7Toggle').addEventListener('click', function(){
+    var wk7t = host.querySelector('#wk7Toggle');
+    if(wk7t) wk7t.addEventListener('click', function(){
       var liste = document.getElementById('wk7Liste');
       var nowZu = liste.style.display !== 'none';
       liste.style.display = nowZu ? 'none' : '';
