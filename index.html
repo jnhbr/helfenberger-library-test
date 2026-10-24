@@ -13899,11 +13899,11 @@ function raetselVirtuell(subject){
    Aufbauten liegen im Browser (localStorage hallenplaner_v1) und lassen sich als Datei weitergeben. */
 /* 🧱 SPORT-BAUSTEINE – Werkzeug im Fach Sport (nur Lehrperson): statische Seite praep/ im Link-Viewer.
    Bausteinkatalog pro Sportart (3v3-Modell), Daten in praep/daten/*.json (alle LP sehen dieselben, kommen mit dem Deploy). Auswahl im Browser (praep_korb_v1). */
-var PRAEP_VERSION = 6;   // nach jeder Änderung an praep/ erhöhen (Browser-Cache)
+var PRAEP_VERSION = 7;   // nach jeder Änderung an praep/ erhöhen (Browser-Cache)
 function praepVirtuell(subject){
   if(subject !== 'sport' || !(state.profile && state.profile.role === 'teacher')) return [];
   return [{id:'praep-bausteine', subject:'sport', folderId:null, order:-1900, virtual:true, werkzeug:true, linkUrl:'praep/?v='+PRAEP_VERSION, linkLabel:'Werkzeug',
-    title:'🧱 Sport-Bausteine und Präp-Werkstatt', meta:'Bausteine für Volleyball, Basketball, Fussball, Handball, Unihockey · 🛠️ Präp-Werkstatt: Reihe aus Bausteinen, Aufbau mit 3D aus dem Hallenplaner, Druck im Altnau-Design'}];
+    title:'🧱 Sport-Bausteine, Präp-Werkstatt und Jahresplanung', meta:'Bausteine und Kleine Spiele mit Skizzen · 🛠️ Präp-Werkstatt · 🗓️ Jahresplanung 7.–9. Klasse nach LP21 · 🧮 Notenrechner · 🏆 Turnierplan'}];
 }
 var HALLENPLANER_VERSION = 25;   // nach jeder Änderung an hallenplaner/index.html erhöhen (Browser-Cache)
 function hallenplanerVirtuell(subject){
@@ -23660,6 +23660,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-24-sport-planung', datum:'2026-10-24', fuer:'lehrer', text:'🗓️ Sport: Jahresplanung für die 7., 8. und 9. Klasse (deine Planung und ein Vorschlag) mit Abdeckung nach Lehrplan 21; «Reihe anlegen» öffnet die Präp-Werkstatt mit passendem Block. Neu auch der 🧮 Notenrechner (Punkte → Note, Notentabelle, Klassenliste) und der 🏆 Turnierplan (Jeder gegen jeden, Felder, Zeiten, Rangliste) sowie ★ Favoriten bei den Bausteinen.'},
   {id:'2026-10-24-kleine-spiele', datum:'2026-10-24', fuer:'lehrer', text:'🎲 Sport-Bausteine: neu «Kleine Spiele» mit 36 Spielen für Einstieg, Aufwärmen, Spiel und Abschluss (Fang-, Lauf-, Ball-, Kooperations- und Reaktionsspiele), jede mit Skizze, Regeln und Varianten. In der 🛠️ Präp-Werkstatt kannst du sie bei jeder Phase dazunehmen.'},
   {id:'2026-10-24-sport-lp21', datum:'2026-10-24', fuer:'lehrer', text:'🧱 Sport-Bausteine nach Lehrplan 21: Jede Karte zeigt den Kompetenzbereich (Spielen, Bewegen an Geräten, Laufen/Springen/Werfen) und die pädagogischen Perspektiven (Leistung, Miteinander, Gesundheit, Ausdruck, Eindruck, Wagnis). Nach Perspektive filtern, in der 🛠️ Präp-Werkstatt siehst du pro Doppellektion und pro Reihe, was du abdeckst. Neu: Bausteine für «Bewegen an Geräten» und «Leichtathletik» samt Beispielreihen.'},
   {id:'2026-10-24-hallenplaner-sportvorlagen', datum:'2026-10-24', fuer:'lehrer', text:'🏟️ Hallenplaner: neue Vorlagen für Basketball (EasyBasket mit festen und mobilen Körben), Fussball (Kleinfelder mit vier Toren), Handball (Softhandball quer) und Unihockey – jeweils 3 gegen 3 für 16 Schüler:innen, mit Grundriss und 3D. In der 🛠️ Präp-Werkstatt sind sie unter «Aufbau» als Vorlagen wählbar, die Beispielreihen nutzen sie gleich.'},
