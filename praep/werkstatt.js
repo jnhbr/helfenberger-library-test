@@ -10,6 +10,8 @@
     {id:'abschluss', name:'Abschluss', hilfe:['abschluss','alt','check'], zeit:''},
     {id:'kreis', name:'Kreis', hilfe:[], zeit:''}
   ];
+  var VORLAGEN_HP = [{id:'v:0', n:'Volleyball 3:3 – drei Kleinfelder', sport:'volleyball'}, {id:'v:1', n:'Basketball 3:3 – EasyBasket', sport:'basketball'}, {id:'v:2', n:'Fussball 3:3 – Kleinfelder mit vier Toren', sport:'fussball'}, {id:'v:3', n:'Handball 3:3 – Softhandball quer', sport:'handball'}, {id:'v:4', n:'Unihockey 3:3 – Kleinfelder', sport:'unihockey'}];
+  function vorlageVon(sport){ var v = VORLAGEN_HP.filter(function(x){ return x.sport === sport; })[0]; return v ? v.id : ''; }
   var W = {daten:null, reihen:[], rid:null, di:0, bild:{}, beobachter:null};
 
   function $(id){ return document.getElementById(id); }
@@ -93,6 +95,7 @@
           if(anzahl !== 5 && n === anzahl - 1 && anzahl > 1) d.phasen[4].notiz = 'Rundenturnier mit allen Stufen, Teams zählen selbst.';
         } else beispielDl(sport, n, anzahl, d);
       }
+      if(beispiel) d.org.aufbauId = vorlageVon(sport);
       r.dls.push(d);
     }
     W.reihen.push(r); W.rid = r.id; W.di = 0; schreiben(); alles();
@@ -159,14 +162,15 @@
     h += '<h2 class="abschnitt">Organisation und Aufbau</h2>'+orgHtml(d);
     $('dlPanel').innerHTML = h;
   }
+  function hpQuery(id){ if(!id) return ''; return id.indexOf('v:') === 0 ? '?vorlage='+id.slice(2) : '?aufbau='+encodeURIComponent(id); }
   function aufbauten(){ try{ return (JSON.parse(localStorage.getItem('hallenplaner_v1') || '{}').gespeichert || []); }catch(e){ return []; } }
   function orgHtml(d){
     var o = d.org, liste = aufbauten();
     var h = '<div class="org"><div class="zeile"><label class="fl">Aufbau aus dem Hallenplaner'+
-      '<select class="feld" data-org="aufbauId" style="min-width:240px"><option value="">– keiner –</option>'+liste.map(function(a){ return '<option value="'+esc(a.id)+'"'+(o.aufbauId === a.id ? ' selected' : '')+'>'+esc(a.name)+'</option>'; }).join('')+'</select></label>'+
+      '<select class="feld" data-org="aufbauId" style="min-width:240px"><option value="">– keiner –</option><optgroup label="Vorlagen">'+VORLAGEN_HP.map(function(v){ return '<option value="'+v.id+'"'+(o.aufbauId === v.id ? ' selected' : '')+'>'+esc(v.n)+'</option>'; }).join('')+'</optgroup><optgroup label="Meine gespeicherten Aufbauten">'+liste.map(function(a){ return '<option value="'+esc(a.id)+'"'+(o.aufbauId === a.id ? ' selected' : '')+'>'+esc(a.name)+'</option>'; }).join('')+'</optgroup></select></label>'+
       '<button class="btn gruen" data-act="bildHolen" type="button"'+(o.aufbauId ? '' : ' disabled')+'>'+(o.bild3d ? '🔄 Bilder aktualisieren' : '🖼️ Bilder holen')+'</button>'+
-      '<a class="btn" style="text-decoration:none" target="_blank" href="../hallenplaner/'+(o.aufbauId ? '?aufbau='+encodeURIComponent(o.aufbauId) : '')+'">🏟️ '+(o.aufbauId ? 'Im Hallenplaner bearbeiten' : 'Neuen Aufbau zeichnen')+'</a></div>'+
-      '<div class="hilfe">'+(liste.length ? 'Gespeicherte Aufbauten stammen aus deinem Hallenplaner in diesem Browser.' : 'Noch kein Aufbau gespeichert: im Hallenplaner zeichnen und unter «💾 Aufbauten» speichern, dann hier wählen.')+
+      '<a class="btn" style="text-decoration:none" target="_blank" href="../hallenplaner/'+hpQuery(o.aufbauId)+'">🏟️ '+(o.aufbauId ? 'Im Hallenplaner bearbeiten' : 'Neuen Aufbau zeichnen')+'</a></div>'+
+      '<div class="hilfe">Die Vorlagen sind fertige Aufbauten pro Sportart. Eigene Aufbauten kommen aus deinem Hallenplaner in diesem Browser (dort unter «💾 Aufbauten» speichern).'+
       ' Nach Änderungen im Hallenplaner unter gleichem Namen speichern und hier «Bilder aktualisieren».</div>';
     if(W.bild[d.id] === 'laedt') h += '<div class="hilfe">⏳ Bilder werden erstellt …</div>';
     if(o.bild3d || o.bild2d){
@@ -213,7 +217,7 @@
     var d = dl(); if(!d || !d.org.aufbauId) return;
     var id = d.id; W.bild[id] = 'laedt'; dlPanel();
     var f = document.createElement('iframe');
-    f.src = '../hallenplaner/?einbett=1&aufbau='+encodeURIComponent(d.org.aufbauId);
+    f.src = '../hallenplaner/'+hpQuery(d.org.aufbauId)+'&einbett=1';
     f.style.cssText = 'position:fixed;left:-12000px;top:0;width:1100px;height:700px;border:0;';
     var fertig = false;
     function ende(){ window.removeEventListener('message', empf); clearTimeout(zeit); setTimeout(function(){ f.remove(); }, 100); }
