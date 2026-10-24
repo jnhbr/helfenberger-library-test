@@ -203,7 +203,7 @@
   }
   function bwahlZeichnen(){
     var d = dl(), ph = d.phasen[wahl.p], def = PHASEN[wahl.p];
-    var liste = (W.daten.daten[wahl.sport] || []).concat(wahl.sport === 'alternativ' ? [] : (W.daten.daten.alternativ || []));
+    var liste = (W.daten.daten[wahl.sport] || []).concat((wahl.sport === 'alternativ' || wahl.sport === 'kleinespiele') ? [] : (W.daten.daten.alternativ || []).concat(W.daten.daten.kleinespiele || []));
     if(wahl.sport === 'alternativ') liste = W.daten.daten.alternativ || [];
     var q = wahl.q.trim().toLowerCase();
     liste = liste.filter(function(i){
@@ -324,7 +324,7 @@
   /* ---------- Ereignisse ---------- */
   function neuDialog(){
     var m = $('modal');
-    m.innerHTML = '<div class="mbox"><h3>Neue Reihe</h3><div class="zeile"><label class="fl">Sportart<select class="feld" id="nSport">'+W.daten.sportarten.map(function(s){ return '<option value="'+s.id+'">'+esc(s.emoji+' '+s.name)+'</option>'; }).join('')+'</select></label>'+
+    m.innerHTML = '<div class="mbox"><h3>Neue Reihe</h3><div class="zeile"><label class="fl">Sportart<select class="feld" id="nSport">'+W.daten.sportarten.filter(function(s){ return s.reihen !== false; }).map(function(s){ return '<option value="'+s.id+'">'+esc(s.emoji+' '+s.name)+'</option>'; }).join('')+'</select></label>'+
       '<label class="fl">Block<select class="feld" id="nAnz"><option value="1">1 DL (Einzellektion)</option><option value="3">3 DL (kurzer Block)</option><option value="5" selected>5 DL (mit Prüfung in DL 5)</option></select></label></div>'+
       '<label class="fl" style="flex-direction:row;align-items:center;gap:6px;margin:6px 0"><input type="checkbox" id="nBsp" checked> mit Beispiel füllen (Bausteine und Tagesziele zum Anpassen)</label>'+
       '<div class="zeile"><button class="btn primaer" id="nOk" type="button">Reihe anlegen</button><button class="btn" id="wZu" type="button">Abbrechen</button></div></div>';
