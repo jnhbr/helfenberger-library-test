@@ -103,7 +103,10 @@
   document.getElementById('navw').innerHTML = P.nav('index.html');
   P.onFav = function(){ if(S.fav) zeichnen(); };
   P.laden().then(function(d){
-    S.sportarten = d.sportarten; S.daten = d.daten; S.sport = S.sportarten[0].id; zeichnen();
+    S.sportarten = d.sportarten; S.daten = d.daten; S.sport = S.sportarten[0].id;
+    var qsp = new URLSearchParams(location.search).get('sport');
+    if(qsp && (qsp === 'alternativ' || S.sportarten.some(function(x){ return x.id === qsp; }))) S.sport = qsp;
+    zeichnen();
   }).catch(function(e){ $('raster').innerHTML = '<div class="leer">Bausteine konnten nicht geladen werden ('+esc(e.message)+').</div>'; });
 })();
 </script>

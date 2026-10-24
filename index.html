@@ -11115,7 +11115,7 @@ function lmvzMerge(){
   var v = state.lmvzV;
   state.folders = state.folders.filter(function(f){ return !f.virtual; });
   state.resources = state.resources.filter(function(r){ return !r.virtual; }).concat(tippVirtuell(state.route.subject))
-    .concat(mtVirtuell(state.route.subject)).concat(kkVirtuell(state.route.subject)).concat(kzmVirtuell(state.route.subject)).concat(svaVirtuell(state.route.subject)).concat(schachVirtuell(state.route.subject)).concat(jassenVirtuell(state.route.subject)).concat(raetselVirtuell(state.route.subject)).concat(hallenplanerVirtuell(state.route.subject)).concat(praepVirtuell(state.route.subject));
+    .concat(mtVirtuell(state.route.subject)).concat(kkVirtuell(state.route.subject)).concat(kzmVirtuell(state.route.subject)).concat(svaVirtuell(state.route.subject)).concat(schachVirtuell(state.route.subject)).concat(jassenVirtuell(state.route.subject)).concat(raetselVirtuell(state.route.subject)).concat(hallenplanerVirtuell(state.route.subject)).concat(praepVirtuell(state.route.subject)).concat(praepOrdnerVirtuell(state.route.subject));
   if(state.route.subject !== LMVZ_SUBJECT) return;
   var sv = sikoreVirtuell();
   state.folders = state.folders.concat(sv.folders);
@@ -13899,13 +13899,35 @@ function raetselVirtuell(subject){
    Aufbauten liegen im Browser (localStorage hallenplaner_v1) und lassen sich als Datei weitergeben. */
 /* 🧱 SPORT-BAUSTEINE – Werkzeug im Fach Sport (nur Lehrperson): statische Seite praep/ im Link-Viewer.
    Bausteinkatalog pro Sportart (3v3-Modell), Daten in praep/daten/*.json (alle LP sehen dieselben, kommen mit dem Deploy). Auswahl im Browser (praep_korb_v1). */
-var PRAEP_VERSION = 8;   // nach jeder Änderung an praep/ erhöhen (Browser-Cache)
+var PRAEP_VERSION = 9;   // nach jeder Änderung an praep/ erhöhen (Browser-Cache)
 function praepVirtuell(subject){
   if(subject !== 'sport' || !(state.profile && state.profile.role === 'teacher')) return [];
   return [{id:'praep-bausteine', subject:'sport', folderId:null, order:-1900, virtual:true, werkzeug:true, linkUrl:'praep/?v='+PRAEP_VERSION, linkLabel:'Werkzeug',
     title:'📋 Sportplaner', meta:'🧱 Bausteine und Kleine Spiele mit Skizzen · 🛠️ Präp-Werkstatt · 🗓️ Jahresplanung 7.–9. Klasse nach LP21 · 🧮 Notenrechner · 🏆 Turnierplan'}];
 }
 var HALLENPLANER_VERSION = 25;   // nach jeder Änderung an hallenplaner/index.html erhöhen (Browser-Cache)
+/* 🧱 Bausteine direkt im passenden Sport-Ordner: pro LP21-Ordner bzw. Sportart-Unterordner eine Kachel «Bausteine …»,
+   die den Sportplaner mit Filter öffnet. Die Ordner werden am Namen erkannt (jede Lehrperson hat ihre eigenen Ordner-IDs). */
+var PRAEP_ORDNER = {'1 laufen, springen, werfen':['leichtathletik','Leichtathletik'], '2 bewegen an geräten':['geraete','Bewegen an Geräten'], '4 spielen':['kleinespiele','Kleine Spiele'],
+  'volleyball':['volleyball','Volleyball'], 'basketball':['basketball','Basketball'], 'fussball':['fussball','Fussball'], 'handball':['handball','Handball'], 'unihockey':['unihockey','Unihockey']};
+function praepOrdnerVirtuell(subject){
+  if(subject !== 'sport' || !(state.profile && state.profile.role === 'teacher')) return [];
+  var out = [], byId = {};
+  (state.folders || []).forEach(function(f){ byId[f.id] = f; });
+  (state.folders || []).forEach(function(f){
+    if(f.virtual || f.subject !== 'sport') return;
+    var nm = String(f.name || '').trim().toLowerCase(), z = PRAEP_ORDNER[nm];
+    if(!z) return;
+    var eltern = f.parentId ? byId[f.parentId] : null;
+    var enm = eltern ? String(eltern.name || '').trim().toLowerCase() : '';
+    var istTop = !f.parentId, istSport = ['volleyball','basketball','fussball','handball','unihockey'].indexOf(nm) >= 0;
+    if(istSport && enm !== '4 spielen') return;
+    if(!istSport && !istTop) return;
+    out.push({id:'praep-ordner-'+f.id, subject:'sport', folderId:f.id, order:-1000, virtual:true, werkzeug:true, linkUrl:'praep/?sport='+z[0]+'&v='+PRAEP_VERSION, linkLabel:'Werkzeug',
+      title:'🧱 Bausteine: '+z[1], meta:'Im 📋 Sportplaner geöffnet · Filter nach Phase und Perspektive · Karten auswählen und drucken'});
+  });
+  return out;
+}
 function hallenplanerVirtuell(subject){
   if(subject !== 'sport' || !(state.profile && state.profile.role === 'teacher')) return [];
   return [{id:'hallenplaner', subject:'sport', folderId:null, order:-2000, virtual:true, werkzeug:true, linkUrl:'hallenplaner/?v='+HALLENPLANER_VERSION, linkLabel:'Werkzeug',
@@ -23660,6 +23682,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-24-bausteine-ordner', datum:'2026-10-24', fuer:'lehrer', text:'🧱 Im Fach Sport liegt in jedem passenden Ordner (Spielen, Bewegen an Geräten, Laufen/Springen/Werfen und bei den Sportarten) eine Kachel «Bausteine …», die den Sportplaner gleich in dieser Kategorie öffnet.'},
   {id:'2026-10-24-sportplaner', datum:'2026-10-24', fuer:'lehrer', text:'📋 Im Fach Sport heisst das Werkzeug mit Bausteinen, Präp-Werkstatt, Jahresplanung, Notenrechner und Turnierplan jetzt «Sportplaner» (neben dem Hallenplaner).'},
   {id:'2026-10-24-sport-planung', datum:'2026-10-24', fuer:'lehrer', text:'🗓️ Sport: Jahresplanung für die 7., 8. und 9. Klasse (deine Planung und ein Vorschlag) mit Abdeckung nach Lehrplan 21; «Reihe anlegen» öffnet die Präp-Werkstatt mit passendem Block. Neu auch der 🧮 Notenrechner (Punkte → Note, Notentabelle, Klassenliste) und der 🏆 Turnierplan (Jeder gegen jeden, Felder, Zeiten, Rangliste) sowie ★ Favoriten bei den Bausteinen.'},
   {id:'2026-10-24-kleine-spiele', datum:'2026-10-24', fuer:'lehrer', text:'🎲 Sport-Bausteine: neu «Kleine Spiele» mit 36 Spielen für Einstieg, Aufwärmen, Spiel und Abschluss (Fang-, Lauf-, Ball-, Kooperations- und Reaktionsspiele), jede mit Skizze, Regeln und Varianten. In der 🛠️ Präp-Werkstatt kannst du sie bei jeder Phase dazunehmen.'},
