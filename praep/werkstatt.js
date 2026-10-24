@@ -271,8 +271,7 @@
     if(ids.length) h += '<section class="seite">'+kopfHtml(r, d, n, 'Bausteine DL '+n)+'<div class="karten2">'+ids.map(function(id){ return P.karteHtml(item(id)); }).join('')+'</div><div class="fuss"><span>'+esc(sportInfo(r.sport).name)+' · Bausteine DL '+n+'</span><span>Sek Altnau</span></div></section>';
     return h;
   }
-  function drucken(alle){
-    var r = reihe(); if(!r) return;
+  function druckHtml(r, alle){
     var h = '';
     if(alle){
       h += '<section class="seite">'+kopfHtml(r, null, 0, r.titel+' – auf einen Blick')+(r.notizen ? '<p>'+esc(r.notizen).replace(/\n/g, '<br>')+'</p>' : '')+
@@ -283,9 +282,14 @@
         }).join('')+'</table><div class="fuss"><span>'+esc(sportInfo(r.sport).name)+' · Reihe</span><span>Sek Altnau</span></div></section>';
       r.dls.forEach(function(d, i){ h += dlSeiten(r, i); });
     } else h = dlSeiten(r, Math.min(W.di, r.dls.length - 1));
-    $('druck').innerHTML = h;
+    return h;
+  }
+  function drucken(alle){
+    var r = reihe(); if(!r) return;
+    $('druck').innerHTML = druckHtml(r, alle);
     setTimeout(function(){ window.print(); }, 80);
   }
+  window.PraepWerkstatt = {W:W, neueReihe:neueReihe, bilderHolen:bilderHolen, druckHtml:druckHtml, schreiben:schreiben, alles:alles};
 
   /* ---------- Datei ---------- */
   function exportieren(){
