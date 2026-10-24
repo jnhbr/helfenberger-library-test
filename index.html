@@ -11115,7 +11115,7 @@ function lmvzMerge(){
   var v = state.lmvzV;
   state.folders = state.folders.filter(function(f){ return !f.virtual; });
   state.resources = state.resources.filter(function(r){ return !r.virtual; }).concat(tippVirtuell(state.route.subject))
-    .concat(mtVirtuell(state.route.subject)).concat(kkVirtuell(state.route.subject)).concat(kzmVirtuell(state.route.subject)).concat(svaVirtuell(state.route.subject)).concat(schachVirtuell(state.route.subject)).concat(jassenVirtuell(state.route.subject)).concat(raetselVirtuell(state.route.subject)).concat(hallenplanerVirtuell(state.route.subject));
+    .concat(mtVirtuell(state.route.subject)).concat(kkVirtuell(state.route.subject)).concat(kzmVirtuell(state.route.subject)).concat(svaVirtuell(state.route.subject)).concat(schachVirtuell(state.route.subject)).concat(jassenVirtuell(state.route.subject)).concat(raetselVirtuell(state.route.subject)).concat(hallenplanerVirtuell(state.route.subject)).concat(praepVirtuell(state.route.subject));
   if(state.route.subject !== LMVZ_SUBJECT) return;
   var sv = sikoreVirtuell();
   state.folders = state.folders.concat(sv.folders);
@@ -13893,6 +13893,14 @@ function raetselVirtuell(subject){
 /* 🏟️ HALLENPLANER – Werkzeug im Fach Sport (nur Lehrperson): statische Seite hallenplaner/ im Link-Viewer (iframe src).
    Grundriss der Dreifachhalle Altnau, Geräte-Baukasten, Materialliste, Druck, 3D (three.js aus assets/vendor). Kein Firestore:
    Aufbauten liegen im Browser (localStorage hallenplaner_v1) und lassen sich als Datei weitergeben. */
+/* 🧱 SPORT-BAUSTEINE – Werkzeug im Fach Sport (nur Lehrperson): statische Seite praep/ im Link-Viewer.
+   Bausteinkatalog pro Sportart (3v3-Modell), Daten in praep/daten/*.json (alle LP sehen dieselben, kommen mit dem Deploy). Auswahl im Browser (praep_korb_v1). */
+var PRAEP_VERSION = 1;   // nach jeder Änderung an praep/ erhöhen (Browser-Cache)
+function praepVirtuell(subject){
+  if(subject !== 'sport' || !(state.profile && state.profile.role === 'teacher')) return [];
+  return [{id:'praep-bausteine', subject:'sport', folderId:null, order:-1900, virtual:true, werkzeug:true, linkUrl:'praep/?v='+PRAEP_VERSION, linkLabel:'Werkzeug',
+    title:'🧱 Sport-Bausteine – Sammlung für Präps', meta:'Volleyball, Basketball, Fussball, Handball, Unihockey · Einstiege, Spielformen, Interventionen, Regelkarten, Beurteilung · filtern, auswählen, drucken im Altnau-Design'}];
+}
 var HALLENPLANER_VERSION = 23;   // nach jeder Änderung an hallenplaner/index.html erhöhen (Browser-Cache)
 function hallenplanerVirtuell(subject){
   if(subject !== 'sport' || !(state.profile && state.profile.role === 'teacher')) return [];
@@ -23648,6 +23656,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-24-sport-bausteine', datum:'2026-10-24', fuer:'lehrer', text:'🧱 Neu im Fach Sport: die Sport-Bausteine. Sammlung für Präps nach dem 3v3-Modell mit Volleyball, Basketball, Fussball, Handball und Unihockey: Einstiege, Spielformen, Interventionen, Regelkarten und Beurteilung. Nach Phase und Halle filtern, Karten auswählen und im Altnau-Design drucken. Dazu die Sport-Ordner nach Lehrplan 21.'},
   {id:'2026-10-24-ordner-waehlen', datum:'2026-10-24', fuer:'lehrer', text:'📂 Im Briefkasten-Dialog gibt es neben dem Abhol-Pfad den Knopf «Ordner wählen…»: Es öffnet sich der Finder, du klickst den Ordner an. (Dienst einmal aktualisieren: bash admin/briefkasten-dienst.sh install)'},
   {id:'2026-10-24-wk7-einklappen', datum:'2026-10-24', fuer:'alle', text:'📘 «Die nächsten 7 Tage» auf der Startseite lässt sich jetzt mit einem Klick auf den Titel ein- und ausklappen (Handy und Computer).'},
   {id:'2026-10-24-sva-abgleich', datum:'2026-10-24', fuer:'alle', text:'🔄 Handy und Laptop bleiben jetzt im Gleichklang: Hast du auf einem Gerät weitergearbeitet, holt das andere den neuen Stand von selbst – und überschreibt ihn nicht mehr mit dem alten.'},
