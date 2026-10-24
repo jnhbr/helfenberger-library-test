@@ -89,13 +89,13 @@
     $('tabs').innerHTML = [7, 8, 9].map(function(k){ return '<button class="tab jahrtab'+(S.jahr === k ? ' an' : '')+'" data-j="'+k+'" type="button">'+k+'. Klasse</button>'; }).join('')+'<span style="width:14px"></span><button class="tab'+(S.plan === 'meine' ? ' an' : '')+'" data-plan="meine" type="button">Deine Planung (Word)</button><button class="tab'+(S.plan === 'vorschlag' ? ' an' : '')+'" data-plan="vorschlag" type="button">Vorschlag (neu)</button><button class="btn" onclick="window.print()" type="button">🖨️ Drucken (A4 quer)</button>';
     var liste = S.plan === 'meine' ? S.daten.jahre : S.daten.vorschlag;
     var j = liste.filter(function(x){ return x.klasse === S.jahr; })[0];
-    $('quelle').innerHTML = S.plan === 'meine' ? '<b>Deine Planung</b> aus den Word-Dateien (_Planung), unverändert übernommen.' : '<b>Vorschlag:</b> gleiche Periodenstruktur und Sonderwochen wie bei dir. Neu: fester Auftritt in Darstellen und Tanzen, Gleiten/Rollen/Fahren, Schwimmen in jedem Jahr, Progression von «Grundlagen» (7.) über «Vertiefen» (8.) zu «selbstständig und mit Rückmeldung» (9.). Die Zeiten orientieren sich an Richtwerten aus Graubünden und der Planungshilfe Basel-Stadt, die Inhalte sind meine Zusammenstellung.';
+    $('quelle').innerHTML = S.plan === 'meine' ? '<b>Deine Planung</b> aus den Word-Dateien (_Planung), unverändert übernommen.' : '<b>Vorschlag:</b> gleiche Periodenstruktur und Sonderwochen wie bei dir. Neu: fester Auftritt in Darstellen und Tanzen, Gleiten/Rollen/Fahren, Schwimmen in jedem Jahr, Progression von «Grundlagen» (7.) über «Vertiefen» (8.) zu «selbstständig und mit Rückmeldung» (9.). Bewegen im Wasser ist kurz gehalten (zwei Wochen) und am Ende des Schuljahres im Sommer eingeplant. Die Zeiten orientieren sich an Richtwerten aus Graubünden und der Planungshilfe Basel-Stadt, die Inhalte sind meine Zusammenstellung.';
     $('abd').innerHTML = abdeckung(j);
     $('jahr').innerHTML = jahrHtml(j);
   }
   document.addEventListener('click', function(e){ var b = e.target.closest('[data-j],[data-plan]'); if(!b) return; if(b.dataset.j) S.jahr = +b.dataset.j; if(b.dataset.plan) S.plan = b.dataset.plan; zeichnen(); });
   $('navw').innerHTML = P.nav('jahresplan.html');
-  Promise.all([P.holen('daten/jahresplan.json?v=1'), P.laden()]).then(function(r){ S.daten = r[0]; S.bst = r[1].sportarten; zeichnen(); })
+  Promise.all([P.holen('daten/jahresplan.json?v=2'), P.laden()]).then(function(r){ S.daten = r[0]; S.bst = r[1].sportarten; zeichnen(); })
     .catch(function(e){ $('jahr').innerHTML = '<p class="leer">Planung konnte nicht geladen werden ('+esc(e.message)+').</p>'; });
 })();
 </script>

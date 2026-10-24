@@ -1572,7 +1572,7 @@
      "vorhaben": [
       {
        "typ": "DL",
-       "wochen": "1–4",
+       "wochen": "1–5",
        "bereich": "Spielen",
        "bereichNr": 4,
        "thema": "Ultimate und Kleine Spiele",
@@ -1594,7 +1594,7 @@
       },
       {
        "typ": "EL",
-       "wochen": "1–4",
+       "wochen": "1–5",
        "bereich": "Gleiten, Rollen, Fahren",
        "bereichNr": 5,
        "thema": "Rollen und Fahren: Inlineskates oder Velo",
@@ -1611,10 +1611,10 @@
       },
       {
        "typ": "DL",
-       "wochen": "5–7",
+       "wochen": "6–7",
        "bereich": "Bewegen im Wasser",
        "bereichNr": 6,
-       "thema": "Brustschwimmen und Tauchen",
+       "thema": "Brustschwimmen und Tauchen (kurz, Sommerblock)",
        "stufen": [
         [
          "BS.6.A.1",
@@ -1632,7 +1632,7 @@
          "Können die Bade- und Tauchregeln einhalten."
         ]
        ],
-       "anlass": "Brusttechnik auf 50 m, Bade- und Tauchregeln",
+       "anlass": "Brusttechnik, Bade- und Tauchregeln, wenn möglich im Sommer",
        "sport": null,
        "gruppen": null
       }
@@ -1657,18 +1657,23 @@
       {
        "typ": "DL",
        "wochen": "1–3",
-       "bereich": "Bewegen im Wasser",
-       "bereichNr": 6,
-       "thema": "Kraul",
+       "bereich": "Bewegen an Geräten",
+       "bereichNr": 2,
+       "thema": "Bodenturnen: Rollen und Sprungrolle",
        "stufen": [
         [
-         "BS.6.A.1",
-         "Schwimmen",
-         "Können wichtige Merkmale einer Wechselschlagtechnik auf einer Strecke von 50 m anwenden."
+         "BS.2.A.1",
+         "Rollen und Drehen",
+         "Können eine Bewegungsfolge zum Rollen und Drehen ausführen."
+        ],
+        [
+         "BS.2.B.1",
+         "Körperspannung",
+         "Können den Körper in Bewegungsabläufen im richtigen Moment anspannen und entspannen."
         ]
        ],
-       "anlass": "Kraul auf 50 m",
-       "sport": null,
+       "anlass": "Grundelemente vor dem Winter",
+       "sport": "geraete",
        "gruppen": null
       },
       {
@@ -2004,7 +2009,7 @@
      "vorhaben": [
       {
        "typ": "DL",
-       "wochen": "1–4",
+       "wochen": "1–5",
        "bereich": "Spielen",
        "bereichNr": 4,
        "thema": "Beachvolleyball",
@@ -2021,7 +2026,7 @@
       },
       {
        "typ": "EL",
-       "wochen": "1–4",
+       "wochen": "1–5",
        "bereich": "Gleiten, Rollen, Fahren",
        "bereichNr": 5,
        "thema": "Gleiten: Eislaufen oder Inlineskates",
@@ -2038,15 +2043,15 @@
       },
       {
        "typ": "DL",
-       "wochen": "5–7",
+       "wochen": "6–7",
        "bereich": "Bewegen im Wasser",
        "bereichNr": 6,
-       "thema": "Brust und Tauchen",
+       "thema": "Schwimmen kurz: Kraul oder Brust, Tauchen (Sommerblock)",
        "stufen": [
         [
          "BS.6.A.1",
          "Schwimmen",
-         "Können die Kernbewegung beim Brustgleichschlag anwenden."
+         "Können wichtige Merkmale einer Wechselschlagtechnik auf einer Strecke von 50 m anwenden."
         ],
         [
          "BS.6.B.1",
@@ -2054,7 +2059,7 @@
          "Können kopfwärts ins tiefe Wasser springen und tiefer als die Körpergrösse abtauchen."
         ]
        ],
-       "anlass": "Streckenschwimmen, evtl. Spielturnier",
+       "anlass": "Technik auf 50 m, evtl. Spielturnier",
        "sport": null,
        "gruppen": null
       }
@@ -2079,28 +2084,23 @@
       {
        "typ": "DL",
        "wochen": "1–3",
-       "bereich": "Bewegen im Wasser",
-       "bereichNr": 6,
-       "thema": "Tauchen, Springen, Sicherheit",
+       "bereich": "Laufen, Springen, Werfen",
+       "bereichNr": 1,
+       "thema": "Sprint und Hürdenlauf",
        "stufen": [
         [
-         "BS.6.B.1",
-         "Ins Wasser springen und Tauchen",
-         "Können kopfwärts ins tiefe Wasser springen und tiefer als die Körpergrösse abtauchen."
+         "BS.1.A.1",
+         "Schnell Laufen",
+         "Können auf den Fussballen schnell und rhythmisch laufen."
         ],
         [
-         "BS.6.B.1",
-         "Ins Wasser springen und Tauchen",
-         "Können verschiedene Sprünge aus unterschiedlicher Höhe ausführen."
-        ],
-        [
-         "BS.6.C.1",
-         "Sicherheit",
-         "Können die Bade- und Tauchregeln einhalten."
+         "BS.1.A.1",
+         "Schnell Laufen",
+         "Können auf den Fussballen schnell und rhythmisch über Hindernisse laufen."
         ]
        ],
-       "anlass": "Rettungs- und Bademassnahmen",
-       "sport": null,
+       "anlass": "Zeit vergleichen, Rückmeldung an Partner",
+       "sport": "leichtathletik",
        "gruppen": null
       },
       {
@@ -2238,18 +2238,18 @@
       {
        "typ": "EL",
        "wochen": "6–8",
-       "bereich": "Laufen, Springen, Werfen",
-       "bereichNr": 1,
-       "thema": "Hürdenlauf",
+       "bereich": "Bewegen an Geräten",
+       "bereichNr": 2,
+       "thema": "Fitness: Kraft und Beweglichkeit",
        "stufen": [
         [
-         "BS.1.A.1",
-         "Schnell Laufen",
-         "Können auf den Fussballen schnell und rhythmisch über Hindernisse laufen."
+         "BS.2.B.1",
+         "Beweglichkeit und Kraft",
+         "Können selbstständig Beweglichkeit und Kraft trainieren."
         ]
        ],
-       "anlass": "",
-       "sport": "leichtathletik",
+       "anlass": "Trainingsplan",
+       "sport": "geraete",
        "gruppen": null
       }
      ],
@@ -2441,7 +2441,7 @@
      "vorhaben": [
       {
        "typ": "DL",
-       "wochen": "1–4",
+       "wochen": "1–5",
        "bereich": "Spielen",
        "bereichNr": 4,
        "thema": "Beachvolleyball und Spielideen",
@@ -2463,7 +2463,7 @@
       },
       {
        "typ": "EL",
-       "wochen": "1–4",
+       "wochen": "1–5",
        "bereich": "Spielen",
        "bereichNr": 4,
        "thema": "Vorbereitung Schulabschlussfeier",
@@ -2474,10 +2474,10 @@
       },
       {
        "typ": "DL",
-       "wochen": "5–7",
+       "wochen": "6–7",
        "bereich": "Bewegen im Wasser",
        "bereichNr": 6,
-       "thema": "Streckenschwimmen und Springen",
+       "thema": "Schwimmen kurz: Strecke, Springen, Sicherheit (Sommerblock)",
        "stufen": [
         [
          "BS.6.A.1",
@@ -2488,9 +2488,14 @@
          "BS.6.B.1",
          "Ins Wasser springen und Tauchen",
          "Können verschiedene Sprünge aus unterschiedlicher Höhe ausführen."
+        ],
+        [
+         "BS.6.C.1",
+         "Sicherheit",
+         "Können die Bade- und Tauchregeln einhalten."
         ]
        ],
-       "anlass": "100 m Strecke, evtl. Spielturnier",
+       "anlass": "Strecke schwimmen, Bade- und Rettungsregeln, evtl. Spielturnier",
        "sport": null,
        "gruppen": null
       }
