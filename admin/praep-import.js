@@ -50,7 +50,7 @@ function chunks(str, maxBytes){
     const html = fs.readFileSync(path.join(pfad, f), 'utf8');
     const bytes = Buffer.byteLength(html, 'utf8'); if(bytes > MAX_RESOURCE_BYTES) throw new Error(f + ' zu gross');
     const titel = (/<title>([^<]+)<\/title>/.exec(html) || [0, f])[1];
-    const sp = f.split('_')[0], ziel = unter(sp);
+    const sp = arg('unter') || f.split('_')[0], ziel = unter(sp);
     const alt = rs.find(r => r.folderId === ziel.id && String(r.title).trim() === titel);
     plan.push({ f, html, bytes, titel, ziel, alt });
     console.log('  ' + (alt ? '↻ ersetzt ' : '＋ neu     ') + sp + ' › ' + titel + '  (' + Math.round(bytes / 1024) + ' KB)');
