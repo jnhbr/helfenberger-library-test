@@ -46636,15 +46636,21 @@ var STP_TERMIN_BILDER = [
   ['zeugnis', /zeugnis|beurteilung|notenschluss/], ['schnuppern', /schnupper|berufs|praktikum|lehrstelle/], ['auftritt', /konzert|theater|auffuehrung|auftritt|musical|zirkus/],
   ['feier', /weihnacht|chlaus|advent|feier|fest\b|abschluss|entlassung|apero/], ['fasnacht', /fasnacht|verkleid|fasching/], ['putztag', /putz|aufraeum|raeumen|clean/],
   ['arzt', /arzt|zahn|impf|schulaerzt|schulpsych/], ['foto', /foto/], ['hospitation', /hospitation|unterrichtsbesuch|inspektion|evaluation/],
-  ['offene-tuer', /offene tuer|tag der offenen|schnuppertag|infotag/], ['ausfall', /ausfall|krank|vertretung|abwesen/]
+  ['offene-tuer', /offene tuer|tag der offenen|schnuppertag|infotag/], ['ausfall', /ausfall|krank|vertretung|abwesen/],
+  ['feiertag', /feiertag|ostern|auffahrt|pfingst|1\. august|bundesfeier|karfreitag|neujahr|berchtold/], ['brueckentag', /bruecke|unterrichtsfrei|schulfrei|schule aus|keine schule/],
+  ['klassenrat', /klassenrat|schuelerrat|klassenstunde|klassenlehrer|\bkl\b|wahlen|abstimmung/], ['lesung', /lesung|lesenacht|bibliothek|buch|vorlese|autor|lesen/],
+  ['wettbewerb', /wettbewerb|olympiade|kaenguru|quiz|schnitzeljagd|rallye|meisterschaft/], ['gesundheit', /gesundheit|praevention|erste hilfe|sucht|aufklaerung|zahnpflege|ernaehrung/],
+  ['praesentation', /praesentation|vortrag|abschlussarbeit|ausstellung|vernissage|projektpraesent|referat/], ['geburtstag', /geburtstag|jubilaeum|verabschied|pensionierung|willkommen/],
+  ['medien', /medien|handy|cyber|internet|computer|digital/], ['teamanlass', /team|kollegium|personal|hock|abendessen|ausflug lp/]
 ];
+var STP_TERMIN_STANDARD = 'assets/termine/termin.webp';   // alles ohne Stichwort-Treffer
 var stpBilderFehlt = {};
 function stpTerminBild(text){
   var t = String(text || '').toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss');
   for(var i = 0; i < STP_TERMIN_BILDER.length; i++){
-    if(STP_TERMIN_BILDER[i][1].test(t)){ var src = STP_TERMIN_BILDER[i][2] || 'assets/termine/'+STP_TERMIN_BILDER[i][0]+'.webp'; return stpBilderFehlt[src] ? null : src; }
+    if(STP_TERMIN_BILDER[i][1].test(t)){ var src = STP_TERMIN_BILDER[i][2] || 'assets/termine/'+STP_TERMIN_BILDER[i][0]+'.webp'; if(!stpBilderFehlt[src]) return src; break; }
   }
-  return null;
+  return stpBilderFehlt[STP_TERMIN_STANDARD] ? null : STP_TERMIN_STANDARD;
 }
 var STP_FERIEN_BILDER = { 'Sportferien':'sport', 'Frühlingsferien':'fruehling', 'Pfingstferien':'pfingsten', 'Sommerferien':'sommer', 'Herbstferien':'herbst', 'Weihnachtsferien':'weihnachten' };
 // Ferien-Symbol: Bildchen, bei fehlender Datei das Emoji.
