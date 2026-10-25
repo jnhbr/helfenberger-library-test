@@ -268,6 +268,7 @@
   body.wackeln .subject-card:active{transform:none;}
   @media (prefers-reduced-motion: reduce){ .subject-card:active,.subject-card.gedrueckt{transform:none;} }
   .subject-meta{font-size:12.5px;color:var(--text-muted);}
+  .subject-meta:empty{display:none;}
   .subject-bar{height:7px;border-radius:99px;background:var(--surface-2);overflow:hidden;}
   .subject-bar span{display:block;height:100%;border-radius:99px;transition:width .4s ease;}
 
@@ -10789,8 +10790,7 @@ function renderHome(){
     html += '<div class="subject-visual" style="background:'+s.soft+';">'+s.icon+'</div>';
     html += '<div class="subject-card-body">';
     html += '<h3>'+s.name+'</h3>';
-    html += '<div class="subject-meta" id="meta-'+s.id+'">wird geladen …</div>';
-    html += '<div class="subject-bar"><span id="bar-'+s.id+'" style="width:0%;background:'+s.color+'"></span></div>';
+    html += '<div class="subject-meta" id="meta-'+s.id+'"></div>';
     html += '</div>';
     html += '</button>';
   });
@@ -10896,14 +10896,12 @@ function paintSubjectsOverview(){
 }
 function paintSubjectOverview(subjectId, eigene){
   var metaEl = document.getElementById('meta-'+subjectId);
-  var barEl = document.getElementById('bar-'+subjectId);
-  if(!metaEl || !barEl) return; // navigated away
+  if(!metaEl) return; // navigated away
   function zeigen(count, neuBei){
-    metaEl.textContent = (count===0 ? 'Noch keine Übung' : (count+' Übung'+(count===1?'':'en'))) +
-      (neuBei.length ? ' · 🆕 neu bei '+neuBei.join(', ') : '');
+    // Anzahl wird nicht mehr gezeigt (schlankere Kachel); nur der Hinweis «neu bei …» bleibt.
+    metaEl.textContent = neuBei.length ? '🆕 neu bei '+neuBei.join(', ') : '';
   }
   zeigen(eigene.length, []);
-  barEl.style.width = '0%';
   // 👥 Schüler:innen: Übungen der Gruppen-Lehrpersonen mitzählen (wie auf der Fachseite).
   fachQuellen(subjectId).then(function(fq){
     if(!fq.fremd.length) return;
