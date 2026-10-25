@@ -46628,7 +46628,7 @@ function stpPlanRoh(ansicht){
 // Gewählt wird nach Stichwort im Titel (ohne Umlaute, Kleinschreibung); fehlt die Datei, bleibt der Punkt bzw. das Emoji.
 var STP_TERMIN_BILDER = [
   ['jahrmarkt', /jahrmarkt|markt/], ['elternabend', /elternabend|elternanlass|infoabend/], ['elterngespraech', /eltern|standortgespr|gespraech|lernbericht/],
-  ['weiterbildung', /weiterbild|fortbild|\bwb\b|\bkurs\b|tagung/], ['sva', /\bsva\b|arbeitstag/], ['konvent', /konvent|sitzung|konferenz|teamtag|schilf/],
+  ['weiterbildung', /weiterbild|fortbild|\bwb\b|\bkurs\b|tagung/], ['sva', /\bsva\b|arbeitstag/, 'assets/subject-sva.webp'], ['konvent', /konvent|sitzung|konferenz|teamtag|schilf/],
   ['sporttag', /sporttag|sportnachmittag|turnier|sportanlass|spieltag|schwimm/], ['schulreise', /schulreise|reise|ausflug/], ['exkursion', /exkursion|wanderung|besuch|museum|betriebs/],
   ['lager', /lager|skitag|schneesport/], ['projektwoche', /projekt/], ['pruefung', /pruefung|\btest\b|lernkontrolle|\blk\b|\bprobe\b/],
   ['zeugnis', /zeugnis|beurteilung|notenschluss/], ['schnuppern', /schnupper|berufs|praktikum|lehrstelle/], ['auftritt', /konzert|theater|auffuehrung|auftritt|musical|zirkus/],
@@ -46640,7 +46640,7 @@ var stpBilderFehlt = {};
 function stpTerminBild(text){
   var t = String(text || '').toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss');
   for(var i = 0; i < STP_TERMIN_BILDER.length; i++){
-    if(STP_TERMIN_BILDER[i][1].test(t)){ var src = 'assets/termine/'+STP_TERMIN_BILDER[i][0]+'.webp'; return stpBilderFehlt[src] ? null : src; }
+    if(STP_TERMIN_BILDER[i][1].test(t)){ var src = STP_TERMIN_BILDER[i][2] || 'assets/termine/'+STP_TERMIN_BILDER[i][0]+'.webp'; return stpBilderFehlt[src] ? null : src; }
   }
   return null;
 }
