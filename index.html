@@ -621,6 +621,12 @@
   .eb-leiste{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin-bottom:12px;}
   .eb-feld{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;}
   .eb-feld select{width:auto;max-width:100%;}
+  /* Auswahlfelder und Eingaben der Earlybird-Seite im Stil der Library (statt Browser-Standard) */
+  .eb-leiste select, .eb-card select{appearance:none;-webkit-appearance:none;font:inherit;font-weight:700;font-size:14px;color:var(--text);cursor:pointer;
+    background:var(--surface) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%237C8494' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>") no-repeat right 12px center;
+    border:2px solid var(--kontur, var(--border));border-radius:10px;padding:8px 36px 8px 12px;min-height:40px;box-shadow:0 3px 0 var(--kontur, transparent);}
+  .eb-auftrag{font:inherit;font-size:13.5px;color:var(--text);background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:8px 12px;}
+  .eb-leiste select:focus-visible, .eb-card select:focus-visible, .eb-auftrag:focus-visible{outline:2px solid var(--gelb, #FEEB15);outline-offset:2px;border-color:var(--kontur, var(--brand));}
   .eb-zahl{color:var(--text-muted);font-size:14px;font-weight:600;margin-right:auto;}
   .eb-von{color:var(--text-muted);}
   .submission-list.eb-liste{max-height:none;overflow:visible;align-items:start;}
