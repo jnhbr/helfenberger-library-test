@@ -584,7 +584,8 @@
   .cal-entry{border-left-width:8px;background:linear-gradient(100deg, color-mix(in srgb, var(--cal-c, var(--brand)) 13%, var(--surface)), var(--surface) 55%);}
   .bild-icon{object-fit:contain;vertical-align:middle;}
   .kz-tile-icon .bild-icon{display:block;}
-  /* Seitenleiste: Bildsymbole ohne Untergrund (Versuch 25.10.); Strichsymbole-Variante siehe Commit 1e524a9 */
+  /* auf dunkler Seitenleiste ein heller Untergrund, damit die dunkle Kontur lesbar bleibt */
+  :root[data-design="neu"] .topbar .bild-icon{background:#fff;border-radius:8px;padding:2px;box-sizing:border-box;}
   .cal-entry-type{display:inline-flex;align-items:center;gap:6px;}
   .cal-list-past{opacity:.6;}
   .cal-past-details summary{cursor:pointer;font-weight:700;font-size:15px;padding:8px 0;list-style:none;}
