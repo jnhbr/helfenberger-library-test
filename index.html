@@ -3560,27 +3560,31 @@
   }
 
   /* 📅 Schlankerer Stundenplan (25.10.2026): weniger Farbe, weniger Text, ruhige Zellen. Nur im neuen Design. */
-  :root[data-design="neu"] .stp-board.stp-board{border:1px solid var(--border);box-shadow:none;padding:14px;}
-  :root[data-design="neu"] .stp-tag{background:var(--surface-2);color:var(--text);box-shadow:none;}
+  :root[data-design="neu"] .stp-board.stp-board{background:transparent;border:none;box-shadow:none;padding:0;}
+  :root[data-design="neu"] .stp-tag{background:var(--surface);color:var(--text);box-shadow:none;}
   :root[data-design="neu"] .stp-tag small{opacity:.7;}
   :root[data-design="neu"] .stp-tag.heute{background:var(--gelb);color:#1D1D1B;}
-  :root[data-design="neu"] .stp-zeit{background:transparent;padding:0;}
+  :root[data-design="neu"] .stp-zeit{background:var(--surface);padding:4px 2px;}
   :root[data-design="neu"] .stp-zeit b{font-size:14px;}
   :root[data-design="neu"] .stp-pause{font-weight:600;}
-  :root[data-design="neu"] .stp-cell{background:var(--surface);border:1px solid var(--border);border-left:5px solid var(--c);box-shadow:none;min-height:56px;}
+  :root[data-design="neu"] .stp-cell{background:color-mix(in srgb, var(--c) 17%, var(--surface));border:1px solid color-mix(in srgb, var(--c) 35%, var(--surface));border-left:5px solid var(--c);box-shadow:none;min-height:56px;}
   :root[data-design="neu"] .stp-cell.link:hover, :root[data-design="neu"] .stp-cell.edit:hover{transform:none;box-shadow:0 0 0 2px var(--c);}
   :root[data-design="neu"] .stp-name{color:var(--text);}
   :root[data-design="neu"] .stp-img{width:24px;height:24px;border-radius:6px;}
-  :root[data-design="neu"] .stp-cell.leer{border:none;background:color-mix(in srgb, var(--surface-2) 55%, transparent);}
+  :root[data-design="neu"] .stp-cell.leer{border:none;background:color-mix(in srgb, var(--surface) 45%, transparent);}
   :root[data-design="neu"] .stp-cell.leer.edit{border:1.5px dashed var(--border);background:transparent;}
   :root[data-design="neu"] .stp-cell.termin{outline:none;}
-  :root[data-design="neu"] .stp-cell.jetzt{background:color-mix(in srgb, var(--c) 18%, var(--surface));box-shadow:0 0 0 3px var(--c);animation:none;}
+  :root[data-design="neu"] .stp-cell.jetzt{background:color-mix(in srgb, var(--c) 34%, var(--surface));box-shadow:0 0 0 3px var(--c);animation:none;}
   :root[data-design="neu"] .stp-cell:not(.edit) .stp-eigen-tag:not(.stp-pin){display:none;}
   .stp-slot2{grid-row:span 2;}
   .stp-mehr{left:auto;right:0;min-width:300px;}
   .stp-lpwahl-l{display:flex;flex-direction:column;gap:6px;padding:8px;font-weight:700;font-size:13px;}
   .stp-lpwahl-l select{margin:0;width:100%;}
-  @media (max-width:600px){ :root[data-design="neu"] .stp-board.stp-board{border-width:1px;box-shadow:none;border-radius:12px;padding:10px;} }
+  @media (max-width:600px){ :root[data-design="neu"] .stp-board.stp-board{background:transparent;border:none;box-shadow:none;border-radius:0;padding:0;} }
+  /* Texte, die ohne weisse Tafel direkt auf dem Hintergrund stehen, bekommen einen eigenen Untergrund */
+  :root[data-design="neu"] .stp-woche-txt, :root[data-design="neu"] .stp-titel{background:var(--surface);border-radius:12px;padding:4px 14px;}
+  :root[data-design="neu"] .stp-pause span{background:var(--surface);border-radius:999px;padding:1px 12px;}
+  .page-welcome .bild-icon, h2 .bild-icon{vertical-align:middle;margin-right:4px;}
 </style>
 <script>if(/-test\//.test(location.pathname))document.documentElement.classList.add('test-site');</script>
 </head>
@@ -6215,7 +6219,7 @@ function renderKalender(){
   clearSubjectWatchers(); clearOverviewWatchers(); unwatchAllProgress();
   var isTeacher = state.profile.role === 'teacher';
   var html = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn">&larr; Start</button></div>';
-  html += '<h2>📅 Kalender</h2>';
+  html += '<h2>'+bildIconHtml('nav-kalender','📅',34)+' Kalender</h2>';
   html += '<div class="back-row"><button class="btn btn-primary btn-sm" id="calNewBtn" type="button">'+(isTeacher ? '+ Neuer Eintrag' : '+ Eigene Hausaufgabe eintragen')+'</button>'+
     (isTeacher && !isLeitung() ? '<button class="btn btn-ghost btn-sm" id="calGruppenBtn" type="button">👥 Gruppen</button>' : '')+
     '<button class="btn btn-ghost btn-sm" id="calIcsBtn" type="button" title="Termine als Kalenderdatei herunterladen">📅 In meinen Kalender</button></div>';
@@ -6375,7 +6379,7 @@ function renderEarlybird(){
   ebState.klasse = earlybirdStartKlasse();
   var heute = todayStr();
   var html = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn">&larr; Start</button></div>';
-  html += '<h2>🐦 Earlybird</h2>';
+  html += '<h2>'+bildIconHtml('kal-earlybird','🐦',34)+' Earlybird</h2>';
   html += '<p class="eb-sub">Mittwochmorgen, '+EARLYBIRD_ZEIT+' Uhr – für Schüler:innen mit zu vielen Einträgen.</p>';
   html += '<div class="eb-leiste"><label class="eb-feld"><span>Termin</span><select id="ebDatum">'+EARLYBIRD_DATEN.map(function(d){
     var nr = kommend.indexOf(d);
@@ -6662,7 +6666,7 @@ function renderRaeume(){
   clearSubjectWatchers(); clearOverviewWatchers(); unwatchAllProgress();
   if(state.profile.role !== 'teacher'){ goHome(); return; }
   var html = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; '+(rbu.von === 'stundenplan' ? 'Stundenplan' : 'Klassenzimmer')+'</button></div>';
-  html += '<h2 class="page-welcome" style="margin-bottom:6px;">🚪 Räume</h2>';
+  html += '<h2 class="page-welcome" style="margin-bottom:6px;">'+bildIconHtml('kz-raeume','🚪',40)+' Räume</h2>';
   html += '<p class="eb-sub">Freie Räume finden und reservieren – die feste Belegung kommt aus dem Untis-Stundenplan.</p>';
   html += '<div class="eb-leiste"><div class="stp-tabs">'+
     '<button type="button" class="stp-tab'+(rbu.tab === 'frei' ? ' on' : '')+'" data-rbu-tab="frei">🔎 Was ist frei?</button>'+
@@ -8151,7 +8155,7 @@ function lsMalen(){
 function renderLernstandUebersicht(){
   clearSubjectWatchers(); clearOverviewWatchers(); unwatchAllProgress();
   var html = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn">&larr; Start</button></div>';
-  html += '<h2>📈 Lernstand-Übersicht</h2>';
+  html += '<h2>'+bildIconHtml('nav-lernstand','📈',34)+' Lernstand-Übersicht</h2>';
   html += '<p class="muted" style="margin:-6px 0 14px;">Nach Fach und Ordner, wie in der Fachansicht: aufklappen, bis du bei der Übung bist – oder oben suchen. „↺" = wie oft zurückgesetzt, mit dem jeweiligen Stand unmittelbar davor. „⏱" = wie lange die Übung schon offen war (nur aktive Zeit, kein Hintergrund-Tab). Nur für dich sichtbar.</p>';
   html += '<div id="lernstandBody"><div class="empty-state">Wird geladen …</div></div>';
   renderChrome(html);
@@ -17797,7 +17801,7 @@ function renderFiguren(){
   var akt = FIG_SEITEN.find(function(x){ return x.id === lsGet('libfig_seite'); }) || FIG_SEITEN[0];
   var html = '<div class="viewer-wrap">';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
-  html += '<div class="viewer-head"><h2>📐 Figuren-Werkstatt</h2>';
+  html += '<div class="viewer-head"><h2>'+bildIconHtml('kz-figuren','📐',32)+' Figuren-Werkstatt</h2>';
   html += FIG_SEITEN.map(function(x){ return '<button class="btn '+(x === akt ? 'btn-primary' : 'btn-ghost')+' btn-sm" type="button" data-figseite="'+x.id+'">'+x.name+'</button>'; }).join(' ');
   html += '<a class="btn btn-ghost btn-sm" href="'+esc(akt.url)+'" target="_blank" rel="noopener">↗ Neuer Tab</a>';
   html += '<button class="btn btn-ghost btn-sm btn-fs" id="fsBtn" type="button">'+FS_ICON_ENTER+'</button>';
@@ -21540,7 +21544,7 @@ function renderSitzplan(){
   clearOverviewWatchers();
   var html = '';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
-  html += '<h2 class="page-welcome" style="margin-bottom:10px;">🪑 Sitzplan</h2>';
+  html += '<h2 class="page-welcome" style="margin-bottom:10px;">'+bildIconHtml('kz-sitzplan','🪑',40)+' Sitzplan</h2>';
   html += '<div id="spHost"><div class="empty-state">Wird geladen …</div></div>';
   renderChrome(html);
   document.getElementById('backBtn').addEventListener('click', function(){
@@ -22671,7 +22675,7 @@ function renderQuizVerwaltung(){
   clearSubjectWatchers(); clearOverviewWatchers();
   var html = '';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
-  html += '<h2 class="page-welcome" style="margin-bottom:10px;">🎮 Klassen-Quiz</h2>';
+  html += '<h2 class="page-welcome" style="margin-bottom:10px;">'+bildIconHtml('kz-quiz','🎮',40)+' Klassen-Quiz</h2>';
   html += '<div class="back-row"><button class="btn btn-primary btn-sm" id="qzNew" type="button">➕ Neues Quiz</button>'
         + '<button class="btn btn-ghost btn-sm" id="qzImport" type="button">📋 Aus Text erstellen</button>'
         + '<button class="btn btn-ghost btn-sm" id="qzDatei" type="button" title="Kahoot, Blooket, Quizlet, Moodle, Canvas …">📥 Datei importieren (Kahoot …)</button>'
@@ -24633,7 +24637,7 @@ function renderAemtliplan(){
   clearSubjectWatchers(); clearOverviewWatchers();
   var html = '';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
-  html += '<h2 class="page-welcome" style="margin-bottom:6px;">🧹 Ämtliplan</h2>';
+  html += '<h2 class="page-welcome" style="margin-bottom:6px;">'+bildIconHtml('nav-aemtli','🧹',40)+' Ämtliplan</h2>';
   html += '<div id="amBody"><div class="empty-state">🧹 Ämtliplan wird geladen …</div></div>';
   renderChrome(html);
   document.getElementById('backBtn').addEventListener('click', function(){
@@ -25772,7 +25776,7 @@ function mioAusText(raw){
 function renderMioVerwaltung(){
   clearSubjectWatchers(); clearOverviewWatchers();
   var html = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
-  html += '<h2 class="page-welcome" style="margin-bottom:6px;">💰 Wer wird Millionär</h2>';
+  html += '<h2 class="page-welcome" style="margin-bottom:6px;">'+bildIconHtml('kz-million','💰',40)+' Wer wird Millionär</h2>';
   html += '<p class="kz-intro">Die Klasse spielt gemeinsam: Frage am Beamer, alle stimmen still auf dem eigenen Gerät ab, die Mehrheit entscheidet. '+
     'Bei Gleichstand gibt es eine Stichwahl unter den meistgewählten Antworten – steht es dann immer noch gleich, bekommt ein zufällig gezogenes Kind das Veto und entscheidet allein.</p>';
   html += '<div class="back-row" style="flex-wrap:wrap;"><button class="btn btn-primary btn-sm" id="mioNeu" type="button">➕ Neues Set</button>'+
@@ -29232,7 +29236,7 @@ function vgRows(){
 function renderVergessen(){
   clearSubjectWatchers(); clearOverviewWatchers();
   var html = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
-  html += '<h2 class="page-welcome" style="margin-bottom:6px;">📋 Vergessen-Zähler</h2>';
+  html += '<h2 class="page-welcome" style="margin-bottom:6px;">'+bildIconHtml('kz-vergessen','📋',40)+' Vergessen-Zähler</h2>';
   html += '<div id="vgBody"><div class="empty-state">Wird geladen …</div></div>';
   renderChrome(html);
   document.getElementById('backBtn').addEventListener('click', function(){ state.route = {name:'klassenzimmer'}; render(); });
@@ -29928,7 +29932,7 @@ function renderEnergizer(){
   clearSubjectWatchers(); clearOverviewWatchers();
   var html = '';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
-  html += '<h2 class="page-welcome" style="margin-bottom:6px;">⚡ Energizer</h2>';
+  html += '<h2 class="page-welcome" style="margin-bottom:6px;">'+bildIconHtml('kz-energizer','⚡',40)+' Energizer</h2>';
   html += '<p class="kz-intro">'+ENERGIZER.length+' Aktivierungsspiele für zwischendurch. Antippen zeigt das Spiel gross am Beamer – mit Timer und, wo es passt, einem eingebauten Spielhelfer.</p>';
   html += '<div class="en-tools">';
   html += '<button class="btn btn-primary" id="enZufall" type="button" title="Zieht ein Spiel passend zu den Filtern – bevorzugt eines, das diese Klasse länger nicht gespielt hat">🎲 Zufalls-Energizer</button>';
@@ -31171,7 +31175,7 @@ function renderKlassenzimmer(){
   aemtliLoad();   // eine Kachel weiter wird er gebraucht — bis dahin ist er da
   var html = '';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Startseite</button></div>';
-  html += '<h2 class="page-welcome" style="margin-bottom:6px;">🏫 Klassenzimmer</h2>';
+  html += '<h2 class="page-welcome" style="margin-bottom:6px;">'+bildIconHtml('nav-klassenzimmer','🏫',40)+' Klassenzimmer</h2>';
   html += '<p class="kz-intro">Werkzeuge für den Unterricht — nur für dich sichtbar. '+
     '<button class="btn btn-ghost btn-sm" id="kzAnordnenBtn" type="button" title="Werkzeuge verschieben oder ausblenden (oder lange auf eine Kachel drücken) – nochmals klicken beendet das Anordnen">✏️ Anordnen</button> '+
     '<button class="btn btn-ghost btn-sm anordnen-widgets" id="kzAnordnenWidgetsBtn" type="button" title="Ausgeblendetes zurückholen">🧩 Widgets</button>'+
@@ -31601,7 +31605,7 @@ function kzmVorlagenListeHtml(typ){
 function renderKzMaterial(){
   clearSubjectWatchers(); clearOverviewWatchers();
   var html = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
-  html += '<h2 class="page-welcome" style="margin-bottom:6px;">🗃️ Unterrichtsmaterial</h2>';
+  html += '<h2 class="page-welcome" style="margin-bottom:6px;">'+bildIconHtml('kz-material','🗃️',40)+' Unterrichtsmaterial</h2>';
   html += '<p class="kz-intro">Quizze, Millionär-Sets, Karteikarten, Wortwolken und Blitzumfragen – nach Fach und in denselben Ordnern wie die Übungen. Was hier in einem Ordner liegt, findest du auch direkt im Fach.</p>';
   html += '<div id="kzmBox"><div class="empty-state">Wird geladen …</div></div>';
   renderChrome(html);
@@ -32024,7 +32028,7 @@ function renderTools(){
   clearSubjectWatchers(); clearOverviewWatchers();
   var html = '';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Startseite</button></div>';
-  html += '<h2 class="page-welcome" style="margin-bottom:6px;">🧰 Tools</h2>';
+  html += '<h2 class="page-welcome" style="margin-bottom:6px;">'+bildIconHtml('nav-tools','🧰',40)+' Tools</h2>';
   html += '<p class="kz-intro">Alles passiert direkt auf deinem Gerät — deine Dateien werden nirgends hochgeladen.</p>';
   html += '<div class="kz-tiles">';
   TOOLS_TILES.forEach(function(t){
@@ -36456,7 +36460,7 @@ function renderPruefungen(){
   clearSubjectWatchers(); clearOverviewWatchers();
   var html = '';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
-  html += '<h2 class="page-welcome" style="margin-bottom:6px;">📝 Prüfungen</h2>';
+  html += '<h2 class="page-welcome" style="margin-bottom:6px;">'+bildIconHtml('kal-pruefung','📝',40)+' Prüfungen</h2>';
   html += '<p class="kz-intro">Online-Prüfung aus einer Übung (auch aus der ✍️ Rechtschreib-Werkstatt), aus einem ⚡ Übungstrainer, aus 🧮 SIKORE, als ⌨️ Abschreibprüfung oder 📥 importiert aus der Prüfungsdatei einer Papierprüfung — die Art wählst du in «➕ Neue Prüfung». Dort stellst du auch ein, für welche Klasse und für wen (ganze Klasse oder eine 👥 Gruppe) die Prüfung ist. Wer die Prüfung verlässt, wird gesperrt, bis du entsperrst.</p>';
   html += '<div class="back-row"><button class="btn btn-primary btn-sm" id="prNeu" type="button">➕ Neue Prüfung</button></div>';
   html += '<div id="prListe"><div class="empty-state">Wird geladen …</div></div>';
@@ -47092,7 +47096,7 @@ function renderStundenplan(){
   var lehrer = state.profile.role === 'teacher';
   if(!stp.ansicht || (!lehrer && stp.ansicht !== 'mein')) stp.ansicht = 'mein';
   var html = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn">&larr; Start</button></div>';
-  html += '<h2 class="page-welcome">🗓️ Stundenplan</h2>';
+  html += '<h2 class="page-welcome">'+bildIconHtml('nav-stundenplan','🗓️',40)+' Stundenplan</h2>';
   html += '<div id="stpBody"><div class="empty-state">Wird geladen …</div></div>';
   renderChrome(html);
   document.getElementById('backBtn').addEventListener('click', function(){ stp.bearbeiten = false; goHome(); });
@@ -47226,8 +47230,8 @@ function stpZeichnen(){
   function pause(j){
     if(j === 0) return '';
     var gap = stpMin(zeilen[j].von) - stpMin(zeilen[j-1].bis);
-    if(gap >= 40) return '<div class="stp-pause mittag">Mittag</div>';
-    if(gap >= 15) return '<div class="stp-pause">Pause</div>';
+    if(gap >= 40) return '<div class="stp-pause mittag"><span>Mittag</span></div>';
+    if(gap >= 15) return '<div class="stp-pause"><span>Pause</span></div>';
     return '';
   }
   function zeit(z, z2){ return '<div class="stp-zeit'+(z.extra?' extra':'')+'"'+(z.extra?' title="Zusatzlektion"':'')+'><b>'+z.nr+(z2 ? '–'+z2.nr : '')+'</b><span>'+esc(z.von)+'</span><span>'+esc((z2 || z).bis)+'</span></div>'; }
