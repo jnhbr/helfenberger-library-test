@@ -262,11 +262,6 @@
   .subject-card h3{font-size:18px;}
   /* iOS-Safari färbt Button-Text sonst systemblau – Fachnamen immer in Textfarbe */
   .subject-card, .subject-card h3{color:var(--text);}
-  /* 🎨 Fachfarbe: Farbkante links, leichter Farbverlauf, Fachname in Fachfarbe */
-  .subject-card{--fach:var(--brand);border-left:6px solid var(--fach);border-color:color-mix(in srgb, var(--fach) 32%, var(--border));border-left-color:var(--fach);
-    background:linear-gradient(135deg, color-mix(in srgb, var(--fach) 15%, var(--surface)), color-mix(in srgb, var(--fach) 5%, var(--surface)));}
-  .subject-card h3{color:color-mix(in srgb, var(--fach) 72%, var(--text));}
-  :root[data-design="neu"] .subject-card{border-left-width:8px;border-color:var(--kontur);border-left-color:var(--fach);}
   /* ✨ Bewegung beim Anklicken: Kachel sinkt wie eine Taste ein */
   .subject-card:active,.subject-card.gedrueckt{transform:translateY(3px) scale(.985);box-shadow:0 3px 8px -6px rgba(20,20,40,.35);transition-duration:.07s;}
   :root[data-design="neu"] .subject-card:active,:root[data-design="neu"] .subject-card.gedrueckt{transform:translateY(5px);box-shadow:0 1px 0 var(--fach, var(--kontur));}
@@ -23690,7 +23685,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-10-25-fachfarbe', datum:'2026-10-25', fuer:'alle', text:'🎨 Die Fach-Kacheln tragen jetzt die Farbe ihres Fachs, und die Übungsanzahl ist weg – es bleibt übersichtlicher. Termine und Ferien im Stundenplan bekommen nach und nach eigene Bildchen.'},
+  {id:'2026-10-25-fachfarbe', datum:'2026-10-25', fuer:'alle', text:'🧹 Auf den Fach-Kacheln steht die Übungsanzahl nicht mehr – es bleibt übersichtlicher. Termine und Ferien im Stundenplan haben jetzt eigene Bildchen.'},
   {id:'2026-10-25-weniger-knoepfe', datum:'2026-10-25', fuer:'lehrer', text:'🧹 Weniger Knöpfe bei den Übungen: Sichtbar bleiben «Öffnen» und «Als aktuell markieren». Zuweisen, Nur Lehrpersonen, Ausblenden und Empfehlen findest du unter «⋯» (der Haken zeigt, was gerade aktiv ist).'},
   {id:'2026-10-24-bausteine-ordner', datum:'2026-10-24', fuer:'lehrer', text:'🧱 Im Fach Sport liegt in jedem passenden Ordner (Spielen, Bewegen an Geräten, Laufen/Springen/Werfen und bei den Sportarten) eine Kachel «Bausteine …», die den Sportplaner gleich in dieser Kategorie öffnet.'},
   {id:'2026-10-24-sportplaner', datum:'2026-10-24', fuer:'lehrer', text:'📋 Im Fach Sport heisst das Werkzeug mit Bausteinen, Präp-Werkstatt, Jahresplanung, Notenrechner und Turnierplan jetzt «Sportplaner» (neben dem Hallenplaner).'},
