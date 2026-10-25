@@ -3558,6 +3558,29 @@
     :root[data-design="neu"] .cal-entry.cal-entry, :root[data-design="neu"] .homework-card.homework-card{border-left-width:6px;}
     :root[data-design="neu"] .homework-card .cal-entry.cal-entry{border-width:1px;border-left-width:6px;box-shadow:none;}
   }
+
+  /* 📅 Schlankerer Stundenplan (25.10.2026): weniger Farbe, weniger Text, ruhige Zellen. Nur im neuen Design. */
+  :root[data-design="neu"] .stp-board.stp-board{border:1px solid var(--border);box-shadow:none;padding:14px;}
+  :root[data-design="neu"] .stp-tag{background:var(--surface-2);color:var(--text);box-shadow:none;}
+  :root[data-design="neu"] .stp-tag small{opacity:.7;}
+  :root[data-design="neu"] .stp-tag.heute{background:var(--gelb);color:#1D1D1B;}
+  :root[data-design="neu"] .stp-zeit{background:transparent;padding:0;}
+  :root[data-design="neu"] .stp-zeit b{font-size:14px;}
+  :root[data-design="neu"] .stp-pause{font-weight:600;}
+  :root[data-design="neu"] .stp-cell{background:var(--surface);border:1px solid var(--border);border-left:5px solid var(--c);box-shadow:none;min-height:56px;}
+  :root[data-design="neu"] .stp-cell.link:hover, :root[data-design="neu"] .stp-cell.edit:hover{transform:none;box-shadow:0 0 0 2px var(--c);}
+  :root[data-design="neu"] .stp-name{color:var(--text);}
+  :root[data-design="neu"] .stp-img{width:24px;height:24px;border-radius:6px;}
+  :root[data-design="neu"] .stp-cell.leer{border:none;background:color-mix(in srgb, var(--surface-2) 55%, transparent);}
+  :root[data-design="neu"] .stp-cell.leer.edit{border:1.5px dashed var(--border);background:transparent;}
+  :root[data-design="neu"] .stp-cell.termin{outline:none;}
+  :root[data-design="neu"] .stp-cell.jetzt{background:color-mix(in srgb, var(--c) 18%, var(--surface));box-shadow:0 0 0 3px var(--c);animation:none;}
+  :root[data-design="neu"] .stp-cell:not(.edit) .stp-eigen-tag:not(.stp-pin){display:none;}
+  .stp-slot2{grid-row:span 2;}
+  .stp-mehr{left:auto;right:0;min-width:300px;}
+  .stp-lpwahl-l{display:flex;flex-direction:column;gap:6px;padding:8px;font-weight:700;font-size:13px;}
+  .stp-lpwahl-l select{margin:0;width:100%;}
+  @media (max-width:600px){ :root[data-design="neu"] .stp-board.stp-board{border-width:1px;box-shadow:none;border-radius:12px;padding:10px;} }
 </style>
 <script>if(/-test\//.test(location.pathname))document.documentElement.classList.add('test-site');</script>
 </head>
@@ -47102,15 +47125,13 @@ function stpZeichnen(){
   var h = '<div class="stp-board">';
   h += '<div class="stp-tools">';
   if(lehrer){
+    var fremdName = '';
+    if(fremd && stp.lpListe){ stp.lpListe.forEach(function(l){ if(l.uid === stp.lpUid) fremdName = l.name; }); }
     h += '<div class="stp-tabs">'+
       '<button type="button" class="stp-tab'+(stp.ansicht==='mein'?' on':'')+'" data-ansicht="mein">👤 Mein Stundenplan</button>'+
-      '<button type="button" class="stp-tab'+(stp.ansicht==='klasse'?' on':'')+'" data-ansicht="klasse">🏫 Klasse '+esc(state.klasse)+'</button></div>';
-    if(stp.lpListe){
-      h += '<select class="stp-lpwahl" id="stpLpWahl" title="Stundenplan einer anderen Lehrperson ansehen">'+
-        '<option value="">👀 Andere Lehrperson …</option>'+
-        stp.lpListe.map(function(l){ return '<option value="'+esc(l.uid)+'"'+(fremd && stp.lpUid===l.uid?' selected':'')+'>'+esc(l.name)+(l.k ? ' ('+esc(klasseLabel(l.k))+')' : '')+'</option>'; }).join('')+
-        '</select>';
-    }
+      '<button type="button" class="stp-tab'+(stp.ansicht==='klasse'?' on':'')+'" data-ansicht="klasse">🏫 Klasse '+esc(state.klasse)+'</button>'+
+      (fremd ? '<button type="button" class="stp-tab on" id="stpFremdTab" title="Zurück zu meinem Plan">👀 '+esc(fremdName || 'Andere Lehrperson')+' ✕</button>' : '')+
+      '</div>';
   } else {
     h += '<div class="stp-titel">Klasse '+esc(state.klasse)+' · mein Plan</div>';
   }
@@ -47121,6 +47142,13 @@ function stpZeichnen(){
   if(lehrer && !stp.bearbeiten) h += '<button class="btn btn-ghost btn-sm" type="button" id="stpRaeumeBtn" title="Freie Räume finden und reservieren">🚪 Räume</button>';
   if(darf && !stp.bearbeiten) h += '<button class="btn btn-ghost btn-sm" type="button" id="stpTerminBtn" title="Etwas nur für diese Woche eintragen: Sporttag, Exkursion, Ausfall …">📌 Termin</button>';
   if(darf) h += '<button class="btn '+(stp.bearbeiten?'btn-primary':'btn-ghost')+' btn-sm" type="button" id="stpEditBtn">'+(stp.bearbeiten?'✅ Fertig':'✏️ Bearbeiten')+'</button>';
+  if(lehrer && stp.lpListe){
+    h += '<span class="up-wrap"><button class="btn btn-ghost btn-sm" type="button" id="stpMehrBtn" aria-haspopup="true" aria-expanded="false" title="Mehr">⋯</button>'+
+      '<span class="up-menue stp-mehr" id="stpMehr" hidden><label class="stp-lpwahl-l"><span>👀 Plan einer anderen Lehrperson ansehen</span>'+
+      '<select class="stp-lpwahl" id="stpLpWahl" title="Stundenplan einer anderen Lehrperson ansehen"><option value="">Auswählen …</option>'+
+      stp.lpListe.map(function(l){ return '<option value="'+esc(l.uid)+'"'+(fremd && stp.lpUid===l.uid?' selected':'')+'>'+esc(l.name)+(l.k ? ' ('+esc(klasseLabel(l.k))+')' : '')+'</option>'; }).join('')+
+      '</select></label></span></span>';
+  }
   h += '</div></div>';
 
   if(stp.bearbeiten){
@@ -47159,9 +47187,9 @@ function stpZeichnen(){
       (lehrer ? 'Mit «✏️ Bearbeiten» füllst du '+(stp.ansicht==='klasse'?'den Plan der Klasse':'deinen Plan')+'.' : 'Sobald deine Lehrperson den Stundenplan eingetragen hat, erscheint er hier.')+'</div>';
   }
 
-  function zelle(tag, z){
+  function zelle(tag, z, z2){
     var key = stpKey(tag, z.s), a = am(tag, z), c = a.c, info = stpInfo(c);
-    var istJetzt = tag === heute && jetzt >= stpMin(z.von) && jetzt < stpMin(z.bis) && !stpLeer(c) && !c.frei;
+    var istJetzt = tag === heute && jetzt >= stpMin(z.von) && jetzt < stpMin((z2 || z).bis) && !stpLeer(c) && !c.frei;
     var eigen = !a.termin && !a.ferien && plan.eigen && plan.eigen(key);
     // Parallel-Termin: das Fach behält sein eigenes (halbes) Feld, der Termin steht im zweiten daneben.
     var tmHier = a.termin && !a.par;
@@ -47171,7 +47199,8 @@ function stpZeichnen(){
     if(info){
       inner += (info.img ? '<img class="stp-img'+(info.full?'':' ct')+'" src="'+info.img+'" alt="" loading="lazy" onerror="stpBildFehlt(this)">' : '<span class="stp-dot"></span>');
       inner += '<span class="stp-txt"><span class="stp-name">'+esc(info.name)+'</span>';
-      var sub = [c.kl ? '👥 '+c.kl : '', c.zi ? '📍 '+c.zi : '', c.lp || ''].filter(Boolean).join(' · ');
+      var kl = c.kl; if(kl && kl === state.klasse && !lehrer) kl = '';   // Schüler:innen: die eigene Klasse muss nicht in jeder Zelle stehen
+      var sub = [kl || '', c.zi || '', c.lp || ''].filter(Boolean).join(' · ');
       if(sub) inner += '<span class="stp-sub">'+esc(sub)+'</span>';
       inner += '</span>';
     } else if(c && c.frei){
@@ -47181,9 +47210,9 @@ function stpZeichnen(){
     } else if(a.ferien){
       inner += '<span class="stp-plus" title="'+esc(a.ferien.label)+'">'+ferienIconHtml(a.ferien, 28)+'</span>';
     }
-    if(tmHier) inner += '<span class="stp-eigen-tag" title="Nur diese Woche">📌</span>';
+    if(tmHier) inner += '<span class="stp-eigen-tag stp-pin" title="Nur diese Woche">📌</span>';
     if(istJetzt){
-      var vonM = stpMin(z.von), bisM = stpMin(z.bis), pp = Math.max(0, Math.min(100, Math.round((jetzt - vonM) / (bisM - vonM) * 100)));
+      var vonM = stpMin(z.von), bisM = stpMin((z2 || z).bis), pp = Math.max(0, Math.min(100, Math.round((jetzt - vonM) / (bisM - vonM) * 100)));
       inner += '<span class="stp-jetzt-tag">JETZT</span><span class="stp-fortschritt" title="noch '+(bisM - jetzt)+' Min."><i style="width:'+pp+'%"></i></span>';
     }
     if(eigen) inner += '<span class="stp-eigen-tag" title="Von dir geändert">✎</span>';
@@ -47197,18 +47226,36 @@ function stpZeichnen(){
   function pause(j){
     if(j === 0) return '';
     var gap = stpMin(zeilen[j].von) - stpMin(zeilen[j-1].bis);
-    if(gap >= 40) return '<div class="stp-pause mittag">🍽️ Mittag</div>';
-    if(gap >= 15) return '<div class="stp-pause">☕ Pause</div>';
+    if(gap >= 40) return '<div class="stp-pause mittag">Mittag</div>';
+    if(gap >= 15) return '<div class="stp-pause">Pause</div>';
     return '';
   }
-  function zeit(z){ return '<div class="stp-zeit'+(z.extra?' extra':'')+'"'+(z.extra?' title="Zusatzlektion"':'')+'><b>'+z.nr+'</b><span>'+esc(z.von)+'</span><span>'+esc(z.bis)+'</span></div>'; }
+  function zeit(z, z2){ return '<div class="stp-zeit'+(z.extra?' extra':'')+'"'+(z.extra?' title="Zusatzlektion"':'')+'><b>'+z.nr+(z2 ? '–'+z2.nr : '')+'</b><span>'+esc(z.von)+'</span><span>'+esc((z2 || z).bis)+'</span></div>'; }
+  // 🔗 Doppellektionen: zwei aufeinanderfolgende gleiche Lektionen (ohne Pause dazwischen) werden eine Zelle.
+  function zellenSig(tag, z){
+    var a = am(tag, z), c = a.c || {};
+    if(a.ferien) return '';
+    if(stpLeer(c) && !c.frei && !a.termin) return '';
+    return JSON.stringify([c.f || '', c.t || '', c.zi || '', c.lp || '', c.kl || '', !!c.frei, !!a.termin, !!a.par, a.par && a.termin ? (a.termin.c.t || '') : '']);
+  }
+  function zusammen(j, tag){
+    if(stp.bearbeiten || j + 1 >= zeilen.length || pause(j + 1) !== '') return false;
+    var s1 = zellenSig(tag, zeilen[j]);
+    return s1 !== '' && s1 === zellenSig(tag, zeilen[j + 1]);
+  }
 
   if(schmal){
     h += '<div class="stp-tagwahl">'+STP_TAGE.map(function(t, d){
       return '<button type="button" class="stp-tagchip'+(d===stp.tag?' on':'')+(d===heute?' heute':'')+'" style="--tc:'+STP_TAG_FARBEN[d]+'" data-tag="'+d+'">'+t+(vorlage ? '' : '<small>'+(ferien[d] ? ferien[d].icon+' ' : '')+stpDatumKurz(stpDatum(d))+'</small>')+'</button>';
     }).join('')+'</div>';
     h += '<div class="stp-tagliste">';
-    zeilen.forEach(function(z, j){ h += pause(j) + '<div class="stp-zeile">'+zeit(z)+zelle(stp.tag, z)+'</div>'; });
+    var uebersprungen = {};
+    zeilen.forEach(function(z, j){
+      if(uebersprungen[j]) return;
+      var z2 = zusammen(j, stp.tag) ? zeilen[j + 1] : null;
+      if(z2) uebersprungen[j + 1] = true;
+      h += pause(j) + '<div class="stp-zeile">'+zeit(z, z2)+zelle(stp.tag, z, z2)+'</div>';
+    });
     h += '</div>';
   } else {
     h += '<div class="stp-grid">';
@@ -47217,10 +47264,17 @@ function stpZeichnen(){
       var zus = [d===heute ? 'heute' : '', vorlage ? '' : stpDatumKurz(stpDatum(d)), ferien[d] ? ferien[d].icon : ''].filter(Boolean).join(' · ');
       h += '<div class="stp-tag'+(d===heute?' heute':'')+(ferien[d]?' ferien':'')+'" style="--tc:'+STP_TAG_FARBEN[d]+'"'+(ferien[d] ? ' title="'+esc(ferien[d].label)+'"' : '')+'>'+t+(zus ? ' <small>'+zus+'</small>' : '')+'</div>';
     });
+    var weg = {};
     zeilen.forEach(function(z, j){
       h += pause(j);
+      var tagRaus = [0,1,2,3,4].map(function(d){ return zusammen(j, d); });
       h += zeit(z);
-      for(var d = 0; d < 5; d++) h += '<div class="stp-slot'+(d===heute?' heute':'')+'">'+zelle(d, z)+'</div>';
+      for(var d = 0; d < 5; d++){
+        if(weg[j+'-'+d]) continue;
+        var doppelt = tagRaus[d];
+        if(doppelt) weg[(j + 1)+'-'+d] = true;
+        h += '<div class="stp-slot'+(d===heute?' heute':'')+(doppelt ? ' stp-slot2' : '')+'">'+zelle(d, z, doppelt ? zeilen[j + 1] : null)+'</div>';
+      }
     });
     h += '</div>';
   }
@@ -47232,6 +47286,13 @@ function stpZeichnen(){
   });
   var rb = document.getElementById('stpRaeumeBtn');
   if(rb) rb.addEventListener('click', function(){ rbu.von = 'stundenplan'; state.route = {name:'raeume'}; render(); });
+  var mehrBtn = document.getElementById('stpMehrBtn'), mehr = document.getElementById('stpMehr');
+  if(mehrBtn && mehr){
+    mehrBtn.addEventListener('click', function(e){ e.stopPropagation(); var an = mehr.hidden; mehr.hidden = !an; mehrBtn.setAttribute('aria-expanded', an ? 'true' : 'false'); });
+    document.addEventListener('click', function(e){ if(!document.body.contains(mehr) || mehr.hidden) return; if(!mehr.contains(e.target) && e.target !== mehrBtn){ mehr.hidden = true; mehrBtn.setAttribute('aria-expanded', 'false'); } });
+  }
+  var fremdTab = document.getElementById('stpFremdTab');
+  if(fremdTab) fremdTab.addEventListener('click', function(){ stp.ansicht = 'mein'; stpZeichnen(); });
   var lw = document.getElementById('stpLpWahl');
   if(lw) lw.addEventListener('change', function(){
     if(lw.value) stpLpZeigen(lw.value);
