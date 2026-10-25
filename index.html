@@ -47139,7 +47139,7 @@ function stpZeichnen(){
   if(!vorlage){
     var fr = stpDatum(4);
     wocheHtml = '<div class="stp-woche"><button class="btn btn-ghost btn-sm" type="button" id="stpWZurueck" title="Vorherige Woche">◀</button>'+
-      '<div class="stp-woche-txt"><b>Woche '+stpKW(woche)+'</b><span>'+stpDatumKurz(woche)+' – '+stpDatumKurz(fr)+fr.slice(0, 4)+'</span></div>'+
+      '<div class="stp-woche-txt"><b>Woche '+stpKW(woche)+'</b><span>'+(woche.slice(5, 7) === fr.slice(5, 7) ? (+woche.slice(8, 10))+'.–'+(+fr.slice(8, 10))+'.'+(+fr.slice(5, 7))+'.' : stpDatumKurz(woche)+'–'+stpDatumKurz(fr))+'</span></div>'+
       '<button class="btn btn-ghost btn-sm" type="button" id="stpWVor" title="Nächste Woche">▶</button>'+
       (woche !== stpWocheJetzt() ? '<button class="btn btn-ghost btn-sm" type="button" id="stpWHeute">Heute</button>' : '')+'</div>';
   }
