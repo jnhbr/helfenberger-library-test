@@ -3455,7 +3455,7 @@ import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   getFirestore, doc, getDoc, getDocFromCache, getDocs, getDocsFromServer, collection, query, where, onSnapshot, serverTimestamp, increment,
   setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, Bytes, deleteField, arrayUnion, arrayRemove,
-  connectFirestoreEmulator, waitForPendingWrites
+  connectFirestoreEmulator, waitForPendingWrites, disableNetwork, enableNetwork
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 /* =====================================================================
@@ -8833,6 +8833,12 @@ async function authGeaendert(user){
   // einem erst 10 Minuten alten Token).
   try{
     await user.getIdToken(true);
+    // 25.10.2026 (Gierszewski, flp-gierszewski): trotz erneuertem Token lehnte Firestore
+    // alle Lehrer-Lesezugriffe ab, nur das eigene Profil ging. Die Firestore-Verbindung
+    // hält das Token der Anmeldung fest, mit dem sie sich zuerst gemeldet hat (ohne die
+    // später vergebenen Rechte). Darum Verbindung einmal neu aufbauen, bevor gelesen wird.
+    await disableNetwork(db);
+    await enableNetwork(db);
   }catch(e){ /* offline: weiter mit dem Zwischenspeicher */ }
   try{
     // Server nicht erreichbar oder Datenbank-Limit erreicht: das eigene Profil
