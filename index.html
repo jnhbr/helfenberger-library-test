@@ -3538,12 +3538,12 @@
 
   /* 3 – Umschalter: eine Art für alle (weisse Pille mit dunklem Rand, gewählt = gelb wie in der Seitenleiste) */
   :root[data-design="neu"] .kz-tab{border:2px solid var(--kontur);background:var(--surface);color:var(--text);border-radius:999px;padding:6px 14px;}
-  :root[data-design="neu"] .kz-tab-on{background:var(--gelb);color:#1D1D1B;border-color:var(--kontur);}
+  :root[data-design="neu"] .kz-tab-on{background:var(--text);color:var(--surface);border-color:var(--kontur);}
   :root[data-design="neu"] .stp-tabs{background:var(--surface);border:2px solid var(--kontur);padding:3px;}
   :root[data-design="neu"] .stp-tab{color:var(--text);}
-  :root[data-design="neu"] .stp-tab.on{background:var(--gelb);color:#1D1D1B;box-shadow:none;}
+  :root[data-design="neu"] .stp-tab.on{background:var(--text);color:var(--surface);box-shadow:none;}
   :root[data-design="neu"] .stp-tagchip{border:2px solid var(--kontur);background:var(--surface);color:var(--text);}
-  :root[data-design="neu"] .stp-tagchip.on{background:var(--gelb);color:#1D1D1B;box-shadow:none;}
+  :root[data-design="neu"] .stp-tagchip.on{background:var(--text);color:var(--surface);box-shadow:none;}
 
   /* 🗂️ Ein Kartenstil für Listen und Flächen (25.10.2026): dunkler Rand, runde Ecken, Versatzschatten wie bei Ordnern und Übungen.
      Verschachtelte Einträge (Kalender in «Die nächsten 7 Tage») bleiben leicht, damit es nicht überladen wirkt. */
@@ -3585,6 +3585,15 @@
   :root[data-design="neu"] .stp-woche-txt, :root[data-design="neu"] .stp-titel{background:var(--surface);border-radius:12px;padding:4px 14px;}
   :root[data-design="neu"] .stp-pause span{background:var(--surface);border-radius:999px;padding:1px 12px;}
   .page-welcome .bild-icon, h2 .bild-icon{vertical-align:middle;margin-right:4px;}
+
+  /* Eine Zeile: Ansicht | Woche | Knöpfe (bei wenig Platz bricht sie von selbst um) */
+  .stp-tools{flex-wrap:wrap;}
+  .stp-tools .stp-woche{flex:1 1 auto;margin:0;gap:6px;justify-content:center;flex-wrap:nowrap;}
+  .stp-tools .stp-woche-txt{flex-direction:row;align-items:baseline;gap:6px;min-width:0;white-space:nowrap;line-height:1.2;}
+  .stp-tools .stp-woche-txt b{font-size:14px;}
+  .stp-tools .stp-woche-txt span{font-size:12px;}
+  .stp-tools .stp-tools-r{flex-wrap:nowrap;gap:6px;}
+  .stp-tools .stp-tools-r .btn{padding-left:10px;padding-right:10px;}
 </style>
 <script>if(/-test\//.test(location.pathname))document.documentElement.classList.add('test-site');</script>
 </head>
@@ -47126,6 +47135,14 @@ function stpZeichnen(){
   var ferien = [0,1,2,3,4].map(function(d){ return vorlage ? null : rbuFerien(stpDatum(d)); });
   function am(tag, z){ return vorlage ? {c:plan.zelle(stpKey(tag, z.s))} : stpAm(plan, stp.ansicht, stpDatum(tag), z.s); }
 
+  var wocheHtml = '';
+  if(!vorlage){
+    var fr = stpDatum(4);
+    wocheHtml = '<div class="stp-woche"><button class="btn btn-ghost btn-sm" type="button" id="stpWZurueck" title="Vorherige Woche">◀</button>'+
+      '<div class="stp-woche-txt"><b>Woche '+stpKW(woche)+'</b><span>'+stpDatumKurz(woche)+' – '+stpDatumKurz(fr)+fr.slice(0, 4)+'</span></div>'+
+      '<button class="btn btn-ghost btn-sm" type="button" id="stpWVor" title="Nächste Woche">▶</button>'+
+      (woche !== stpWocheJetzt() ? '<button class="btn btn-ghost btn-sm" type="button" id="stpWHeute">Heute</button>' : '')+'</div>';
+  }
   var h = '<div class="stp-board">';
   h += '<div class="stp-tools">';
   if(lehrer){
@@ -47139,6 +47156,7 @@ function stpZeichnen(){
   } else {
     h += '<div class="stp-titel">Klasse '+esc(state.klasse)+' · mein Plan</div>';
   }
+  h += wocheHtml;
   h += '<div class="stp-tools-r">';
   if(darf && stp.bearbeiten && lehrer) h += '<button class="btn btn-ghost btn-sm" type="button" id="stpZeitenBtn">⏰ Lektionszeiten</button>';
   if(darf && lehrer && stp.bearbeiten && stp.ansicht === 'mein') h += '<button class="btn btn-ghost btn-sm" type="button" id="stpKopieBtn" title="Klassenplan als Vorlage übernehmen">📋 Aus Klassenplan</button>';
@@ -47161,11 +47179,6 @@ function stpZeichnen(){
       '<button type="button" class="stp-tab'+(vorlage?'':' on')+'" data-modus="woche">📌 Nur diese Woche</button></div>';
   }
   if(!vorlage){
-    var fr = stpDatum(4);
-    h += '<div class="stp-woche"><button class="btn btn-ghost btn-sm" type="button" id="stpWZurueck" title="Vorherige Woche">◀</button>'+
-      '<div class="stp-woche-txt"><b>Woche '+stpKW(woche)+(dieseWoche ? ' · diese Woche' : '')+'</b><span>'+stpDatumKurz(woche)+' – '+stpDatumKurz(fr)+fr.slice(0, 4)+'</span></div>'+
-      '<button class="btn btn-ghost btn-sm" type="button" id="stpWVor" title="Nächste Woche">▶</button>'+
-      (woche !== stpWocheJetzt() ? '<button class="btn btn-ghost btn-sm" type="button" id="stpWHeute">Heute</button>' : '')+'</div>';
     if(ferien.every(Boolean)){
       var f0 = ferien[0];
       h += '<div class="stp-ferien-banner"><span>'+ferienIconHtml(f0, 40)+' <b>'+esc(f0.label)+'</b> bis '+stpDatumKurz(f0.end)+' – keine Schule.</span>'+
