@@ -21651,7 +21651,7 @@ function spSave(){
     Object.keys(sp.doc.seats).forEach(function(id){ if(!valid[id]) delete sp.doc.seats[id]; });
     setDoc(kdoc('klassenzimmer','sitzplan'), {
       tables: sp.doc.tables, seats: sp.doc.seats, meta: sp.doc.meta,
-      rules: sp.doc.rules, ruleOff: sp.doc.ruleOff || [], absent: sp.doc.absent,
+      rules: sp.doc.rules, ruleOff: sp.doc.ruleOff || [], gruppeSel: sp.doc.gruppeSel || '', absent: sp.doc.absent,
       genderMode: sp.doc.genderMode, mirror: !!sp.doc.mirror,
       teilen: sp.doc.teilen,
       raum: sp.raum || spRaumStandard(),
@@ -21699,6 +21699,7 @@ function renderSitzplan(){
       meta:   (d && d.meta) ? Object.assign({}, d.meta) : base.meta,
       rules:  (d && Array.isArray(d.rules)) ? d.rules : base.rules,
       ruleOff: (d && Array.isArray(d.ruleOff)) ? d.ruleOff : [],
+      gruppeSel: (d && d.gruppeSel) || '',
       absent: (d && Array.isArray(d.absent)) ? d.absent : base.absent,
       genderMode: (d && d.genderMode) || base.genderMode,
       mirror: !!(d && d.mirror),
@@ -21707,6 +21708,8 @@ function renderSitzplan(){
     var v = res[2].exists() ? res[2].data() : null;
     sp.saved = (v && Array.isArray(v.plans)) ? v.plans : [];
     sp.loaded = true;
+    sp.gruppen = sp.gruppen || [];
+    loadMeineGruppen().then(function(list){ sp.gruppen = list; if(state.route.name === 'sitzplan') paintSitzplan(); }).catch(function(err){ console.error(err); });
     // Leeres Zimmer: gleich die 11 Zweiertische in Reihen hinstellen.
     if(!sp.doc.tables.length){ spAutoLayout('reihen', true); return; }
     paintSitzplan();
@@ -21748,6 +21751,11 @@ function paintSitzplan(){
   html += '<select class="sp-select" id="spGenderMode">';
   [['egal','Geschlecht egal'],['gemischt','Tischpaare gemischt'],['gleich','Tischpaare gleich']].forEach(function(o){
     html += '<option value="'+o[0]+'"'+(sp.doc.genderMode===o[0]?' selected':'')+'>'+o[1]+'</option>';
+  });
+  html += '</select>';
+  html += '<select class="sp-select" id="spGruppeSel" title="Wer wird zufällig gesetzt?"><option value="">Ganze Klasse</option>';
+  (sp.gruppen || []).forEach(function(g){
+    html += '<option value="'+esc(g.id)+'"'+(sp.doc.gruppeSel===g.id?' selected':'')+'>👥 '+esc(g.name||'Gruppe')+' ('+(g.mitglieder||[]).length+')</option>';
   });
   html += '</select>';
   html += '<button class="btn btn-primary btn-sm" id="spShuffle" type="button">🎲 Zufällig setzen</button>';
@@ -21913,6 +21921,9 @@ function wireSitzplan(){
 
   host.querySelector('#spGenderMode').addEventListener('change', function(e){
     sp.doc.genderMode = e.target.value; spSave();
+  });
+  host.querySelector('#spGruppeSel').addEventListener('change', function(e){
+    sp.doc.gruppeSel = e.target.value; spSave();
   });
   host.querySelector('#spShuffle').addEventListener('click', spShuffleSeats);
   host.querySelector('#spRules').addEventListener('click', spRulesModal);
@@ -22295,7 +22306,10 @@ function spRulesModal(){
 
 function spShuffleSeats(){
   var seatIds = spAllSeatIds();
-  var students = spActiveStudents().map(function(s){ return s.uid; });
+  var gruppe = sp.doc.gruppeSel ? (sp.gruppen || []).filter(function(g){ return g.id === sp.doc.gruppeSel; })[0] : null;
+  var students = (gruppe
+    ? (sp.roster || []).filter(function(s){ return (gruppe.mitglieder || []).indexOf(s.uid) >= 0 && !spIsAbsent(s.uid); })
+    : spActiveStudents()).map(function(s){ return s.uid; });
   if(!seatIds.length){ toast('Zuerst Zweiertische setzen.'); return; }
   if(students.length > seatIds.length){
     toast('Zu wenig Plätze: '+students.length+' Kinder, '+seatIds.length+' Plätze.');
@@ -24120,6 +24134,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-26-sitz-gruppe', datum:'2026-10-26', fuer:'lehrer', text:'Sitzplan: Neben «Zufällig setzen» kannst du eine deiner Gruppen wählen, dann werden nur deren Mitglieder gesetzt.'},
   {id:'2026-10-26-sitz-regelgruppen', datum:'2026-10-26', fuer:'lehrer', text:'Sitzplan: Im Fenster «⚖️ Regeln» lassen sich ganze Regelgruppen an- und abwählen, damit das Zufallssetzen nicht an unerfüllbaren Regeln scheitert.'},
   {id:'2026-10-27-alle-pruefungen', datum:'2026-10-27', fuer:'lehrer', text:'📝 Im Kalender gibt es den Knopf «Alle Prüfungen»: die Prüfungen aller Klassen und Lehrpersonen nach Woche. So siehst du, wenn sich bei jemandem die Prüfungen häufen.'},
   {id:'2026-10-27-sva-bereit', datum:'2026-10-27', fuer:'lehrer', text:'🎓 SVA › «Projekte der Klasse»: Grobkonzepte, die Schüler:innen als «bereit» markiert haben, stehen jetzt zuoberst und sind gleich aufgeklappt, mit allem, was sie geschrieben haben.'},
