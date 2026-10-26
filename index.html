@@ -12832,7 +12832,7 @@ function uiChangePassword(){
       closeModal();
       toast('Passwort geändert.');
     }catch(err){
-      console.error(err);
+      if(!(err && (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/too-many-requests'))) console.error(err);
       var m = 'Konnte nicht geändert werden. Bitte nochmals versuchen.';
       if(err && (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential')){ m = 'Das aktuelle Passwort stimmt nicht.'; }
       else if(err && err.code === 'auth/weak-password'){ m = 'Das neue Passwort ist zu schwach (mind. 6 Zeichen).'; }
@@ -35525,7 +35525,7 @@ function pruefStand(s, antworten, beantwortet){
   clearTimeout(s.saveTimer);
   s.saveTimer = setTimeout(function(){
     if(pruef.sess !== s || s.ending) return;
-    updateDoc(teilRef(s.pid, state.user.uid), {antworten:s.antworten, beantwortet:s.beantwortet, lebt:serverTimestamp()}).catch(function(err){ console.error('Prüfungsstand speichern', err); });
+    updateDoc(teilRef(s.pid, state.user.uid), {antworten:s.antworten, beantwortet:s.beantwortet, lebt:serverTimestamp()}).catch(function(err){ if(!(err && err.code === 'permission-denied')) console.error('Prüfungsstand speichern', err); });
   }, 1200);
 }
 // Abgabe. d = {antworten, punkte?, max?, details?} — Punkte/Details bringt nur
