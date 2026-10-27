@@ -16105,7 +16105,7 @@ function folienLaden(){
   if(window.FolienKonverter) return Promise.resolve(window.FolienKonverter);
   return new Promise(function(resolve, reject){
     var sc = document.createElement('script');
-    sc.src = 'folien.js?v=1';   // Service Worker liefert Dateien aus dem Cache: bei jeder Änderung an folien.js die Nummer erhöhen
+    sc.src = 'folien.js?v=2';   // Service Worker liefert Dateien aus dem Cache: bei jeder Änderung an folien.js die Nummer erhöhen
     sc.onload = function(){ resolve(window.FolienKonverter); };
     sc.onerror = function(){ reject(new Error('Der PowerPoint-Umwandler konnte nicht geladen werden (Internet?).')); };
     document.head.appendChild(sc);
