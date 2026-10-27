@@ -13591,6 +13591,7 @@ function bkListeZeichnen(){
     on('bkopen-', function(){ bkOeffnen(x.klasse, b); });
     on('bkleer-', function(){ bkLeerenStart(x.klasse, b); });
     on('bkzeig-', function(){ bkEinblenden(x.klasse, b); });
+    on('bkhide-', function(){ bkAusblenden(x.klasse, b); });
     on('bkedit-', function(){ bkEditor(b); });
     on('bkdel-', function(){ bkLoeschenFragen(x.klasse, b); });
     bkKarteStatus(x, meiner);
@@ -13614,6 +13615,7 @@ function bkKarteHtml(x){
     h += (b.versteckt ? '<button class="btn btn-primary btn-sm" id="bkzeig-'+esc(b.id)+'" type="button">👁 Einblenden</button>' : '')+
       (bkKannLokal() && !b.versteckt ? '<button class="btn btn-primary btn-sm" id="bkleer-'+esc(b.id)+'" type="button">📬 Leeren</button>' : '')+
       '<button class="btn btn-ghost btn-sm" id="bkopen-'+esc(b.id)+'" type="button">👥 Abgaben</button>'+
+      (!b.versteckt && b.kalenderId ? '<button class="btn btn-ghost btn-sm" id="bkhide-'+esc(b.id)+'" type="button">🙈 Ausblenden</button>' : '')+
       '<button class="btn btn-ghost btn-sm" id="bkedit-'+esc(b.id)+'" type="button">Bearbeiten</button>'+
       '<button class="btn btn-danger btn-sm" id="bkdel-'+esc(b.id)+'" type="button">Löschen</button>';
   } else {
@@ -13996,6 +13998,14 @@ async function bkEinblenden(klasse, b){
     await fsUpdateDoc(bkRef(klasse, b.id), {versteckt:false, updatedAt:serverTimestamp()});
     toast('Eingeblendet'+(b.kalenderId && b.frist ? ' – die Abgabe steht jetzt im Kalender.' : '.'));
   }catch(err){ console.error(err); toast('Konnte nicht eingeblendet werden.'); }
+}
+// 👁 → 🙈: versehentlich eingeblendet oder noch nicht bereit – Briefkasten und Kalender-Abgabe verschwinden wieder für die Schüler:innen.
+async function bkAusblenden(klasse, b){
+  try{
+    await fsUpdateDoc(bkRef(klasse, b.id), {versteckt:true, kalenderGeplant:!!(b.kalenderId && b.frist), updatedAt:serverTimestamp()});
+    if(b.kalenderId) await fsDeleteDoc(kdocFor(klasse, 'calendarEntries', b.kalenderId)).catch(function(err){ console.warn('Kalendereintrag', err); });
+    toast('Ausgeblendet – Briefkasten und Abgabe im Kalender sind für die Schüler:innen weg.');
+  }catch(err){ console.error(err); toast('Konnte nicht ausgeblendet werden.'); }
 }
 function bkLoeschenFragen(klasse, bk){
   uiConfirm('Briefkasten «'+bk.titel+'» abbauen?',
@@ -24531,6 +24541,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-27-bk-wieder-ausblenden', datum:'2026-10-27', fuer:'lehrer', text:'🙈 Briefkasten versehentlich eingeblendet? Mit «🙈 Ausblenden» auf der Karte ist er für die Schüler:innen wieder weg, samt Abgabe im Kalender – einblenden kannst du ihn jederzeit neu.'},
   {id:'2026-10-27-empfehlen-an', datum:'2026-10-27', fuer:'lehrer', text:'⭐ Material teilen geht neu per «Empfehlen an …»: Bei Übungen, Quizzen, Spiel-Sets, Karteikarten, Wortwolken und Blitzumfragen (🗃️ Unterrichtsmaterial) setzt du Häkchen bei den Lehrpersonen, die es bekommen sollen. Sie übernehmen es unter ⚙️ «Von Lehrern empfohlen». Neues Material wird nicht mehr automatisch in alle Seiten kopiert; schon vorhandene Kopien werden bei Änderungen weiter nachgeführt.'},
   {id:'2026-10-27-bk-ausblenden', datum:'2026-10-27', fuer:'lehrer', text:'📮 Briefkästen kannst du jetzt nur vorbereiten und ausblenden («🙈 Noch ausblenden»). Mit «👁 Einblenden» sehen die Schüler:innen den Briefkasten – und erst dann steht die Abgabe in ihrem Kalender.'},
   {id:'2026-10-27-schwierigkeit-waehlen', datum:'2026-10-27', fuer:'lehrer', text:'🎚️ Schwierigkeit wählbar: Vor jedem Klassen-Quiz und jedem Spiel kannst du gemischt, nur leicht, nur mittel, nur schwer oder mittel + schwer wählen. Im 🏆 Grossen Preis folgt die Schwierigkeit jetzt den Punkten: 100 leicht, 500 schwer. Alle 🎲 Trivia-Quizze haben jetzt Stufen und 10 bis 30 zusätzliche, deutlich schwierigere Fragen (auch Nischenfragen, z. B. bei Disney). Beim Bearbeiten eines Klassen-Quiz bleiben Stufe und Kategorie der Fragen erhalten.'},
