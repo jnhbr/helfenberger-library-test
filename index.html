@@ -15587,7 +15587,7 @@ function renderFolderContents(){
    immer im DOM (nur versteckt), damit die Knöpfe normal verdrahtet werden. */
 var ZUSATZ_ARTEN = {
   folien:    {icon:'🎞️', name:'PPP Folien'},
-  methode: {icon:'🧰', name:'Methodenmaterial'},
+  methode: {icon:'🧰', name:'Methodenkoffer'},
   pruefung:{icon:'📝', name:'Prüfungen'},
   kk:      {icon:'🗂️', name:'Karteikarten'},
   quiz:    {icon:'🎮', name:'Klassen-Quizze'},
@@ -15598,7 +15598,7 @@ var ZUSATZ_ARTEN = {
 };
 var zusatzOffen = {};   // «Fach|Ordner|Art» → aufgeklappt (nur für diese Sitzung)
 function zusatzArt(r){
-  if(r.methode) return 'methode';
+  if(r.methode || /^🧰/.test(String(r.title || ''))) return 'methode';
   if(r.folien) return 'folien';
   if(r.kk && r.ausOrdner) return 'kk';
   if(r.kzm && ZUSATZ_ARTEN[r.kzm.typ]) return r.kzm.typ;
@@ -15612,7 +15612,11 @@ function zusatzHtml(liste, subjectId, here){
     if(!teil.length) return;
     var titel = function(r){ return String(r.title || '').replace(/^\S+\s/, ''); };
     teil.sort(function(a, b){
-      if(art === 'methode' && a.methode && b.methode && a.methode.sort !== b.methode.sort) return (a.methode.sort || 0) - (b.methode.sort || 0);
+      if(art === 'methode'){
+        // nach Lektion (L2 vor L17), egal wann hochgeladen
+        var lek = function(r){ var m = /\bL\s?(\d+)/.exec((r.methode && r.methode.lektion) || '') || /\bL\s?(\d+)/.exec(String(r.title || '')); return m ? +m[1] : 999; };
+        if(lek(a) !== lek(b)) return lek(a) - lek(b);
+      }
       return titel(a).localeCompare(titel(b), 'de', {numeric:true});
     });
     var karten = teil.map(function(r){ return resourceCardHtml(r, -1, 0, false); }).join('');
@@ -24350,6 +24354,7 @@ function aemtliMeineTermine_(cfg, uid){
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
   {id:'2026-10-27-live-mehrere-klassen', datum:'2026-10-27', fuer:'lehrer', text:'👥 Live-Runden für mehrere Klassen, deine Fach-Gruppen (z. B. Mathe) oder einzelne Schüler:innen: ☁️ Wortwolke, 📊 Blitzumfrage, 🎮 Klassen-Quiz, 💰 Millionär und die Spiele (Schätzmeister, Bingo, Buzzer …) erscheinen bei allen Gewählten, auch in anderen Klassen, und die Antworten laufen am Beamer zusammen. Gewählt wird über «👥 Wer macht mit?» – im Klassenzimmer oben, im Start-Dialog von Wortwolke, Umfrage und Quiz und auf der Millionär-Seite. Dieselbe Auswahl gilt für Zufall, Gruppen & Partner. Startest du etwas direkt aus einem Fach-Ordner oder einer Planung, fragt vorher ein Dialog «Für wen?».'},
+  {id:'2026-10-27-methodenkoffer', datum:'2026-10-27', fuer:'lehrer', text:'🧰 Der Methodenkoffer liegt als ein Ordner unter «Zusatzmaterial», nach Lektion sortiert (L2 vor L17).'},
   {id:'2026-10-27-methodenmaterial', datum:'2026-10-27', fuer:'lehrer', text:'🧰 Methodenmaterial im Fach: Schilder, Rollenkarten, Raster und Karten stehen einzeln unter «Zusatzmaterial» (nur für Lehrpersonen, als druckbares PDF) – mit Lektion und der Menge pro Schüler:in/Paar/Gruppe.'},
   {id:'2026-10-27-sikore-ganze-klasse', datum:'2026-10-27', fuer:'lehrer', text:'SIKORE-Prüfung: Bei «Ganze Klasse» erscheinen nur noch die Schüler:innen deiner Klasse – Gäste aus Parallelklassen sind nur dabei, wenn du unter «Für» eine 👥 Gruppe wählst.'},
   {id:'2026-10-27-ordner-loeschen', datum:'2026-10-27', fuer:'lehrer', text:'Ordner lassen sich jetzt auch mit Inhalt löschen (zweimal bestätigen). Mit Ctrl+Z (⌘Z) holst du sie 1 Minute lang zurück.'},
