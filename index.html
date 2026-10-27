@@ -11749,6 +11749,7 @@ async function uebungZuMir(r, quelle, heim){
     if(r.externalUrl) copy.externalUrl = r.externalUrl;
     if(r.pdf) copy.pdf = true;
     if(r.folien) copy.folien = true;
+    if(r.methode) copy.methode = r.methode;
     // Ein Lehrer-HTML bleibt auch als Kopie eines (sonst sähe die Klasse es).
     if(istLehrerHtml(r)) copy.nurLehrer = true;
     await setDoc(ref, copy);
@@ -15586,6 +15587,7 @@ function renderFolderContents(){
    immer im DOM (nur versteckt), damit die Knöpfe normal verdrahtet werden. */
 var ZUSATZ_ARTEN = {
   folien:    {icon:'🎞️', name:'PPP Folien'},
+  methode: {icon:'🧰', name:'Methodenmaterial'},
   pruefung:{icon:'📝', name:'Prüfungen'},
   kk:      {icon:'🗂️', name:'Karteikarten'},
   quiz:    {icon:'🎮', name:'Klassen-Quizze'},
@@ -15596,6 +15598,7 @@ var ZUSATZ_ARTEN = {
 };
 var zusatzOffen = {};   // «Fach|Ordner|Art» → aufgeklappt (nur für diese Sitzung)
 function zusatzArt(r){
+  if(r.methode) return 'methode';
   if(r.folien) return 'folien';
   if(r.kk && r.ausOrdner) return 'kk';
   if(r.kzm && ZUSATZ_ARTEN[r.kzm.typ]) return r.kzm.typ;
@@ -15608,7 +15611,10 @@ function zusatzHtml(liste, subjectId, here){
     var teil = liste.filter(function(r){ return zusatzArt(r) === art; });
     if(!teil.length) return;
     var titel = function(r){ return String(r.title || '').replace(/^\S+\s/, ''); };
-    teil.sort(function(a, b){ return titel(a).localeCompare(titel(b), 'de', {numeric:true}); });
+    teil.sort(function(a, b){
+      if(art === 'methode' && a.methode && b.methode && a.methode.sort !== b.methode.sort) return (a.methode.sort || 0) - (b.methode.sort || 0);
+      return titel(a).localeCompare(titel(b), 'de', {numeric:true});
+    });
     var karten = teil.map(function(r){ return resourceCardHtml(r, -1, 0, false); }).join('');
     if(teil.length < 2){ html += karten; return; }
     var key = subjectId + '|' + (here || '') + '|' + art, offen = !!zusatzOffen[key], A = ZUSATZ_ARTEN[art];
@@ -16026,7 +16032,7 @@ function resourceCardHtml(r, index, total, isTeacher){
   }
   if(!lp && !r.folien) html += '<div class="resource-ring" style="--p:0" title="Fortschritt"><span id="pbar-'+r.id+'">–</span></div>';
   html += '<div class="resource-info"><h4>'+esc(r.title || r.fileName)+(r.current?' <span class="chip-current">Aktuell</span>':'')+(lp?' <span class="chip-lehrer">🔒 Nur Lehrpersonen</span>':'')+(aus?' <span class="chip-lehrer">🙈 Ausgeblendet</span>':'')+niveauChipHtml(r, isTeacher)+'</h4>';
-  var metaStart = lp && r.folien ? '🎞️ Folien · nur Lehrpersonen · Notizen + 🎤 Referentenansicht' : lp && r.pdf ? '📄 Lehrer-PDF · für Schüler:innen unsichtbar' : lp ? 'Lehrer-HTML · für Schüler:innen unsichtbar' : r.pdf ? '📄 PDF' : r.folien ? '🎞️ Folien · ▶ Präsentieren, Notizen nur für Lehrpersonen' : r.externalUrl ? '🔗 Link · öffnet in neuem Tab' : 'Noch nicht geübt';
+  var metaStart = r.methode ? '🧰 Methodenmaterial · ' + (r.methode.lektion ? esc(r.methode.lektion) + ' · ' : '') + (r.methode.menge ? esc(r.methode.menge) + ' · ' : '') + 'nur Lehrpersonen, zum Drucken' : lp && r.folien ? '🎞️ Folien · nur Lehrpersonen · Notizen + 🎤 Referentenansicht' : lp && r.pdf ? '📄 Lehrer-PDF · für Schüler:innen unsichtbar' : lp ? 'Lehrer-HTML · für Schüler:innen unsichtbar' : r.pdf ? '📄 PDF' : r.folien ? '🎞️ Folien · ▶ Präsentieren, Notizen nur für Lehrpersonen' : r.externalUrl ? '🔗 Link · öffnet in neuem Tab' : 'Noch nicht geübt';
   if(aus) metaStart = 'Für Schüler:innen ausgeblendet · ' + metaStart;
   html += '<div class="resource-meta" id="pmeta-'+r.id+'">'+metaStart+(uploaded?' · hinzugefügt am '+uploaded:'')+'</div>';
   html += '</div>';
@@ -24322,6 +24328,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-27-methodenmaterial', datum:'2026-10-27', fuer:'lehrer', text:'🧰 Methodenmaterial im Fach: Schilder, Rollenkarten, Raster und Karten stehen einzeln unter «Zusatzmaterial» (nur für Lehrpersonen, als druckbares PDF) – mit Lektion und der Menge pro Schüler:in/Paar/Gruppe.'},
   {id:'2026-10-27-sikore-ganze-klasse', datum:'2026-10-27', fuer:'lehrer', text:'SIKORE-Prüfung: Bei «Ganze Klasse» erscheinen nur noch die Schüler:innen deiner Klasse – Gäste aus Parallelklassen sind nur dabei, wenn du unter «Für» eine 👥 Gruppe wählst.'},
   {id:'2026-10-27-ordner-loeschen', datum:'2026-10-27', fuer:'lehrer', text:'Ordner lassen sich jetzt auch mit Inhalt löschen (zweimal bestätigen). Mit Ctrl+Z (⌘Z) holst du sie 1 Minute lang zurück.'},
   {id:'2026-10-26-sitz-gruppe', datum:'2026-10-26', fuer:'lehrer', text:'Sitzplan: Wähle oben eine deiner Gruppen – jede Gruppe hat ihre eigene Sitzordnung (Plätze, Regeln, Abwesende). Die Tische bleiben für alle gleich.'},
