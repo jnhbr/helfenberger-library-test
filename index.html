@@ -24349,7 +24349,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-10-27-live-mehrere-klassen', datum:'2026-10-27', fuer:'lehrer', text:'👥 Live-Runden für mehrere Klassen, deine Fach-Gruppen (z. B. Mathe) oder einzelne Schüler:innen: ☁️ Wortwolke, 📊 Blitzumfrage, 🎮 Klassen-Quiz, 💰 Millionär und die Spiele (Schätzmeister, Bingo, Buzzer …) erscheinen bei allen Gewählten, auch in anderen Klassen, und die Antworten laufen am Beamer zusammen. Gewählt wird über «👥 Wer macht mit?» – im Klassenzimmer oben, im Start-Dialog von Wortwolke, Umfrage und Quiz und auf der Millionär-Seite. Dieselbe Auswahl gilt für Zufall, Gruppen & Partner.'},
+  {id:'2026-10-27-live-mehrere-klassen', datum:'2026-10-27', fuer:'lehrer', text:'👥 Live-Runden für mehrere Klassen, deine Fach-Gruppen (z. B. Mathe) oder einzelne Schüler:innen: ☁️ Wortwolke, 📊 Blitzumfrage, 🎮 Klassen-Quiz, 💰 Millionär und die Spiele (Schätzmeister, Bingo, Buzzer …) erscheinen bei allen Gewählten, auch in anderen Klassen, und die Antworten laufen am Beamer zusammen. Gewählt wird über «👥 Wer macht mit?» – im Klassenzimmer oben, im Start-Dialog von Wortwolke, Umfrage und Quiz und auf der Millionär-Seite. Dieselbe Auswahl gilt für Zufall, Gruppen & Partner. Startest du etwas direkt aus einem Fach-Ordner oder einer Planung, fragt vorher ein Dialog «Für wen?».'},
   {id:'2026-10-27-methodenmaterial', datum:'2026-10-27', fuer:'lehrer', text:'🧰 Methodenmaterial im Fach: Schilder, Rollenkarten, Raster und Karten stehen einzeln unter «Zusatzmaterial» (nur für Lehrpersonen, als druckbares PDF) – mit Lektion und der Menge pro Schüler:in/Paar/Gruppe.'},
   {id:'2026-10-27-sikore-ganze-klasse', datum:'2026-10-27', fuer:'lehrer', text:'SIKORE-Prüfung: Bei «Ganze Klasse» erscheinen nur noch die Schüler:innen deiner Klasse – Gäste aus Parallelklassen sind nur dabei, wenn du unter «Für» eine 👥 Gruppe wählst.'},
   {id:'2026-10-27-ordner-loeschen', datum:'2026-10-27', fuer:'lehrer', text:'Ordner lassen sich jetzt auch mit Inhalt löschen (zweimal bestätigen). Mit Ctrl+Z (⌘Z) holst du sie 1 Minute lang zurück.'},
@@ -31967,14 +31967,30 @@ function kzmStarten(it){
   if(AKT_TYPEN[it.typ] && it.id) aktStarten('item:' + it.typ + ':' + it.id);
   else kzmStartenHier(it);
 }
+// «Für wen?» vor dem direkten Start aus Ordner/Planung: sonst startet die Runde stumm mit der
+// gemerkten Auswahl «Wer macht mit?» und die Klasse einer anderen Lehrperson sieht sie nicht.
+function liveFuerWenDialog(titel, weiter){
+  var h = '<h3>👥 Für wen?</h3><p class="pr-hinweis"><b>'+esc(titel)+'</b></p>'+
+    '<p style="margin:0 0 6px;">Die Runde erscheint bei: <b id="fwText">'+esc(mitKurz())+'</b></p>'+
+    '<p class="pr-hinweis">Klassen, deine Fach-Gruppen (z. B. Mathe) oder einzelne Schüler:innen – auch aus anderen Klassen.</p>'+
+    '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="fwAbbr" type="button">Abbrechen</button>'+
+    '<button class="btn btn-ghost btn-sm" id="fwAendern" type="button">👥 Ändern</button>'+
+    '<button class="btn btn-primary btn-sm" id="fwGo" type="button">▶︎ Starten</button></div>';
+  openModal(h);
+  mitGruppenLaden().then(function(){ var t = document.getElementById('fwText'); if(t) t.textContent = mitKurz(); });
+  function neu(){ liveFuerWenDialog(titel, weiter); }
+  document.getElementById('fwAbbr').addEventListener('click', closeModal);
+  document.getElementById('fwAendern').addEventListener('click', function(){ mitDialog(neu, neu); });
+  document.getElementById('fwGo').addEventListener('click', function(){ closeModal(); weiter(); });
+}
 function kzmStartenHier(it){
   if(!it) return;
   if(it.typ === 'quiz') quizStartDialog(it.raw);
-  else if(it.typ === 'million') spielWahl(it.raw.title, mioAusQuiz(it.raw));
-  else if(it.typ === 'schaetz') schaetzStart(it.raw.title, schaetzNorm(it.raw.questions), schaetzOpt().sec);
+  else if(it.typ === 'million') liveFuerWenDialog(it.raw.title, function(){ spielWahl(it.raw.title, mioAusQuiz(it.raw)); });
+  else if(it.typ === 'schaetz') liveFuerWenDialog(it.raw.title, function(){ schaetzStart(it.raw.title, schaetzNorm(it.raw.questions), schaetzOpt().sec); });
   else if(it.typ === 'kk') goResource(Object.assign(kkRes(it.raw), {folderId:it.ordner, ausOrdner:true}));
-  else if(it.typ === 'wolke') wolkeStart(it.raw.frage, Math.max(1, Math.min(5, +it.raw.max || 3)), it.raw.zeigen !== false);
-  else if(it.typ === 'umfrage') umfrageStartSerie(umfrageFragen(it.raw), it.raw.titel || '');
+  else if(it.typ === 'wolke') liveFuerWenDialog(it.raw.frage, function(){ wolkeStart(it.raw.frage, Math.max(1, Math.min(5, +it.raw.max || 3)), it.raw.zeigen !== false); });
+  else if(it.typ === 'umfrage') liveFuerWenDialog(it.raw.titel || umfrageFragen(it.raw)[0].frage, function(){ umfrageStartSerie(umfrageFragen(it.raw), it.raw.titel || ''); });
   else if(it.typ === 'pruefung'){ startPruefungWatcher(); state.route = {name:'pruefung', id:it.id}; render(); }
 }
 // Nach jedem Speichern: Zwischenspeicher neu laden und die offene Ansicht nachführen.
