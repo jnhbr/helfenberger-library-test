@@ -34252,7 +34252,11 @@ function lphMelden(heartbeat, erzwungenRaus){
   else if(lph.drin !== false && !drin){ data.raus = increment(1); data.rausSeit = serverTimestamp(); }
   lph.drin = drin;
   fsSetDoc(doc(db, 'lernphasen', lph.aktiv.id, 'praesenz', state.user.uid), data, {merge:true})
-    .catch(function(err){ console.error('Lernphase: Meldung', err); });
+    .catch(function(err){
+      // Lernphase eben beendet oder Person entfernt: kein Fehler, nur Stand neu holen (stoppt das Melden).
+      if(err && err.code === 'permission-denied'){ console.warn('Lernphase: Meldung abgelehnt', err.code); lphNachfragen(); return; }
+      console.error('Lernphase: Meldung', err);
+    });
 }
 function lphWechsel(){ lphMelden(false); }
 // Ein Klick in eine Übung (iframe) löst am Fenster «blur» aus, obwohl die
