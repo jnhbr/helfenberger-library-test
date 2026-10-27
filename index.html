@@ -4260,16 +4260,25 @@ function undoAusfuehren(){
     return;
   }
   undoLaeuft = true;
+  var undoFehlPfade = [];
   var teile = [];
   for(var i = 0; i < aktion.eintraege.length; i += 400) teile.push(aktion.eintraege.slice(i, i + 400));
   teile.reduce(function(p, teil){
     return p.then(function(){
       var b = fsWriteBatch(db);
       teil.forEach(function(e){ if(e.vorher) b.set(e.ref, e.vorher); else b.delete(e.ref); });
-      return b.commit();
+      // Ein einziges verweigertes Dokument kippt sonst den ganzen Batch: dann einzeln weiter, Rest wiederherstellen.
+      return b.commit().catch(function(err){
+        console.error('Rückgängig (Batch) – versuche einzeln', err);
+        return Promise.all(teil.map(function(e){
+          return (e.vorher ? fsSetDoc(e.ref, e.vorher) : fsDeleteDoc(e.ref)).catch(function(err2){
+            undoFehlPfade.push(e.ref.path); console.error('Rückgängig verweigert: '+e.ref.path, err2);
+          });
+        }));
+      });
     });
   }, Promise.resolve()).then(function(){
-    toast('↩️ Rückgängig gemacht.');
+    toast(undoFehlPfade.length ? '⚠️ Rückgängig nur teilweise: '+undoFehlPfade.length+' Eintrag/Einträge nicht erlaubt.' : '↩️ Rückgängig gemacht.');
     // Ansicht auffrischen – nicht in einer offenen Übung/Live-Ansicht (würde dort den Stand verlieren).
     if(['resource','quizplay','pruefung'].indexOf(state.route.name) < 0){
       var y = window.scrollY; render(); setTimeout(function(){ window.scrollTo(0, y); }, 0);
