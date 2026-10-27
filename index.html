@@ -24322,6 +24322,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-27-sikore-ganze-klasse', datum:'2026-10-27', fuer:'lehrer', text:'SIKORE-Prüfung: Bei «Ganze Klasse» erscheinen nur noch die Schüler:innen deiner Klasse – Gäste aus Parallelklassen sind nur dabei, wenn du unter «Für» eine 👥 Gruppe wählst.'},
   {id:'2026-10-27-ordner-loeschen', datum:'2026-10-27', fuer:'lehrer', text:'Ordner lassen sich jetzt auch mit Inhalt löschen (zweimal bestätigen). Mit Ctrl+Z (⌘Z) holst du sie 1 Minute lang zurück.'},
   {id:'2026-10-26-sitz-gruppe', datum:'2026-10-26', fuer:'lehrer', text:'Sitzplan: Wähle oben eine deiner Gruppen – jede Gruppe hat ihre eigene Sitzordnung (Plätze, Regeln, Abwesende). Die Tische bleiben für alle gleich.'},
   {id:'2026-10-26-sitz-regelgruppen', datum:'2026-10-26', fuer:'lehrer', text:'Sitzplan: Im Fenster «⚖️ Regeln» lassen sich ganze Regelgruppen an- und abwählen, damit das Zufallssetzen nicht an unerfüllbaren Regeln scheitert.'},
@@ -40003,6 +40004,8 @@ async function sikoreEditor(p){
   }catch(err){ console.error(err); }
   if(token !== prEditorToken) return;   // inzwischen wurde eine andere Art gewählt
   roster.sort(function(a, b){ return (a.displayName || a.username || '').localeCompare(b.displayName || b.username || '', 'de'); });
+  var gastUids = {};
+  roster.forEach(function(s){ if(gastFach(s)) gastUids[s.uid] = 1; });
   var levels = Object.assign({}, (p && p.levels) || {});
   if(neu) roster.forEach(function(s){ if(vorschlag[s.uid]) levels[s.uid] = vorschlag[s.uid].neu; });
   var skw = JSON.parse(JSON.stringify(pruefSkala(p || {})));
@@ -40050,7 +40053,8 @@ async function sikoreEditor(p){
   function fuerAnwenden(){
     var g = pruefFuerGruppe();
     Array.prototype.forEach.call(document.querySelectorAll('.sk-lv-row'), function(row){
-      var drin = !g || (g.mitglieder || []).indexOf(row.getAttribute('data-uid')) >= 0;
+      var u = row.getAttribute('data-uid');
+      var drin = g ? (g.mitglieder || []).indexOf(u) >= 0 : !gastUids[u];   // Ganze Klasse: keine Gäste aus Parallelklassen
       row.hidden = !drin;
       var sel = row.querySelector('select');
       if(!drin && sel && !sel.disabled) sel.value = '';
