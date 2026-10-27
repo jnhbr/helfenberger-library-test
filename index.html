@@ -3576,6 +3576,7 @@
   :root[data-design="neu"] .stp-cell.termin{outline:none;}
   :root[data-design="neu"] .stp-cell.jetzt{background:color-mix(in srgb, var(--c) 34%, var(--surface));box-shadow:0 0 0 3px var(--c);animation:none;}
   :root[data-design="neu"] .stp-cell:not(.edit) .stp-eigen-tag:not(.stp-pin){display:none;}
+  .stp-pr{align-self:flex-start;margin-top:2px;background:#E63950;color:#fff;border-radius:999px;font-size:10.5px;font-weight:800;padding:1px 8px;line-height:1.5;white-space:nowrap;}
   .stp-slot2{grid-row:span 2;}
   .stp-mehr{left:auto;right:0;min-width:300px;}
   .stp-lpwahl-l{display:flex;flex-direction:column;gap:6px;padding:8px;font-weight:700;font-size:13px;}
@@ -24204,6 +24205,7 @@ function aemtliMeineTermine_(cfg, uid){
 const NEUIGKEITEN = [
   {id:'2026-10-26-sitz-gruppe', datum:'2026-10-26', fuer:'lehrer', text:'Sitzplan: Wähle oben eine deiner Gruppen – jede Gruppe hat ihre eigene Sitzordnung (Plätze, Regeln, Abwesende). Die Tische bleiben für alle gleich.'},
   {id:'2026-10-26-sitz-regelgruppen', datum:'2026-10-26', fuer:'lehrer', text:'Sitzplan: Im Fenster «⚖️ Regeln» lassen sich ganze Regelgruppen an- und abwählen, damit das Zufallssetzen nicht an unerfüllbaren Regeln scheitert.'},
+  {id:'2026-10-27-stundenplan-pruefung', datum:'2026-10-27', fuer:'alle', text:'📝 Im Stundenplan steht bei der Lektion jetzt eine kleine rote Pille «Prüfung», wenn im Kalender an diesem Tag eine Prüfung in diesem Fach eingetragen ist.'},
   {id:'2026-10-27-alle-pruefungen', datum:'2026-10-27', fuer:'lehrer', text:'📝 Im Kalender gibt es den Knopf «Alle Prüfungen»: die Prüfungen aller Klassen und Lehrpersonen nach Woche. So siehst du, wenn sich bei jemandem die Prüfungen häufen.'},
   {id:'2026-10-27-sva-bereit', datum:'2026-10-27', fuer:'lehrer', text:'🎓 SVA › «Projekte der Klasse»: Grobkonzepte, die Schüler:innen als «bereit» markiert haben, stehen jetzt zuoberst und sind gleich aufgeklappt, mit allem, was sie geschrieben haben.'},
   {id:'2026-10-26-pdf-handy', datum:'2026-10-26', fuer:'alle', text:'📄 PDFs (z. B. das Chemie-Lehrmittel) zeigen auf Handy und Tablet jetzt alle Seiten, nicht nur die erste.'},
@@ -47095,7 +47097,10 @@ function stpLaden(){
   var leer = function(){ return null; };
   var te = getDoc(stpTermineRef()).then(function(s){ return s.exists() ? s.data() : null; }).catch(leer);
   var tk = getDoc(stpTermineRef(state.klasse)).then(function(s){ return s.exists() ? s.data() : null; }).catch(leer);
-  return Promise.all([k, e, sch, te, tk]).then(function(r){
+  // 📝 Prüfungen aus dem Kalender: erscheinen als kleine Pille in der Lektion des Fachs.
+  var pr = loadMyCalendarEntries(addDaysStr(-7)).then(function(l){ return l.filter(function(x){ return x.type === 'pruefung' && x.subject; }); }).catch(function(err){ console.error('Stundenplan Prüfungen', err); return []; });
+  return Promise.all([k, e, sch, te, tk, pr]).then(function(r){
+    stp.pruefungen = r[5] || [];
     stp.termine = { eigen:(r[3] && r[3].termine) || {}, klasse:(r[4] && r[4].termine) || {} };
     stp.klasse = { zeiten:stpZeitenAktuell(r[0] && r[0].zeiten), zellen:(r[0] && r[0].zellen) || {} };
     stp.eigen = { zeiten:stpZeitenAktuell(r[1] && r[1].zeiten), zellen:(r[1] && r[1].zellen) || {} };
@@ -47115,6 +47120,12 @@ function stpLaden(){
       }).catch(function(err){ console.error('Klassenplan '+kl, err); });
     }));
   });
+}
+// Prüfung (Kalender-Eintrag) dieses Fachs an diesem Datum, sonst null.
+function stpPruefung(datum, c){
+  if(!c || !c.f || !stp.pruefungen) return null;
+  for(var i = 0; i < stp.pruefungen.length; i++){ var e = stp.pruefungen[i]; if(e.dueDate === datum && e.subject === c.f) return e; }
+  return null;
 }
 function stpVorladen(){ stpLaden().then(renderStpJetzt); }
 
@@ -47457,6 +47468,8 @@ function stpZeichnen(){
       var kl = c.kl; if(kl && kl === state.klasse && !lehrer) kl = '';   // Schüler:innen: die eigene Klasse muss nicht in jeder Zelle stehen
       var sub = [kl || '', c.zi || '', c.lp || ''].filter(Boolean).join(' · ');
       if(sub) inner += '<span class="stp-sub">'+esc(sub)+'</span>';
+      var prf = !vorlage && !a.ferien && !(a.termin && !a.par) ? stpPruefung(stpDatum(tag), c) : null;
+      if(prf) inner += '<span class="stp-pr" title="Prüfung: '+esc(prf.title || '')+'">📝 Prüfung</span>';
       inner += '</span>';
     } else if(c && c.frei){
       inner += '<span class="stp-txt"><span class="stp-name">🌴 '+(a.termin ? 'Fällt aus' : 'Frei')+'</span>'+(a.termin && c.t ? '<span class="stp-sub">'+esc(c.t)+'</span>' : '')+'</span>';
