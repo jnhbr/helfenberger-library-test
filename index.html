@@ -294,12 +294,12 @@
   .sva-chip.gelb{background:#FFF1C2;color:#7A5200;} .sva-chip.ok{background:#DDF1E4;color:#1B6B3F;} .sva-chip.papier{background:#EDE6D6;color:#5C4A22;}
   .sva-achtung{border:1px solid #F3C9C2;background:#FFF7F5;border-radius:10px;padding:10px 14px;} .sva-achtung.ruhig{border-color:var(--border);background:transparent;color:var(--text-muted);font-size:14px;}
   .sva-achtung summary{cursor:pointer;} .sva-achtung ul{margin:6px 0 2px;padding-left:20px;} .sva-achtung li{margin:5px 0;line-height:1.9;} .sva-achtung p{margin:6px 0 0;}
-  .sva-detailzeile[hidden]{display:none;} .sva-detailzeile td{background:rgba(0,0,0,.03);padding:12px;white-space:normal;}
-  .sva-detail{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:14px;align-items:start;} @media(max-width:760px){.sva-detail{grid-template-columns:1fr;}}
-  .sva-gk{display:grid;grid-template-columns:1fr 1fr;gap:8px;} @media(max-width:760px){.sva-gk{grid-template-columns:1fr;}}
-  .sva-gkf{background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;line-height:1.45;overflow-wrap:anywhere;} .sva-gkf.leer{color:var(--text-muted);background:transparent;border-style:dashed;}
+  .sva-detailzeile[hidden]{display:none;} .sva-tab .sva-detailzeile td{background:rgba(0,0,0,.03);padding:12px;white-space:normal;max-width:0;}
+  .sva-detail{display:flex;flex-direction:column;gap:12px;}
+  .sva-gk{display:flex;flex-direction:column;gap:8px;}
+  .sva-gkf{background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:15px;line-height:1.5;overflow-wrap:anywhere;white-space:normal;} .sva-gkf.leer{color:var(--text-muted);background:transparent;border-style:dashed;}
   .sva-gkl{display:block;font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);margin-bottom:2px;}
-  .sva-detail .sva-rueck{margin-top:0;position:sticky;top:0;background:var(--surface,#fff);border-style:solid;}
+  .sva-detail .sva-rueck{margin-top:0;background:var(--surface,#fff);border-style:solid;}
   .sva-rueck{margin-top:10px;padding:10px;border:1px dashed var(--border);border-radius:8px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;} .sva-rueck .modal-input{width:100%;}
   .sva-pform{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin:8px 0;} .sva-pform label.breit{grid-column:1 / -1;} .sva-pform .modal-input{width:100%;}
   .sva-rueckbox{border-radius:10px;padding:10px 14px;background:#E9F6EE;border:1px solid #BFE3CC;} .sva-rueckbox.ueber{background:#FFF4D6;border-color:#EBD08A;}
