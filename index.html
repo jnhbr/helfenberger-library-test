@@ -7770,7 +7770,7 @@ function wsCsv(){
 
 var LR_DATEI_RE = /lesereise/i;
 var LR_KEY_RE = /^[a-z0-9]+_lesereise_v\d+$/;
-var lrState = { detailUid:null, sort:'name', daten:null, laedt:false, buch:'' };
+var lrState = { detailUid:null, sort:'name', daten:null, laedt:false, buch:'', ansicht:'schueler', kap:0, nurSum:false };
 
 function lrAusDoc(data){
   var out = {};
@@ -7919,10 +7919,12 @@ function lrZeichnen(){
     if(sel) sel.onchange = function(){ lrState.buch = sel.value; lrState.detailUid = null; lrZeichnen(); };
   }
   if(lrState.detailUid){ lrDetail(body, buch); return; }
+  if(lrState.ansicht === 'kapitel'){ lrKapitel(body, buch); return; }
   var rows = lrZeilen(buch), n = rows.length || 1, N = meta.stationen.length;
   var totDone = 0, fertig = 0, nie = 0, qA = 0, qF = 0;
   rows.forEach(function(x){ totDone += x.r.done; if(x.r.fin) fertig++; if(!x.r.begonnen) nie++; qA += x.r.qAns; qF += x.r.qFirst; });
-  var h = '<div class="da-student-card"><h4>📖 '+esc(meta.buch || '')+(meta.autor ? ' <span class="tiny muted">· '+esc(meta.autor)+'</span>' : '')+' · '+rows.length+' Schüler:innen</h4>';
+  var h = lrTabsHtml();
+  h += '<div class="da-student-card"><h4>📖 '+esc(meta.buch || '')+(meta.autor ? ' <span class="tiny muted">· '+esc(meta.autor)+'</span>' : '')+' · '+rows.length+' Schüler:innen</h4>';
   h += '<div class="ws-kpis">' +
     '<div><b>'+(Math.round(totDone/n*10)/10)+'</b><span>Ø Stationen von '+N+'</span></div>' +
     '<div><b>'+(qA ? Math.round(qF/qA*100) : 0)+'%</b><span>Kapitel-Checks beim 1. Versuch richtig</span></div>' +
@@ -7958,9 +7960,110 @@ function lrZeichnen(){
   });
   h += '</tbody></table></div><p class="tiny muted">⭐ = Kapitel-Checks beim ersten Versuch fehlerfrei · 1. Versuch = Anteil der Fragen, die beim ersten Versuch stimmten · 🏅 = Linien-Abzeichen · ✍️ = Schreibaufträge mit mind. 50 Wörtern / angefangen · 🏁 = Abschlussquiz bestanden</p>';
   body.innerHTML = h;
+  lrTabsBinden(body);
   Array.prototype.forEach.call(body.querySelectorAll('.ws-name'), function(b){
     b.addEventListener('click', function(){ lrState.detailUid = b.getAttribute('data-uid'); lrZeichnen(); window.scrollTo(0, 0); });
   });
+}
+
+function lrTabsHtml(){
+  return '<div class="da-toolbar" style="margin-bottom:10px"><button class="btn btn-sm '+(lrState.ansicht === 'kapitel' ? 'btn-ghost' : 'btn-primary')+'" type="button" data-lrtab="schueler">👤 Pro Schüler:in</button>' +
+    '<button class="btn btn-sm '+(lrState.ansicht === 'kapitel' ? 'btn-primary' : 'btn-ghost')+'" type="button" data-lrtab="kapitel">📝 Zusammenfassungen pro Kapitel</button>' +
+    '<button class="btn btn-ghost btn-sm" type="button" id="lrAllePdf">📄 Alle Lesetagebücher als PDF</button></div>';
+}
+function lrTabsBinden(body){
+  Array.prototype.forEach.call(body.querySelectorAll('[data-lrtab]'), function(b){
+    b.addEventListener('click', function(){ lrState.ansicht = b.getAttribute('data-lrtab'); lrState.detailUid = null; lrZeichnen(); });
+  });
+  var a = document.getElementById('lrAllePdf');
+  if(a) a.addEventListener('click', function(){ lrPdf(null); });
+}
+
+// Lesetagebuch als druckbares Blatt (ein Blatt-Block pro Schüler:in); Druckdialog › «Als PDF sichern»
+function lrTagebuchHtml(stu, st, meta){
+  var r = lrAuswerten(st, meta), N = meta.stationen.length, moods = meta.moods || ['😣','😟','😐','🙂','😄'];
+  function box(t){ return '<div style="white-space:pre-wrap;border:1px solid #999;border-radius:4pt;padding:4pt 8pt;margin:3pt 0">'+esc(t)+'</div>'; }
+  var h = '<div class="blatt"><h1>📖 Lesetagebuch · '+esc(meta.buch || '')+'</h1><p><b>'+esc(stu.displayName || '?')+'</b>'+(meta.autor ? ' · '+esc(meta.autor) : '')+' · '+r.done+' / '+N+' Stationen entwertet'+(r.fin ? ' · Endstation '+(r.fin.best || 0)+'/15' : '')+'</p>';
+  Object.keys(meta.linien || {}).forEach(function(b){
+    var L = meta.linien[b], teile = '';
+    meta.stationen.forEach(function(s, i){
+      if(s.b !== b) return;
+      var dd = (st && st.st && st.st[i] && st.st[i].d) || {};
+      if(!dd.sum && !dd.quote && !dd.ask) return;
+      teile += '<h3 style="margin:8pt 0 0;font-size:11pt;break-after:avoid">'+(i+1)+'. '+esc(s.t)+' <span class="klein">S. '+esc(s.p)+(s.e && s.e !== s.p ? '–'+esc(s.e) : '')+(dd.mood ? ' · '+esc(moods[dd.mood - 1] || '') : '')+'</span></h3>' +
+        (dd.sum ? box(dd.sum) : '') + (dd.quote ? '<div class="klein"><i>«'+esc(dd.quote)+'»</i>'+(dd.page ? ' (S. '+esc(dd.page)+')' : '')+'</div>' : '') + (dd.ask ? '<div class="klein">❓ '+esc(dd.ask)+'</div>' : '');
+    });
+    if(teile) h += '<h2>'+esc((L.line ? L.line+' · ' : '')+(L.name || ''))+'</h2>'+teile;
+  });
+  var fh = '';
+  (meta.figuren || []).forEach(function(f){
+    var x = st && st.fig && st.fig[f.id];
+    if(!x || !(x.who || x.scene || x.end || (x.traits || []).length)) return;
+    fh += '<p style="margin:6pt 0 0;break-inside:avoid"><b>'+esc(f.emoji+' '+f.name)+'</b>'+((x.traits || []).length ? ' <span class="klein">· '+esc(x.traits.join(', '))+'</span>' : '')+(x.who ? box(x.who) : '')+(x.scene ? '<span class="klein">Wichtigste Szene: '+esc(x.scene)+'</span><br>' : '')+(x.end ? '<span class="klein">Was wird aus der Figur: '+esc(x.end)+'</span>' : '')+'</p>';
+  });
+  if(fh) h += '<h2>👥 Figuren-Steckbriefe</h2>'+fh;
+  var sp = (st && st.sp) || {};
+  if(st && (st.moodNote || sp.r1 || sp.r2)){
+    h += '<h2>📈 Stimmung &amp; 🌀 Spirale</h2>' + (st.moodNote ? '<div class="klein"><b>Tiefpunkt / Höhepunkt:</b></div>'+box(st.moodNote) : '') +
+      (sp.r1 ? '<div class="klein"><b>Wo hätte sie aussteigen können?</b></div>'+box(sp.r1) : '') + (sp.r2 ? '<div class="klein"><b>Wer hätte helfen können?</b></div>'+box(sp.r2) : '');
+  }
+  var wh = '';
+  (meta.schreiben || []).forEach(function(w){
+    var x = st && st.wr && st.wr[w.id];
+    if(x && x.text) wh += '<h3 style="margin:8pt 0 0;font-size:11pt;break-after:avoid">'+esc((w.emoji || '✍️')+' '+w.title)+' <span class="klein">'+lrWoerter(x.text)+' Wörter</span></h3>'+box(x.text);
+  });
+  if(wh) h += '<h2>✍️ Schreibwerkstatt</h2>'+wh;
+  return h + '</div>';
+}
+// uid = eine Person, null = alle (die etwas geschrieben/begonnen haben)
+function lrPdf(uid){
+  var d = lrState.daten; if(!d || !Object.keys(d.buecher || {}).length){ toast('Noch keine Daten.'); return; }
+  var buch = lrBuch(), meta = buch.meta;
+  var liste = lrZeilen(buch).filter(function(x){ return uid ? x.stu.uid === uid : (x.st && x.r.begonnen || x.r.texte); });
+  liste.sort(function(a, b){ return (a.stu.displayName || '').localeCompare(b.stu.displayName || '', 'de'); });
+  if(!liste.length){ toast('Noch kein Lesetagebuch vorhanden.'); return; }
+  toast('Druckfenster öffnet sich – dort «Als PDF sichern» wählen.');
+  svaDruck('Lesetagebuch ' + (meta.buch || '') + (uid ? ' – ' + (liste[0].stu.displayName || '') : ' – ' + (state.klasse || '')),
+    liste.map(function(x){ return lrTagebuchHtml(x.stu, x.st || {}, meta); }).join(''));
+}
+
+// Pro Kapitel: was haben alle Schüler:innen als Zusammenfassung geschrieben?
+function lrSumme(buch, i){
+  return lrState.daten.roster.map(function(stu){
+    var st = buch.proStu[stu.uid], sd = st && st.st && st.st[i], dd = (sd && sd.d) || {};
+    return {stu:stu, sum:String(dd.sum || '').trim(), done:!!(sd && sd.done), mood:dd.mood || 0, star:!!(sd && sd.star), quote:dd.quote || '', page:dd.page || '', ask:dd.ask || ''};
+  }).sort(function(a, b){ return (a.stu.displayName || '').localeCompare(b.stu.displayName || '', 'de'); });
+}
+function lrKapitel(body, buch){
+  var meta = buch.meta, N = meta.stationen.length, moods = meta.moods || ['😣','😟','😐','🙂','😄'];
+  if(lrState.kap < 0 || lrState.kap >= N) lrState.kap = 0;
+  var i = lrState.kap, s = meta.stationen[i], L = (meta.linien || {})[s.b] || {};
+  var liste = lrSumme(buch, i), mit = liste.filter(function(x){ return x.sum; }), ohne = liste.filter(function(x){ return !x.sum; });
+  var h = lrTabsHtml();
+  h += '<div class="da-toolbar" style="margin-bottom:10px"><button class="btn btn-ghost btn-sm" id="lrKapPrev" type="button"'+(i === 0 ? ' disabled' : '')+'>&larr;</button>' +
+    '<select class="sk-wahl" id="lrKapWahl" style="flex:1;min-width:200px">' + meta.stationen.map(function(st, k){
+      var anz = lrSumme(buch, k).filter(function(x){ return x.sum; }).length;
+      return '<option value="'+k+'"'+(k === i ? ' selected' : '')+'>'+(k+1)+'. '+esc(st.t)+' ('+anz+')</option>'; }).join('') + '</select>' +
+    '<button class="btn btn-ghost btn-sm" id="lrKapNext" type="button"'+(i === N - 1 ? ' disabled' : '')+'>&rarr;</button></div>';
+  h += '<div class="da-student-card"><h4>'+(L.line ? '<span style="display:inline-block;background:'+esc(L.color || '#555')+';color:#fff;border-radius:5px;padding:0 6px;font-weight:800;font-size:12px">'+esc(L.line)+'</span> ' : '')+(i+1)+'. '+esc(s.t)+' <span class="tiny muted">S. '+esc(s.p)+(s.e && s.e !== s.p ? '–'+esc(s.e) : '')+'</span></h4>' +
+    '<div class="ws-kpis"><div><b>'+mit.length+' / '+liste.length+'</b><span>Zusammenfassung geschrieben</span></div>' +
+    '<div><b>'+(mit.length ? Math.round(mit.reduce(function(a, x){ return a + lrWoerter(x.sum); }, 0) / mit.length) : 0)+'</b><span>Ø Wörter</span></div>' +
+    '<div><b>'+liste.filter(function(x){ return x.done; }).length+'</b><span>Station entwertet</span></div></div></div>';
+  mit.forEach(function(x){
+    h += '<div class="da-student-card" style="break-inside:avoid"><b>'+esc(x.stu.displayName || '?')+'</b> <span class="tiny muted">'+lrWoerter(x.sum)+' Wörter'+(x.done ? ' · 🎫 entwertet'+(x.star ? ' ⭐' : '') : ' · ✎ noch nicht entwertet')+'</span>' +
+      (x.mood ? ' <span style="font-size:18px">'+esc(moods[x.mood - 1] || '')+'</span>' : '') +
+      '<div style="white-space:pre-wrap;background:var(--surface-2);border-radius:10px;padding:8px 12px;margin:6px 0 0">'+esc(x.sum)+'</div>' +
+      (x.quote ? '<div class="tiny"><i>«'+esc(x.quote)+'»</i>'+(x.page ? ' (S. '+esc(x.page)+')' : '')+'</div>' : '') +
+      (x.ask ? '<div class="tiny">❓ '+esc(x.ask)+'</div>' : '') + '</div>';
+  });
+  if(!mit.length) h += '<div class="empty-state">Zu diesem Kapitel hat noch niemand eine Zusammenfassung geschrieben.</div>';
+  else if(ohne.length) h += '<p class="tiny muted"><b>Noch keine Zusammenfassung ('+ohne.length+'):</b> '+ohne.map(function(x){ return esc(x.stu.displayName || '?'); }).join(', ')+'</p>';
+  body.innerHTML = h;
+  lrTabsBinden(body);
+  function geh(k){ lrState.kap = k; lrZeichnen(); }
+  document.getElementById('lrKapWahl').addEventListener('change', function(e){ geh(parseInt(e.target.value, 10) || 0); });
+  document.getElementById('lrKapPrev').addEventListener('click', function(){ geh(i - 1); });
+  document.getElementById('lrKapNext').addEventListener('click', function(){ geh(i + 1); });
 }
 
 function lrDetail(body, buch){
@@ -7969,7 +8072,7 @@ function lrDetail(body, buch){
   if(!stu){ lrState.detailUid = null; lrZeichnen(); return; }
   var st = buch.proStu[stu.uid] || {}, r = lrAuswerten(st, meta), N = meta.stationen.length, moods = meta.moods || ['😣','😟','😐','🙂','😄'];
   function txt(s){ return '<div style="white-space:pre-wrap;background:var(--surface-2);border-radius:10px;padding:8px 12px;margin:6px 0">'+esc(s)+'</div>'; }
-  var h = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="lrZurueck" type="button">&larr; alle Schüler:innen</button></div>';
+  var h = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="lrZurueck" type="button">&larr; alle Schüler:innen</button> <button class="btn btn-ghost btn-sm" id="lrEinzelPdf" type="button">📄 Lesetagebuch als PDF</button></div>';
   h += '<div class="da-student-card"><h4>'+esc(stu.displayName || '?')+' · 📖 '+esc(meta.buch || '')+(st.name && st.name !== stu.displayName ? ' <span class="tiny muted">(Name auf der Fahrkarte: '+esc(st.name)+')</span>' : '')+'</h4><div class="ws-kpis">' +
     '<div><b>'+r.done+' / '+N+'</b><span>Stationen entwertet</span></div>' +
     '<div><b>'+(r.qAns ? Math.round(r.qFirst / r.qAns * 100) : 0)+'%</b><span>beim 1. Versuch richtig</span></div>' +
@@ -8039,12 +8142,19 @@ function lrDetail(body, buch){
   if(wh) h += '<details class="da-student-card ws-posten" open><summary><b>✍️ Schreibwerkstatt</b></summary>'+wh+'</details>';
   body.innerHTML = h;
   document.getElementById('lrZurueck').addEventListener('click', function(){ lrState.detailUid = null; lrZeichnen(); });
+  document.getElementById('lrEinzelPdf').addEventListener('click', function(){ lrPdf(stu.uid); });
 }
 
 function lrCsv(){
   var d = lrState.daten;
   if(!d || !Object.keys(d.buecher || {}).length){ toast('Noch keine Daten.'); return; }
   var buch = lrBuch(), meta = buch.meta;
+  if(lrState.ansicht === 'kapitel'){
+    var zr = [['Schüler:in', 'Kapitel Nr.', 'Kapitel', 'Wörter', 'Zusammenfassung']];
+    meta.stationen.forEach(function(s, i){ lrSumme(buch, i).forEach(function(x){ if(x.sum) zr.push([x.stu.displayName, i + 1, s.t, lrWoerter(x.sum), x.sum]); }); });
+    downloadTextFile('lesereise-zusammenfassungen-'+todayStr()+'.csv', zr.map(function(r){ return r.map(csvField).join(','); }).join('\r\n'), 'text/csv');
+    return;
+  }
   var rows = [['Schüler:in', 'Stationen entwertet', 'Stationen total', 'nächste Station', 'fehlerfreie Checks', '1. Versuch %', 'Linien-Abzeichen', 'Texte (≥50 Wörter)', 'Endstation', 'zuletzt']];
   lrZeilen(buch).forEach(function(x){
     rows.push([x.stu.displayName, x.r.done, meta.stationen.length, x.r.begonnen ? lrStationText(meta, x.r.cur) : '', x.r.stars,
@@ -24675,6 +24785,7 @@ const NEUIGKEITEN = [
   {id:'2026-10-09-schach-lp', datum:'2026-10-09', fuer:'lehrer', text:'♟️ Schach für die Klasse: Im Fach «Schach & Jassen» gibt es das Schachbrett. Während der Unterrichtszeit ist es für Schüler:innen gesperrt – oben im Schachclub schaltest du unter «🔑 Lehrperson: Freischaltung» für 15, 30 oder 45 Minuten oder bis zum Ende der Lektion frei (auch für mehrere Klassen), und setzt die Rangliste zurück. Du selbst kannst immer spielen.'},
   {id:'2026-10-08-faecher-ausblenden', datum:'2026-10-08', fuer:'alle', text:'🧩 Du kannst jetzt auch Fächer ausblenden, die du nicht brauchst: «✏️ Anordnen» antippen (oder lange auf eine Kachel drücken) und beim Fach auf «−». Unter den Kacheln steht dann «… ausgeblendet · anzeigen» – so holst du sie jederzeit zurück.'},
   {id:'2026-10-08-wer-macht-mit', datum:'2026-10-08', fuer:'lehrer', text:'👥 Neu im 🏫 Klassenzimmer: «Wer macht mit?» (Knopf oben rechts in 🎲 Zufall, ⏱ Ruhephase und 👥 Gruppen & Partner). Mische ganze Klassen aus der ganzen Schule, deine 👥 Gruppen und einzelne Schüler:innen – z. B. die G2b und drei aus der E3a. Die Auswahl gilt für Glücksrad, Wer ist dran?, Gruppen & Partner und die Flüsterliste und ersetzt den Knopf «👭 Gäste».'},
+  {id:'2026-10-28-lesereise-kapitel', datum:'2026-10-28', fuer:'lehrer', text:'📖 Lesereise-Übersicht (📈 Lernstand): neu «📝 Zusammenfassungen pro Kapitel» – Kapitel wählen und alle Zusammenfassungen der Klasse untereinander lesen. Lesetagebücher gibt es einzeln (im Detail) oder für alle auf einmal als 📄 PDF (Druckdialog › Als PDF sichern).'},
   {id:'2026-10-08-lernstand-ordner', datum:'2026-10-08', fuer:'lehrer', text:'📈 Die Lernstand-Übersicht ist neu nach Fach und Ordner geordnet, wie in der Fachansicht – mit Suchfeld. SIKORE, alle Übungstrainer, Karteikarten, Werkstatt, Lesereise, Voci und die Diktat-Auswertung stehen dort, wo die Übung liegt. Der Stand wird erst beim Aufklappen geladen, darum öffnet die Seite viel schneller.'},
   {id:'2026-10-08-klassenwahl-schlank', datum:'2026-10-08', fuer:'lehrer', text:'🏫 Klasse wechseln: Zuoberst steht nur noch deine eigene Seite, darunter alle Klassen. «⭐ Meine Seiten» gibt es nicht mehr. ⚡ Die Energizer kommen ohne Fotos aus – die Liste ist kürzer und lädt schneller.'},
   {id:'2026-10-08-schneller', datum:'2026-10-08', fuer:'alle', text:'⚡ Die Library startet schneller: Sie öffnet sich sofort aus dem Speicher deines Geräts und holt Neues im Hintergrund. Gibt es eine neue Version, lädt sie von selbst neu – oder unten erscheint kurz «🔄 Neue Version», wenn du gerade etwas machst.'},
