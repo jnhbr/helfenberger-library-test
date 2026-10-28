@@ -15782,27 +15782,37 @@ function renderFolderContents(){
   }
 
   var html = '';
-  if(folders.length){
+  // 🧰 Werkzeuge (3D-Körper, Algebra-Kacheln, Figuren-Werkstatt) stehen als eigener Bereich ganz unten.
+  var ordnerNorm = folders.filter(function(f){ return !f.werkzeug; });
+  var werkzeugOrdner = folders.filter(function(f){ return f.werkzeug; });
+  if(ordnerNorm.length){
     html += '<div class="section-label">Ordner</div>';
-    html += folders.map(function(f){ return folderCardHtml(f, realFolders.indexOf(f), realFolders.length, isTeacher && !f.virtual); }).join('');
+    html += ordnerNorm.map(function(f){ return folderCardHtml(f, realFolders.indexOf(f), realFolders.length, isTeacher && !f.virtual); }).join('');
   }
   // Klassenzimmer-Material (Prüfungen, Karteikarten, Quiz, Wortwolken, Blitzumfragen) steht
   // unter den eigentlichen Übungen; ab zwei Stück derselben Art als Sammelordner.
   var zusatz = resources.filter(zusatzArt);
   var material = resources.filter(function(r){ return !zusatzArt(r); });
   if(material.length){
-    if(folders.length) html += '<div class="section-label">Übungen</div>';
+    if(ordnerNorm.length) html += '<div class="section-label">Übungen</div>';
     html += material.map(function(r){ return resourceCardHtml(r, realResources.indexOf(r), realResources.length, isTeacher && !r.virtual); }).join('');
   }
   if(zusatz.length){
     if(folders.length || material.length) html += '<div class="section-label">Zusatzmaterial</div>';
     html += zusatzHtml(zusatz, subjectId, here);
   }
+  if(werkzeugOrdner.length){
+    html += '<div class="section-label">Werkzeuge</div>';
+    html += werkzeugOrdner.map(function(f){ return folderCardHtml(f, 0, 1, false); }).join('');
+  }
   listEl.innerHTML = html;
   zusatzVerdrahten(listEl);
 
   folders.forEach(function(f){
-    document.getElementById('fopen-'+f.id).addEventListener('click', function(){ goSubject(subjectId, f.id); });
+    document.getElementById('fopen-'+f.id).addEventListener('click', function(){
+      if(f.figuren){ state.figVon = subjectId; state.route = {name:'figuren'}; render(); return; }
+      goSubject(subjectId, f.id);
+    });
     if(!isTeacher || f.virtual) return;
     var i = realFolders.indexOf(f);
     document.getElementById('fup-'+f.id).addEventListener('click', function(){ reorderFolder(realFolders, i, -1); });
@@ -15947,8 +15957,11 @@ function zusatzVerdrahten(listEl){
 function folderCardHtml(f, index, total, isTeacher){
   var c = subtreeCounts(f.id);
   var parts = [];
-  if(c.folders) parts.push(c.folders+' Ordner');
-  parts.push(c.resources+' Übung'+(c.resources===1?'':'en'));
+  if(f.sub) parts.push(f.sub);
+  else{
+    if(c.folders) parts.push(c.folders+' Ordner');
+    parts.push(c.resources+' Übung'+(c.resources===1?'':'en'));
+  }
 
   var html = '<div class="folder-card'+(c.hasCurrent?' has-current':'')+'" id="fcard-'+f.id+'">';
   if(isTeacher){
@@ -18325,7 +18338,8 @@ function renderFiguren(){
   clearSubjectWatchers(); clearOverviewWatchers();
   var akt = FIG_SEITEN.find(function(x){ return x.id === lsGet('libfig_seite'); }) || FIG_SEITEN[0];
   var html = '<div class="viewer-wrap">';
-  html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button></div>';
+  var figZurueck = state.figVon;
+  html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; '+(figZurueck ? esc(subjectName(figZurueck)) : 'Klassenzimmer')+'</button></div>';
   html += '<div class="viewer-head"><h2>'+bildIconHtml('kz-figuren','📐',32)+' Figuren-Werkstatt</h2>';
   html += FIG_SEITEN.map(function(x){ return '<button class="btn '+(x === akt ? 'btn-primary' : 'btn-ghost')+' btn-sm" type="button" data-figseite="'+x.id+'">'+x.name+'</button>'; }).join(' ');
   html += '<a class="btn btn-ghost btn-sm" href="'+esc(akt.url)+'" target="_blank" rel="noopener">↗ Neuer Tab</a>';
@@ -18347,7 +18361,10 @@ function renderFiguren(){
   html += '<iframe id="resourceFrame" title="Figuren-Werkstatt: '+esc(akt.name)+'" src="'+esc(akt.url)+'" allow="fullscreen; clipboard-read; clipboard-write" allowfullscreen></iframe>';
   html += '</div></div>';
   renderChrome(html);
-  document.getElementById('backBtn').addEventListener('click', function(){ state.route = {name:'klassenzimmer'}; render(); });
+  document.getElementById('backBtn').addEventListener('click', function(){
+    if(figZurueck){ state.figVon = null; goSubject(figZurueck, null); return; }
+    state.route = {name:'klassenzimmer'}; render();
+  });
   Array.prototype.forEach.call(document.querySelectorAll('[data-figseite]'), function(b){
     b.addEventListener('click', function(){ lsSet('libfig_seite', b.getAttribute('data-figseite')); renderFiguren(); });
   });
@@ -24659,6 +24676,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-28-mathe-werkzeuge', datum:'2026-10-28', fuer:'alle', text:'🧰 Mathe: Ganz unten gibt es jetzt den Bereich «Werkzeuge» – dort stehen 🧊 3D-Körper & Algebra-Kacheln (Lehrpersonen zusätzlich die 📐 Figuren-Werkstatt).'},
   {id:'2026-10-28-pruefung-zeit-steht', datum:'2026-10-28', fuer:'lehrer', text:'⏱ Gesperrte Prüfung: Die Zeit der Person steht still, bis du sie entsperrst (bei leerem Akku oder Absturz ab dem letzten Lebenszeichen).'},
   {id:'2026-10-28-neues-fenster', datum:'2026-10-28', fuer:'lehrer', text:'⧉ Neues Fenster: Der kleine Knopf oben links neben ← → öffnet die Library in einem zweiten Fenster.'},
   {id:'2026-10-27-bk-wieder-ausblenden', datum:'2026-10-27', fuer:'lehrer', text:'🙈 Briefkasten versehentlich eingeblendet? Mit «🙈 Ausblenden» auf der Karte ist er für die Schüler:innen wieder weg, samt Abgabe im Kalender – einblenden kannst du ihn jederzeit neu.'},
@@ -32126,7 +32144,7 @@ function kzToolStarten(id){
   else if(id === 'slf') openBeamerTools('slf');
   else if(id === 'energizer'){ state.route = {name:'energizer'}; render(); }
   else if(id === 'raeume'){ rbu.von = 'klassenzimmer'; state.route = {name:'raeume'}; render(); }
-  else if(id === 'figuren'){ state.route = {name:'figuren'}; render(); }
+  else if(id === 'figuren'){ state.figVon = null; state.route = {name:'figuren'}; render(); }
   else if(id === 'sitzplan'){ state.route = {name:'sitzplan'}; render(); }
   else if(id === 'quiz'){ state.route = {name:'quiz'}; render(); }
   else if(id === 'million'){ state.route = {name:'million'}; render(); }
@@ -40267,7 +40285,9 @@ var MWZ_ORDNER = 'mwz_werkzeuge';
 var MWZ_VERSION = 2;   // nach jedem Neubau erhöhen: GitHub Pages lässt index.html 10 Min. im Browser-Cache
 function sikoreVirtuell(){
   return {
-    folders:[{id:MWZ_ORDNER, subject:'mathe', parentId:null, name:'🧊 Werkzeuge: 3D-Körper & Algebra-Kacheln', order:-1990, virtual:true}],
+    folders:[{id:MWZ_ORDNER, subject:'mathe', parentId:null, name:'🧊 3D-Körper & Algebra-Kacheln', order:-1990, virtual:true, werkzeug:true}].concat(
+      (state.profile && state.profile.role === 'teacher') ? [{id:'mwz_figuren', subject:'mathe', parentId:null, name:'📐 Figuren-Werkstatt', order:-1989, virtual:true, werkzeug:true, figuren:true,
+        sub:'Saubere Figuren für Prüfungen und Arbeitsblätter · nur Lehrperson'}] : []),
     resources:[{id:'sikore_trainer', subject:'mathe', folderId:null, order:-2000, virtual:true, sikore:true, imHub:true,
       title:'🧮 SIKORE – Sicher Kopfrechnen'},
       {id:'mwz_koerper', subject:'mathe', folderId:MWZ_ORDNER, order:0, virtual:true, werkzeug:true, linkUrl:'geometrie-koerper/?v='+MWZ_VERSION, linkLabel:'Werkzeug',
