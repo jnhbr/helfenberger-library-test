@@ -3626,13 +3626,10 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
   /* ❄ WINTER-LOOK (1.–26. Dezember, siehe winterAn()): Lichterkette am Rand + Zipfelmützen auf dem Logo. */
   #winterLichter{position:fixed;inset:0;z-index:90;pointer-events:none;}
   #winterLichter svg{width:100%;height:100%;display:block;overflow:visible;}
-  #winterLichter .wl-b{animation:wlGlimm 5s ease-in-out infinite;}
-  @keyframes wlGlimm{0%,100%{opacity:1;}50%{opacity:.72;}}
   .winter .login-logo,.winter .topbar-logo .kib-logo{position:relative;}
   .winter .login-logo::after,.winter .topbar-logo .kib-logo::after{
     content:"";position:absolute;left:0;right:0;top:-12%;bottom:0;pointer-events:none;
     background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='r' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23e0393e'/%3E%3Cstop offset='1' stop-color='%23a81d24'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M14 76 C16 40 38 16 74 14 C84 13 90 22 83 29 C69 38 68 58 88 76 Z' fill='url(%23r)'/%3E%3Crect x='8' y='68' width='86' height='22' rx='11' fill='%23fff'/%3E%3Crect x='8' y='68' width='86' height='22' rx='11' fill='none' stroke='%23c9d6e6' stroke-width='1.5'/%3E%3Ccircle cx='83' cy='22' r='10' fill='%23fff' stroke='%23c9d6e6' stroke-width='1.5'/%3E%3C/svg%3E") 29.0% 7.6%/10.5% auto no-repeat,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='r' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23e0393e'/%3E%3Cstop offset='1' stop-color='%23a81d24'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M14 76 C16 40 38 16 74 14 C84 13 90 22 83 29 C69 38 68 58 88 76 Z' fill='url(%23r)'/%3E%3Crect x='8' y='68' width='86' height='22' rx='11' fill='%23fff'/%3E%3Crect x='8' y='68' width='86' height='22' rx='11' fill='none' stroke='%23c9d6e6' stroke-width='1.5'/%3E%3Ccircle cx='83' cy='22' r='10' fill='%23fff' stroke='%23c9d6e6' stroke-width='1.5'/%3E%3C/svg%3E") 7.3% 24.2%/10.5% auto no-repeat,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='r' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23e0393e'/%3E%3Cstop offset='1' stop-color='%23a81d24'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M14 76 C16 40 38 16 74 14 C84 13 90 22 83 29 C69 38 68 58 88 76 Z' fill='url(%23r)'/%3E%3Crect x='8' y='68' width='86' height='22' rx='11' fill='%23fff'/%3E%3Crect x='8' y='68' width='86' height='22' rx='11' fill='none' stroke='%23c9d6e6' stroke-width='1.5'/%3E%3Ccircle cx='83' cy='22' r='10' fill='%23fff' stroke='%23c9d6e6' stroke-width='1.5'/%3E%3C/svg%3E") 8.5% 65.0%/10.5% auto no-repeat,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='r' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23e0393e'/%3E%3Cstop offset='1' stop-color='%23a81d24'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M14 76 C16 40 38 16 74 14 C84 13 90 22 83 29 C69 38 68 58 88 76 Z' fill='url(%23r)'/%3E%3Crect x='8' y='68' width='86' height='22' rx='11' fill='%23fff'/%3E%3Crect x='8' y='68' width='86' height='22' rx='11' fill='none' stroke='%23c9d6e6' stroke-width='1.5'/%3E%3Ccircle cx='83' cy='22' r='10' fill='%23fff' stroke='%23c9d6e6' stroke-width='1.5'/%3E%3C/svg%3E") 31.1% 77.0%/10.5% auto no-repeat}
-  @media (prefers-reduced-motion:reduce){#winterLichter .wl-b{animation:none;}}
 </style>
 <script>if(/-test\//.test(location.pathname))document.documentElement.classList.add('test-site');</script>
 </head>
@@ -9171,7 +9168,7 @@ function winterLichterBauen(){
   var alt = document.getElementById('winterLichter'); if(alt) alt.remove();
   if(!winterAn()) return;
   var W = document.documentElement.clientWidth, H = window.innerHeight, o = '', k, i, x, y, t;
-  var glow = function(cx, cy, d){ return '<g class="wl-b" style="animation-delay:'+d+'s"><circle cx="'+cx+'" cy="'+cy+'" r="9" fill="url(#wlG)"/><circle cx="'+cx+'" cy="'+cy+'" r="2.8" fill="#ffe9b0"/></g>'; };
+  var glow = function(cx, cy, d){ return '<g><circle cx="'+cx+'" cy="'+cy+'" r="9" fill="url(#wlG)"/><circle cx="'+cx+'" cy="'+cy+'" r="2.8" fill="#ffe9b0"/></g>'; };
   var swag = 84, d = 'M0 2';
   for(x = 0; x < W; x += swag) d += ' Q'+(x+swag/2)+' 11 '+(x+swag)+' 2';
   o += '<path d="'+d+'" fill="none" stroke="#5b5f68" stroke-width="1" opacity=".55"/>';
