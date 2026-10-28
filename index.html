@@ -9167,7 +9167,7 @@ libZoomPruefen();
 function winterLichterBauen(){
   var alt = document.getElementById('winterLichter'); if(alt) alt.remove();
   if(!winterAn()) return;
-  var W = document.documentElement.clientWidth, H = window.innerHeight, o = '', k, i, x, y, t;
+  var z = libZoom() || 1, W = Math.round(document.documentElement.clientWidth / z), H = Math.round(window.innerHeight / z), o = '', k, i, x, y, t;
   var glow = function(cx, cy, d){ return '<g><circle cx="'+cx+'" cy="'+cy+'" r="9" fill="url(#wlG)"/><circle cx="'+cx+'" cy="'+cy+'" r="2.8" fill="#ffe9b0"/></g>'; };
   var swag = 84, d = 'M0 2';
   for(x = 0; x < W; x += swag) d += ' Q'+(x+swag/2)+' 11 '+(x+swag)+' 2';
