@@ -36183,7 +36183,7 @@ function pruefVerstoss(grund){
   var pid = s.pid;
   pruefSessionStopp();
   pruefLokal(pid, {status:'gesperrt', aktiv:false, verstoesse:upd.verstoesse});
-  updateDoc(teilRef(pid, state.user.uid), upd).catch(function(err){ console.error('Sperre speichern', err); });
+  updateDoc(teilRef(pid, state.user.uid), upd).catch(function(err){ if(!(err && err.code === 'permission-denied')) console.error('Sperre speichern', err); });
   pruefFullscreenAus();
   pruefZeigeGesperrt(pruefById(pid), grund);
 }
@@ -36300,7 +36300,7 @@ function pruefStudentUpdate(){
     // Die Prüfung war noch gar nicht fertig geladen (langsame Verbindung) —
     // dafür wird niemand gesperrt: einfach nochmals versuchen lassen.
     pruefLokal(p.id, {aktiv:false});
-    updateDoc(teilRef(p.id, state.user.uid), {aktiv:false}).catch(function(err){ console.error('Teilnahme zurücksetzen', err); });
+    updateDoc(teilRef(p.id, state.user.uid), {aktiv:false}).catch(function(err){ if(!(err && err.code === 'permission-denied')) console.error('Teilnahme zurücksetzen', err); });
     pruefZeigeEntsperrt(p, true);
     return;
   }
@@ -36309,7 +36309,7 @@ function pruefStudentUpdate(){
     // neu geladen/geschlossen oder die Prüfung in einem zweiten Tab geöffnet.
     var vs = (t.verstoesse || []).concat([{at:Date.now(), grund:'Seite neu geladen oder verlassen'}]).slice(-30);
     pruefLokal(p.id, {status:'gesperrt', aktiv:false, verstoesse:vs});
-    updateDoc(teilRef(p.id, state.user.uid), {status:'gesperrt', aktiv:false, gesperrtAm:serverTimestamp(), verstoesse:vs}).catch(function(err){ console.error('Sperre speichern', err); });
+    updateDoc(teilRef(p.id, state.user.uid), {status:'gesperrt', aktiv:false, gesperrtAm:serverTimestamp(), verstoesse:vs}).catch(function(err){ if(!(err && err.code === 'permission-denied')) console.error('Sperre speichern', err); });
     pruefZeigeGesperrt(p, 'Seite neu geladen oder verlassen');
     return;
   }
@@ -40352,7 +40352,8 @@ function sikorePruefStart(p, sess, ov, saved){
   sess.sikore = {p:p, level:level, reihen:reihen, ans:ans};
   ov.innerHTML = pruefLockBar(p, sess.vorschau) + '<div class="pr-bank-wrap"><div class="pr-bank sk-pruef" id="skPruef"></div></div>';
   pruefLockBarVerdrahten();
-  var el = document.getElementById('skPruef');
+  var el = ov.querySelector('#skPruef') || document.getElementById('skPruef');
+  if(!el) throw new Error('Prüfungsfenster wurde geschlossen, bitte nochmals starten.');
   el.innerHTML = '<div class="pr-q-kopf"><span class="pr-badge">🧮 SIKORE</span><span>'+esc(sikoreLevelText(level))+'</span></div>'+
     '<p class="pr-hinweis">Rechne im Kopf und schreib jedes Ergebnis ins Kästchen (Enter = nächstes Kästchen). Mit deinem Ergebnis rechnest du gleich weiter.'+
     (c.quersumme ? ' Am Zeilenende steht die Quersumme (QS) des richtigen Ergebnisses als Kontrolle.' : '')+'</p>'+
