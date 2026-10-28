@@ -190,6 +190,7 @@
   @page{@top-left{content:""}@top-center{content:""}@top-right{content:""}@bottom-left{content:""}@bottom-center{content:""}@bottom-right{content:""}}
   .topbar-zurueck{font-size:19px;line-height:1;padding:6px 11px;flex-shrink:0;}
   .topbar-zurueck[hidden]{display:none;}
+  .topbar-navrow{display:flex;flex-direction:row;align-items:center;gap:6px;flex-shrink:0;}
   .topbar-neufenster{font-size:15px;padding:6px 9px;}
   .topbar-logo img{height:100%;width:auto;object-fit:contain;display:block;}
   .topbar-title{font-family:'Baloo 2';font-weight:800;font-size:17px;color:var(--brand-ink);cursor:pointer;}
@@ -10766,9 +10767,11 @@ function renderChrome(innerHtml){
   var isTeacher = state.profile && state.profile.role === 'teacher';
   var html = '';
   html += '<div class="topbar">';
+  html += '<div class="topbar-navrow">';
   html += '<button class="btn btn-ghost btn-sm topbar-zurueck" id="zurueckBtn" type="button" title="Zurück zur letzten Seite" aria-label="Zurück zur letzten Seite"'+(verlauf.stapel.length ? '' : ' hidden')+'>←</button>'+
     '<button class="btn btn-ghost btn-sm topbar-zurueck" id="vorBtn" type="button" title="Wieder vorwärts" aria-label="Wieder vorwärts"'+(verlauf.vor.length ? '' : ' hidden')+'>→</button>';
   if(isTeacher) html += '<button class="btn btn-ghost btn-sm topbar-zurueck topbar-neufenster" id="neuFensterBtn" type="button" title="Library in neuem Fenster öffnen" aria-label="Library in neuem Fenster öffnen">⧉</button>';
+  html += '</div>';
   html += '<div class="topbar-logo" id="logoBtn" role="button" tabindex="0" title="Hilfe" aria-label="Library-Hilfe öffnen">'+kibLogoHtml()+'</div>';
   html += '<div class="topbar-title" id="titleBtn">Helfenberger\'s Library</div>';
   html += neuNavHtml(isTeacher);
