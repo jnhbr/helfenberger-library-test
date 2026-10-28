@@ -24549,6 +24549,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-28-pruefung-zeit-steht', datum:'2026-10-28', fuer:'lehrer', text:'⏱ Gesperrte Prüfung: Die Zeit der Person steht still, bis du sie entsperrst (bei leerem Akku oder Absturz ab dem letzten Lebenszeichen).'},
   {id:'2026-10-28-neues-fenster', datum:'2026-10-28', fuer:'lehrer', text:'⧉ Neues Fenster: Der kleine Knopf oben links neben ← → öffnet die Library in einem zweiten Fenster.'},
   {id:'2026-10-27-bk-wieder-ausblenden', datum:'2026-10-27', fuer:'lehrer', text:'🙈 Briefkasten versehentlich eingeblendet? Mit «🙈 Ausblenden» auf der Karte ist er für die Schüler:innen wieder weg, samt Abgabe im Kalender – einblenden kannst du ihn jederzeit neu.'},
   {id:'2026-10-27-empfehlen-an', datum:'2026-10-27', fuer:'lehrer', text:'⭐ Material teilen geht neu per «Empfehlen an …»: Bei Übungen, Quizzen, Spiel-Sets, Karteikarten, Wortwolken und Blitzumfragen (🗃️ Unterrichtsmaterial) setzt du Häkchen bei den Lehrpersonen, die es bekommen sollen. Sie übernehmen es unter ⚙️ «Von Lehrern empfohlen». Neues Material wird nicht mehr automatisch in alle Seiten kopiert; schon vorhandene Kopien werden bei Änderungen weiter nachgeführt.'},
@@ -39379,13 +39380,25 @@ function pruefZuschlagDialog(p){
     updateDoc(pruefRef(p.id), {zuschlag:map}).then(function(){ closeModal(); toast(Object.keys(map).length ? '♿ Zeitzuschlag für '+Object.keys(map).length+' Person'+(Object.keys(map).length === 1 ? '' : 'en')+' gespeichert.' : 'Kein Zeitzuschlag mehr.'); }).catch(pruefFehler);
   });
 }
+// Entsperren: die Zeit der Person stand während der Sperre still. Startzeit um
+// die Sperrdauer nach hinten schieben. Bei «Seite neu geladen» (z. B. Akku leer)
+// zählt das letzte Lebenszeichen als Beginn der Sperre, nicht der Neustart.
+function pruefEntsperrUpd(p, t){
+  var upd = {status:'laeuft', aktiv:false, entsperrtAm:serverTimestamp()};
+  if(p && +p.zeitMin > 0 && t && t.startMs){
+    var g = pruefMs(t.gesperrtAm), l = pruefMs(t.lebt), stop = g;
+    if(l && (!g || g - l > 90000)) stop = l;
+    if(stop && Date.now() > stop) upd.startMs = t.startMs + (Date.now() - stop);
+  }
+  return upd;
+}
 function pruefMonitorVerdrahten(p){
   var el = document.getElementById('prMon');
   el.onclick = function(e){
     var b = e.target.closest('button'); if(!b) return;
     var a = b.getAttribute('data-a'), eu = b.getAttribute('data-e'), du = b.getAttribute('data-d'), ru = b.getAttribute('data-r');
     var teil = pruef.teil[p.id] || {};
-    if(eu){ updateDoc(teilRef(p.id, eu), {status:'laeuft', aktiv:false, entsperrtAm:serverTimestamp()}).then(function(){ toast('Entsperrt.'); }).catch(pruefFehler); return; }
+    if(eu){ updateDoc(teilRef(p.id, eu), pruefEntsperrUpd(p, teil[eu])).then(function(){ toast('Entsperrt.'); }).catch(pruefFehler); return; }
     if(du){ if(pruefArt(p) === 'sikore') sikoreDetailsLehrer(p, du); else if(pruefArt(p) === 'tippen') tippPrDetailsLehrer(p, du); else pruefDetailsLehrer(p, du); return; }
     if(ru){
       uiConfirm('Teilnahme zurücksetzen?', (teil[ru] && teil[ru].name || 'Die Person')+' verliert alle Antworten und kann die Prüfung neu beginnen.', 'Zurücksetzen', function(){
@@ -39427,7 +39440,7 @@ function pruefMonitorVerdrahten(p){
     else if(a === 'download') pruefDownloadDialog(p);
     else if(a === 'alleEntsperren'){
       var batch = writeBatch();
-      Object.keys(teil).forEach(function(uid){ if(teil[uid].status === 'gesperrt') batch.update(teilRef(p.id, uid), {status:'laeuft', aktiv:false, entsperrtAm:serverTimestamp()}); });
+      Object.keys(teil).forEach(function(uid){ if(teil[uid].status === 'gesperrt') batch.update(teilRef(p.id, uid), pruefEntsperrUpd(p, teil[uid])); });
       batch.commit().then(function(){ toast('Alle entsperrt.'); }).catch(pruefFehler);
     }
     else if(a === 'loeschen') uiConfirm('Prüfung löschen?', 'Die Prüfung und alle Abgaben werden gelöscht — auch die Noten im Notenrechner der Schüler:innen.', 'Löschen', async function(){
