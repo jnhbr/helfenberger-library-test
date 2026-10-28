@@ -3623,23 +3623,11 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
   .stp-tools .stp-tabs .stp-tab{padding:6px 10px;}
   .stp-tools{gap:8px;}
 
-  /* ❄ WINTER-LOOK (1.–26. Dezember, siehe winterAn()). Schneetextur: Wikimedia Commons «Gfp-snow-texture.jpg», Yinan Chen, Public Domain. */
+  /* ❄ WINTER-LOOK (1.–26. Dezember, siehe winterAn()): Lichterkette am Rand + Zipfelmützen auf dem Logo. */
   #winterLichter{position:fixed;inset:0;z-index:90;pointer-events:none;}
   #winterLichter svg{width:100%;height:100%;display:block;overflow:visible;}
   #winterLichter .wl-b{animation:wlGlimm 5s ease-in-out infinite;}
   @keyframes wlGlimm{0%,100%{opacity:1;}50%{opacity:.72;}}
-  .winter .subject-card,.winter .btn:not(.topbar-bell):not(#fsExitBtn),.winter .topbar-title{position:relative;}
-  .winter .subject-card::before,.winter .subject-card::after,.winter .btn:not(.topbar-bell):not(#fsExitBtn)::before,.winter .btn:not(.topbar-bell):not(#fsExitBtn)::after{
-    content:"";position:absolute;left:7%;right:7%;top:-6px;height:12px;pointer-events:none;
-    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 16' preserveAspectRatio='none'%3E%3Cpath d='M0 7 Q0 1 7 1 L93 1 Q100 1 100 7 L100 9 Q97 14 93 11 Q90 16 85 11 Q80 15 76 10 Q72 14 66 10 Q60 15 54 10 Q48 16 42 10 Q37 14 32 10 Q26 16 21 11 Q16 15 12 11 Q6 15 3 10 Q0 11 0 9 Z' fill='%23000'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 16' preserveAspectRatio='none'%3E%3Cpath d='M0 7 Q0 1 7 1 L93 1 Q100 1 100 7 L100 9 Q97 14 93 11 Q90 16 85 11 Q80 15 76 10 Q72 14 66 10 Q60 15 54 10 Q48 16 42 10 Q37 14 32 10 Q26 16 21 11 Q16 15 12 11 Q6 15 3 10 Q0 11 0 9 Z' fill='%23000'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;}
-  .winter .subject-card::before,.winter .btn:not(.topbar-bell):not(#fsExitBtn)::before{top:-4.5px;background:rgba(60,85,130,.5);}
-  .winter .subject-card::after,.winter .btn:not(.topbar-bell):not(#fsExitBtn)::after{
-    background:linear-gradient(rgba(255,255,255,.82),rgba(255,255,255,.7)),url(assets/winter-schnee.jpg) center/160px auto;}
-  .winter .subject-card::before,.winter .subject-card::after{left:10%;right:10%;top:-9px;height:17px;}
-  .winter .subject-card::before{top:-7.5px;}
-  .winter .btn-sm::before,.winter .btn-sm::after{left:10%;right:10%;height:9px;top:-4.5px;}
-  .winter .btn-sm::before{top:-3.5px;}
-  .winter .pr-lock .btn::before,.winter .pr-lock .btn::after{display:none;}
   .winter .login-logo,.winter .topbar-logo .kib-logo{position:relative;}
   .winter .login-logo::after,.winter .topbar-logo .kib-logo::after{
     content:"";position:absolute;left:0;right:0;top:-12%;bottom:0;pointer-events:none;
@@ -24739,7 +24727,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-10-28-winter-look', datum:'2026-10-28', fuer:'alle', text:'❄️ Vom 1. bis 26. Dezember bekommt die Library einen Winter-Look: Lichterkette am Rand, Schnee auf den Knöpfen und eine Zipfelmütze auf dem Logo. Mit dem ❄️-Knopf oben kannst du ihn ausschalten.'},
+  {id:'2026-10-28-winter-look', datum:'2026-10-28', fuer:'alle', text:'❄️ Vom 1. bis 26. Dezember bekommt die Library einen Winter-Look: Lichterkette am Rand und Zipfelmützen auf dem Logo. Mit dem ❄️-Knopf oben kannst du ihn ausschalten.'},
   {id:'2026-10-28-mathe-werkzeuge', datum:'2026-10-28', fuer:'alle', text:'🧰 Mathe: Ganz unten gibt es jetzt den Bereich «Werkzeuge» – dort stehen 🧊 3D-Körper & Algebra-Kacheln (Lehrpersonen zusätzlich die 📐 Figuren-Werkstatt).'},
   {id:'2026-10-28-pruefung-zeit-steht', datum:'2026-10-28', fuer:'lehrer', text:'⏱ Gesperrte Prüfung: Die Zeit der Person steht still, bis du sie entsperrst (bei leerem Akku oder Absturz ab dem letzten Lebenszeichen).'},
   {id:'2026-10-28-neues-fenster', datum:'2026-10-28', fuer:'lehrer', text:'⧉ Neues Fenster: Der kleine Knopf oben links neben ← → öffnet die Library in einem zweiten Fenster.'},
