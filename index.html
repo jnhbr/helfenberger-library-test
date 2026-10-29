@@ -8206,6 +8206,8 @@ async function loadLernstandGrund(){
   r[0].forEach(function(d){
     var data = d.data();
     if(LERNSTAND_EXCLUDED_SUBJECTS.indexOf(data.subject) !== -1 || istLehrerHtml(data)) return;
+    // Nur Übungen, in denen man etwas macht: keine PDFs, Folien, Links oder Methodenmaterial.
+    if(data.pdf || data.folien || data.externalUrl || data.methode) return;
     resources.push(Object.assign({id:d.id}, data));
   });
   r[1].forEach(function(d){ folders[d.id] = Object.assign({id:d.id}, d.data()); });
@@ -24888,6 +24890,7 @@ const NEUIGKEITEN = [
   {id:'2026-10-09-schach-lp', datum:'2026-10-09', fuer:'lehrer', text:'♟️ Schach für die Klasse: Im Fach «Schach & Jassen» gibt es das Schachbrett. Während der Unterrichtszeit ist es für Schüler:innen gesperrt – oben im Schachclub schaltest du unter «🔑 Lehrperson: Freischaltung» für 15, 30 oder 45 Minuten oder bis zum Ende der Lektion frei (auch für mehrere Klassen), und setzt die Rangliste zurück. Du selbst kannst immer spielen.'},
   {id:'2026-10-08-faecher-ausblenden', datum:'2026-10-08', fuer:'alle', text:'🧩 Du kannst jetzt auch Fächer ausblenden, die du nicht brauchst: «✏️ Anordnen» antippen (oder lange auf eine Kachel drücken) und beim Fach auf «−». Unter den Kacheln steht dann «… ausgeblendet · anzeigen» – so holst du sie jederzeit zurück.'},
   {id:'2026-10-08-wer-macht-mit', datum:'2026-10-08', fuer:'lehrer', text:'👥 Neu im 🏫 Klassenzimmer: «Wer macht mit?» (Knopf oben rechts in 🎲 Zufall, ⏱ Ruhephase und 👥 Gruppen & Partner). Mische ganze Klassen aus der ganzen Schule, deine 👥 Gruppen und einzelne Schüler:innen – z. B. die G2b und drei aus der E3a. Die Auswahl gilt für Glücksrad, Wer ist dran?, Gruppen & Partner und die Flüsterliste und ersetzt den Knopf «👭 Gäste».'},
+  {id:'2026-10-29-lernstand-nur-uebungen', datum:'2026-10-29', fuer:'lehrer', text:'📈 Die Lernstand-Übersicht zeigt nur noch Übungen, in denen die Schüler:innen etwas machen – PDFs, Folien, Links und Methodenmaterial sind nicht mehr dabei.'},
   {id:'2026-10-28-lesereise-kapitel', datum:'2026-10-28', fuer:'lehrer', text:'📖 Lesereise-Übersicht (📈 Lernstand): neu «📝 Zusammenfassungen pro Kapitel» – Kapitel wählen und alle Zusammenfassungen der Klasse untereinander lesen. Lesetagebücher gibt es einzeln (im Detail) oder für alle auf einmal als 📄 PDF (Druckdialog › Als PDF sichern).'},
   {id:'2026-10-08-lernstand-ordner', datum:'2026-10-08', fuer:'lehrer', text:'📈 Die Lernstand-Übersicht ist neu nach Fach und Ordner geordnet, wie in der Fachansicht – mit Suchfeld. SIKORE, alle Übungstrainer, Karteikarten, Werkstatt, Lesereise, Voci und die Diktat-Auswertung stehen dort, wo die Übung liegt. Der Stand wird erst beim Aufklappen geladen, darum öffnet die Seite viel schneller.'},
   {id:'2026-10-08-klassenwahl-schlank', datum:'2026-10-08', fuer:'lehrer', text:'🏫 Klasse wechseln: Zuoberst steht nur noch deine eigene Seite, darunter alle Klassen. «⭐ Meine Seiten» gibt es nicht mehr. ⚡ Die Energizer kommen ohne Fotos aus – die Liste ist kürzer und lädt schneller.'},
