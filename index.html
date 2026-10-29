@@ -13075,8 +13075,8 @@ function paintNotenrechner(){
       var ans = row.querySelector('.noten-pruef-ansicht');
       if(ans) ans.addEventListener('click', function(){
         var p = pruefById(lp.pruefungId), t = p && pruef.mine[p.id];
-        if(p && p.resultateFrei && t && t.status === 'abgegeben') pruefResultatZeigen(p);
-        else toast('Die Prüfung ist nicht mehr abrufbar.');
+        if(p && p.resultateFrei && t && t.status === 'abgegeben' && pruefResultatFrisch(p, 30)) pruefResultatZeigen(p);
+        else toast('Die Prüfung ist nicht mehr abrufbar (nur 30 Tage nach der Freigabe).');
       });
       inp.addEventListener('change', function(){
         var v = parseNote(inp.value);
@@ -24862,7 +24862,7 @@ const NEUIGKEITEN = [
   {id:'2026-10-20-eigenes-fenster', datum:'2026-10-20', fuer:'lehrer', text:'🪟 Klassenzimmer › «🪟 Eigenes Fenster: an»: Wortwolken, Umfragen, Spiele und Beamer-Werkzeuge starten dann in einem eigenen Fenster im Vollbild (z. B. auf den Beamer ziehen), die Library bleibt daneben frei. Es läuft immer nur eines aufs Mal: Startest du etwas Neues, fragt die Library, ob das Laufende beendet werden soll.'},
   {id:'2026-10-20-sva-grobkonzept', datum:'2026-10-20', fuer:'alle', text:'🎓 SVA: Neue Abgaben! Dein Grobkonzept gibst du schon am Montag, 2. November, bis 12 Uhr ab – an diesem Morgen schreibst du es in der Schule fertig, wer fertig ist, darf nach Hause. Du kannst ab sofort selbstständig damit beginnen. Das Dossier-Gerüst ist neu am Mittwoch, 18. November, fällig.'},
   {id:'2026-10-19-dossier-drucken', datum:'2026-10-19', fuer:'lehrer', text:'📖 🧰 Tools › «Dossier drucken» (früher «Broschüre drucken»): A5- oder A4-Dossier, gefalzt und in der Mitte geheftet, Dicke Dossiers werden automatisch auf Teile mit höchstens 16 Bogen verteilt – mehr schafft der Hefter nicht. In der Desktop-App der Library druckst du direkt: Drucker, Exemplare, Farbe und Heften wählen, fertig.'},
-  {id:'2026-10-29-pruefung-2tage', datum:'2026-10-29', fuer:'alle', text:'📝 Freigegebene Prüfungen siehst du 2 Tage lang direkt bei der Prüfung. Danach findest du sie im 🎶 Notenrechner: einfach auf den Prüfungsnamen tippen.'},
+  {id:'2026-10-29-pruefung-2tage', datum:'2026-10-29', fuer:'alle', text:'📝 Freigegebene Prüfungen siehst du 2 Tage lang direkt bei der Prüfung. Danach findest du sie 30 Tage lang im 🎶 Notenrechner: einfach auf den Prüfungsnamen tippen. Die Note bleibt.'},
   {id:'2026-10-19-ausblenden', datum:'2026-10-19', fuer:'lehrer', text:'🙈 Neu bei jeder Übung, jedem PDF und Link: «🙈 Ausblenden». Die Klasse sieht sie dann nicht (z. B. ein Lösungsdossier), du siehst sie gestrichelt. Ist das Thema durch, mit «👁 Einblenden» freigeben.'},
   {id:'2026-10-19-neues-fenster', datum:'2026-10-19', fuer:'alle', text:'🪟 Übungen, LMVZ-Seiten und PDFs kannst du neben «Vollbild» jetzt auch «In neuem Fenster» öffnen. Das Fenster ist bildschirmgross, du kannst es aber kleiner machen und in der Library nebenher etwas anderes machen – dein Stand wird trotzdem gespeichert. In Prüfungen geht das nicht.'},
   {id:'2026-10-19-sitzplan-jm-regeln', datum:'2026-10-19', fuer:'lehrer', text:'🪑 Sitzplan › ⚖️ Regeln: neu auch «darf nicht neben Mädchen/Jungen» und «muss neben Mädchen/Jungen» für einzelne Kinder. Massgebend sind die J/M-Knöpfe; «🎲 Zufällig setzen» hält sich daran.'},
@@ -35658,10 +35658,10 @@ function pruefArt(p){ return p.art || 'nativ'; }
 function pruefAnzahl(p){ if(pruefArt(p) === 'tippen') return tippPrCfg(p).text.length || 1; if(pruefArt(p) === 'mt') return mtPrCfg(p).anzahl; if(pruefArt(p) === 'sikore'){ var sc = sikoreCfg(p); return sc.reihen * sc.laenge; } return pruefArt(p) === 'bank' ? (p.fragen || []).length : ((p.cfg && p.cfg.anzahl) || 0); }
 function pruefMs(ts){ return ts && ts.toMillis ? ts.toMillis() : (typeof ts === 'number' ? ts : 0); }
 // Freigegebene Resultate sehen die Schüler:innen 2 Tage direkt (Banner, Ordner); danach nur noch über die Note im Notenrechner.
-function pruefResultatFrisch(p){
+function pruefResultatFrisch(p, tage){
   var t = pruef.mine[p.id], z = t && t.notiertAm;
   var ms = z && typeof z.toMillis === 'function' ? z.toMillis() : null;
-  return ms == null || Date.now() - ms < 2 * 86400000;
+  return ms == null || Date.now() - ms < (tage || 2) * 86400000;
 }
 function pruefById(id){ return pruef.list.find(function(p){ return p.id === id; }) || null; }
 // Fach der Prüfung (Fach der Übung, sonst Fach im Notenrechner) — für Fach-Gäste.
