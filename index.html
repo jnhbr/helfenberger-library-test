@@ -17837,12 +17837,24 @@ function saveTrackedKeys(rid, tracked){
 
 // Entfernten Stand anwenden: gesetzte Schlüssel schreiben, fehlende entfernen
 // (so wandert auch ein „Alles zurücksetzen" auf das andere Gerät).
+// Hat die Seite im Wert ein Feld savedAt (Rechtschreib-Werkstatt) und der lokale Stand ist neuer, bleibt er:
+// Dieselbe Übung kann als mehrere Kopien (andere resourceId, gleicher localStorage-Schlüssel) existieren —
+// ein älterer Cloud-Stand einer anderen Kopie darf den neueren Stand auf dem Gerät nicht überschreiben.
+function lokalNeuerAls(lok, rem){
+  try{ var a = JSON.parse(lok), b = JSON.parse(rem); return !!(a && b && typeof a.savedAt === 'number' && typeof b.savedAt === 'number' && a.savedAt > b.savedAt); }catch(e){ return false; }
+}
 function applyRemoteStore(keys, store){
+  var behalten = false;
   keys.forEach(function(k){
     if(k.indexOf(LIB_PREFIX) === 0) return;
-    if(Object.prototype.hasOwnProperty.call(store, k)) lsSet(k, store[k]);
+    if(Object.prototype.hasOwnProperty.call(store, k)){
+      var lok = lsGet(k);
+      if(lok !== null && lok !== store[k] && lokalNeuerAls(lok, store[k])){ behalten = true; return; }
+      lsSet(k, store[k]);
+    }
     else lsDel(k);
   });
+  return behalten;
 }
 
 // Vor dem Laden des iframes aufrufen. Läuft nie in einen Fehler, der das
@@ -17856,6 +17868,7 @@ async function prepareResourceSync(rid){
   // Ansicht als Schüler:in: deren Übungsstand nicht in diesen Browser holen
   // (er würde sich sonst mit Jans eigenem Stand vermischen) und nichts hochladen.
   if(!state.user || alsSchueler()){ syncState.baseline = lsSnapshot(); return; }
+  var behalten = false;
   try{
     var snap = await getDoc(doc(db,'progress', state.user.uid, 'resources', rid));
     var data = snap.exists() ? snap.data() : null;
@@ -17868,7 +17881,7 @@ async function prepareResourceSync(rid){
     if(data && data.storeJson && remoteRev > localRev(rid)){
       var store = {};
       try{ store = JSON.parse(data.storeJson) || {}; }catch(e){ store = {}; }
-      applyRemoteStore(keys, store);
+      behalten = applyRemoteStore(keys, store);
       setLocalRev(rid, remoteRev);
       saveTrackedKeys(rid, syncState.tracked);
     }
@@ -17876,7 +17889,7 @@ async function prepareResourceSync(rid){
     // mit einem veralteten lokalen Stand überschrieb das den Stand vom anderen Gerät).
     // Ausnahme: lokal liegt Neueres als in der Cloud (früherer Schreibvorgang gescheitert) → hochladen.
     if(data && data.storeJson && remoteRev >= localRev(rid) || !syncState.remoteOk){
-      syncState.lastWritten = buildStorePayload().json;
+      syncState.lastWritten = behalten ? null : buildStorePayload().json;   // lokal Neueres bleibt → wird hochgeladen
     }
   }catch(err){
     console.error('Stand konnte nicht geladen werden', err);
@@ -17908,10 +17921,10 @@ function svaSyncBeobachten(rid){
     // Übung zuerst aus der Seite nehmen: ihr pagehide würde sonst den alten Stand wieder in localStorage schreiben.
     var fr = document.getElementById('resourceFrame');
     if(fr && fr.parentNode) fr.parentNode.removeChild(fr);
-    applyRemoteStore(keys, store);
+    var behalten = applyRemoteStore(keys, store);
     setLocalRev(rid, remoteRev);
     saveTrackedKeys(rid, syncState.tracked);
-    syncState.lastWritten = buildStorePayload().json;
+    syncState.lastWritten = behalten ? null : buildStorePayload().json;
     syncState.baseline = lsSnapshot();
     toast('Neuerer Stand von deinem anderen Gerät geladen.');
     if(state.route && state.route.name === 'resource') render();
@@ -24770,6 +24783,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-30-stand-neuer-bleibt', datum:'2026-10-30', fuer:'alle', text:'💾 Dein Übungsstand (z. B. Rechtschreib-Werkstatt) wird beim Öffnen nicht mehr durch einen älteren Stand überschrieben, wenn du auf diesem Gerät schon weiter bist.'},
   {id:'2026-10-30-pin-ausweichen', datum:'2026-10-30', fuer:'lehrer', text:'📌 «Immer im Vordergrund» öffnet jetzt auch dann ein Fenster, wenn das Bild-in-Bild-Video nicht startet (z. B. in der installierten Chrome-App).'},
   {id:'2026-10-30-uebung-ohne-wellenlinie', datum:'2026-10-30', fuer:'alle', text:'✍️ In Übungsseiten (z. B. Diktat-Training) werden Wörter nicht mehr rot unterstrichen, und dein Stand wird auch beim Wegwechseln sofort gesichert.'},
   {id:'2026-10-30-diktat-kurz', datum:'2026-10-30', fuer:'lehrer', text:'✂️ Diktat-Prüfungen: Im Monitor gibt es «Kürzeres Diktat». Wer dort angehakt ist, muss nicht das ganze Diktat schreiben – was nach dem zuletzt geschriebenen Wort fehlt, zählt nicht als Fehler. Das Geschriebene wird normal korrigiert.'},
