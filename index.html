@@ -3664,10 +3664,12 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
   .duck .qh-big,.duck .qh-qnum,.duck .qh-sub,.duck .qh-count,.duck .qh-timer,.duck .qh-qtext,.duck .lsp-kopfzeile,.duck .lsp-status,.duck .lsp-hinweis-text,.duck .tsp-hinweis,.duck .tsp-gross,.duck .tsp-wer,.duck .lsp-klein{color:#fff;text-shadow:0 4px 0 rgba(0,0,0,.25);}
   .duck .qh-big,.duck .tsp-gross{font-weight:800;}
   .duck .qh-sub,.duck .qh-count,.duck .lsp-klein{color:rgba(255,255,255,.85);text-shadow:none;}
-  .duck .qh-timer{display:inline-flex;align-items:center;justify-content:center;min-width:1.7em;aspect-ratio:1;border-radius:50%;background:var(--dk-gelb);color:var(--dk-ink);border:6px solid var(--dk-ink);text-shadow:none;font-size:clamp(34px,calc(7vh/var(--lz,1)),70px);}
-  .duck .qh-timer-hot{background:var(--dk-orange);color:#fff;}
+  .duck .qh-timer,.duck .lsp-timer,.qp-timer{--p:1;display:inline-flex;align-items:center;justify-content:center;aspect-ratio:1;border-radius:50%;color:var(--dk-ink,#14302c);border:5px solid var(--dk-ink,#14302c);text-shadow:none;line-height:1;box-sizing:border-box;
+    background:radial-gradient(circle,var(--dk-gelb,#f6b223) 0 58%,transparent 59%),conic-gradient(var(--dk-gelb,#f6b223) calc(var(--p)*360deg),rgba(0,0,0,.22) 0);box-shadow:0 6px 0 rgba(0,0,0,.28);}
+  .duck .qh-timer{min-width:1.9em;font-size:clamp(34px,calc(7vh/var(--lz,1)),70px);}
+  .duck .lsp-timer{width:1.9em;font-size:.95em;padding:0;margin:0 .15em;vertical-align:middle;}
+  .duck .qh-timer-hot,.qp-timer-hot{background:radial-gradient(circle,var(--dk-orange,#f15a12) 0 58%,transparent 59%),conic-gradient(var(--dk-orange,#f15a12) calc(var(--p)*360deg),rgba(0,0,0,.22) 0);color:#fff;}
   .duck .qh-timer-stopped{background:#cfd8d5;color:var(--dk-ink);}
-  .duck .lsp-timer{background:var(--dk-gelb);color:var(--dk-ink);border:4px solid var(--dk-ink);border-radius:999px;padding:0 .35em;}
   /* Fragekarten und Karten: weiss, 5px Rand, harter Schatten */
   .duck .qh-qtext,.duck .lsp-frage,.duck .tsp-frage{background:#fff;color:var(--dk-ink);text-shadow:none;border:5px solid var(--dk-ink);border-radius:30px;box-shadow:0 12px 0 rgba(0,0,0,.28);padding:22px 32px;}
   .duck .lsp-frage small,.duck .tsp-frage small{color:var(--dk-orange);}
@@ -3736,8 +3738,7 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
   .qp-wrap{background:radial-gradient(ellipse at 50% 30%,#2f78d6 0%,#0f2f66 80%);color:#fff;border-radius:28px;padding:18px 16px 22px;border:5px solid #14302c;box-shadow:0 10px 0 rgba(0,0,0,.28);--text:#14302c;--text-muted:#4b6360;--surface:#fff;--surface-2:#eef3f1;max-width:760px;margin:0 auto;}
   .qp-wrap .qp-head{color:#fff;} .qp-wrap .qp-head .btn{background:#fff;color:#14302c;border:3px solid #14302c;border-radius:16px;box-shadow:0 4px 0 rgba(0,0,0,.28);}
   .qp-q{background:#fff;color:#14302c;border:5px solid #14302c;border-radius:24px;box-shadow:0 8px 0 rgba(0,0,0,.28);padding:16px 18px;width:100%;box-sizing:border-box;}
-  .qp-timer{display:inline-flex;align-items:center;justify-content:center;width:1.6em;height:1.6em;border-radius:50%;background:#f6b223;color:#14302c;border:5px solid #14302c;font-size:40px;}
-  .qp-timer-hot{background:#f15a12;color:#fff;}
+  .qp-timer{width:1.8em;font-size:36px;}
   .qp-a{background:#fff;color:#14302c;border:5px solid #14302c;border-radius:22px;box-shadow:0 7px 0 rgba(0,0,0,.28);}
   .qp-a[class*="qh-a-"]{background:#fff;}
   .qp-a-picked{outline:none;background:#f6b223;transform:translateY(4px);box-shadow:0 3px 0 rgba(0,0,0,.28);}
@@ -23593,6 +23594,8 @@ function quizSetDoc(data, opts){
    selbst mit, in dem es die Frage zum ersten Mal sieht - übrig bleibt nur die
    Netzwerk-Latenz von ein paar Zehntelsekunden. */
 var quizClock = { key:'', start:0 };
+// Ring um den Countdown-Kreis (Duck-Bühne): --p = Anteil der Restzeit (1 voll, 0 leer).
+function duckRing(el, left, sec){ if(el && sec) el.style.setProperty('--p', Math.max(0, Math.min(1, left/sec))); }
 function quizSecondsLeft(s){
   if(!s || s.state !== 'frage') return 0;
   // Gestoppt: überall bleibt die Zahl stehen, die der Beamer beim Drücken zeigte.
@@ -24158,7 +24161,7 @@ function quizHostTick(s){
   var t = document.querySelector('.qh-timer');
   if(t && !s.stopped){
     var left = quizSecondsLeft(s);
-    t.textContent = left;
+    t.textContent = left; duckRing(t, left, s.sec);
     t.classList.toggle('qh-timer-hot', left <= 5);
   }
   var c = document.querySelector('.qh-q .qh-count');
@@ -24185,7 +24188,7 @@ function paintQuizHostFull(quiz, stage, s){
     }).join('')+'</div>';
     h += s.stopped
       ? '<div class="qh-timer qh-timer-stopped">⏸ '+left+'</div><div class="qh-sub">Zeit gestoppt — auflösen, sobald alle so weit sind.</div>'
-      : '<div class="qh-timer'+(left<=5?' qh-timer-hot':'')+'">'+left+'</div>';
+      : '<div class="qh-timer'+(left<=5?' qh-timer-hot':'')+'" style="--p:'+(s.sec ? Math.max(0, Math.min(1, left/s.sec)) : 1)+'">'+left+'</div>';
     h += '<div class="qh-count">'+count+' von '+quizLive.players.length+' geantwortet</div>';
     h += '<div class="qh-btns">'
        + (s.stopped ? '' : '<button class="btn btn-ghost tm-big" id="qhStop" type="button">⏸ Zeit stoppen</button>')
@@ -24447,7 +24450,7 @@ function quizPlayTick(s){
   if(s.state !== 'frage') return;
   var left = quizSecondsLeft(s);
   var t = document.querySelector('.qp-timer');
-  if(t){ t.textContent = (s.stopped ? '⏸ ' : '')+left; t.classList.toggle('qp-timer-hot', !s.stopped && left <= 5); }
+  if(t){ t.textContent = (s.stopped ? '⏸ ' : '')+left; duckRing(t, left, s.sec); t.classList.toggle('qp-timer-hot', !s.stopped && left <= 5); }
   var over = !s.stopped && left <= 0;
   Array.prototype.forEach.call(document.querySelectorAll('[data-choice]'), function(b){
     b.disabled = over || quizPlay.choice !== null;
@@ -24476,7 +24479,7 @@ function quizPlayFullRender(s){
       : '<div class="qp-mid"><div class="qp-wait">⏳</div><div class="qp-big">Einen Moment …</div><p>Du wirst gerade angemeldet.</p></div>';
   } else if(s.state === 'frage'){
     var left = quizSecondsLeft(s);
-    html += '<div class="qp-timer'+(left<=5?' qp-timer-hot':'')+'">'+left+'</div>';
+    html += '<div class="qp-timer'+(left<=5?' qp-timer-hot':'')+'" style="--p:'+(s.sec ? Math.max(0, Math.min(1, left/s.sec)) : 1)+'">'+left+'</div>';
     html += '<div class="qp-q">'+esc(s.question ? s.question.text : '')+'</div>';
     html += '<div class="qp-answers">'+((s.question && s.question.answers)||[]).map(function(a, i){
       if(!a) return '';
@@ -28344,7 +28347,7 @@ function schaetzHKlick(s, sp, a){
 function schaetzHTick(s, sp){
   if(s.phase !== 'frage') return;
   var j = lspDabei().length, v = schaetzTipps(sp).length, left = lspSekunden(s), el = lsp.overlay.el;
-  var t = el.querySelector('#lspTimer'); if(t) t.textContent = left;
+  var t = el.querySelector('#lspTimer'); if(t){ t.textContent = left; duckRing(t, left, s.sec); }
   var c = el.querySelector('#lspCount'); if(c) c.textContent = v + ' von ' + j + ' haben getippt';
   if((j > 0 && v >= j && Date.now() - sp.rundeStart > 2500) || left <= 0) schaetzZu(s, sp);
 }
@@ -28377,7 +28380,7 @@ function schaetzHHtml(s, sp){
   }
   h += '<div class="lsp-kopfzeile">Frage '+s.nr+(s.total ? ' / '+s.total : '')+'</div><div class="lsp-frage">'+esc(s.frage)+(s.einheit ? '<small>Antwort in '+esc(s.einheit)+'</small>' : '')+'</div>';
   if(s.phase === 'frage'){
-    h += '<div class="lsp-status">🤔 Schätzt! · ⏱ <span class="lsp-timer" id="lspTimer">'+lspSekunden(s)+'</span> s · <span id="lspCount"></span></div>';
+    h += '<div class="lsp-status">🤔 Schätzt! · ⏱ <span class="lsp-timer" id="lspTimer" style="--p:'+(s.sec ? Math.max(0, Math.min(1, lspSekunden(s)/s.sec)) : 1)+'">'+lspSekunden(s)+'</span> s · <span id="lspCount"></span></div>';
     h += '<div class="lsp-aktion"><button class="btn btn-primary" data-lh="zu" type="button">⏹ Tipps schliessen</button></div>';
   } else if(s.phase === 'zu'){
     h += schaetzStrahl(s.tipps, null, s.einheit, false);
@@ -28532,7 +28535,7 @@ function bingoHKlick(s, sp, a){
 function bingoHTick(s, sp){
   if(s.phase !== 'frage') return;
   var left = lspSekunden(s), el = lsp.overlay.el;
-  var t = el.querySelector('#lspTimer'); if(t) t.textContent = left;
+  var t = el.querySelector('#lspTimer'); if(t){ t.textContent = left; duckRing(t, left, s.sec); }
   var c = el.querySelector('#lspCount'); if(c) c.textContent = bingoMarkiert(sp) + ' haben ein Feld getippt';
   if(left <= 0) bingoAufloesen(s, sp);
 }
@@ -28544,7 +28547,7 @@ function bingoHHtml(s, sp){
   }
   h += '<div class="lsp-kopfzeile">Frage '+s.nr+' / '+s.total+(s.bingos && s.bingos.length ? ' · 🎉 '+s.bingos.length+' Bingo' : '')+'</div><div class="lsp-frage">'+esc(s.frage)+'</div>';
   if(s.phase === 'frage'){
-    h += '<div class="lsp-status">Wer hat die Antwort auf der Karte? Antippen! · ⏱ <span class="lsp-timer" id="lspTimer">'+lspSekunden(s)+'</span> s · <span id="lspCount"></span></div>';
+    h += '<div class="lsp-status">Wer hat die Antwort auf der Karte? Antippen! · ⏱ <span class="lsp-timer" id="lspTimer" style="--p:'+(s.sec ? Math.max(0, Math.min(1, lspSekunden(s)/s.sec)) : 1)+'">'+lspSekunden(s)+'</span> s · <span id="lspCount"></span></div>';
     h += '<div class="lsp-aktion"><button class="btn btn-primary" data-lh="auf" type="button">🔓 Auflösen</button></div>';
   } else {
     var neu = (s.bingos || []).filter(function(x){ return x.r === s.runde; });
@@ -29064,7 +29067,7 @@ function gntHTick(s, sp){
   if(!g) return;
   if(s.phase === 'frage'){
     var left = lspSekunden(s), el = lsp.overlay.el, n = Object.keys(gntAntworten(sp)).length, j = g.eligible.length;
-    var t = el.querySelector('#lspTimer'); if(t) t.textContent = left;
+    var t = el.querySelector('#lspTimer'); if(t){ t.textContent = left; duckRing(t, left, s.sec); }
     var c = el.querySelector('#lspCount'); if(c) c.textContent = n + ' von ' + j + ' haben geantwortet';
     if((j > 0 && n >= j && Date.now() - sp.rundeStart > 1500) || left <= 0) gntZu(s, sp);
     return;
@@ -29148,7 +29151,7 @@ function gntHHtml(s, sp){
     h += '<div class="gnt-geheim">'+(s.phase === 'frage' ? '🤫 <b>Die Klasse antwortet</b><small>Die Frage steht nur auf euren Geräten. '+esc(s.oneName || '?')+', nicht hinschauen!</small>'
       : '🔒 <b>Die Klasse hat geantwortet</b><small>'+(s.beantwortet || 0)+' von '+(s.anzahl || 0)+' Antworten · jetzt ist '+esc(s.oneName || '?')+' dran.</small>')+'</div>';
     if(s.phase === 'frage'){
-      h += '<div class="lsp-status">⏱ <span class="lsp-timer" id="lspTimer">'+lspSekunden(s)+'</span> s · <span id="lspCount"></span></div>';
+      h += '<div class="lsp-status">⏱ <span class="lsp-timer" id="lspTimer" style="--p:'+(s.sec ? Math.max(0, Math.min(1, lspSekunden(s)/s.sec)) : 1)+'">'+lspSekunden(s)+'</span> s · <span id="lspCount"></span></div>';
       h += '<div class="lsp-aktion"><button class="btn btn-primary" data-lh="zu" type="button">⏹ Antworten schliessen</button>'+abbruch+'</div>';
     } else h += '<div class="lsp-aktion"><button class="btn btn-primary" data-lh="zeigen" type="button">👀 Frage für '+esc(s.oneName || '?')+' zeigen</button>'+abbruch+'</div>';
     return h + '</div>';
