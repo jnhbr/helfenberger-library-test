@@ -18099,6 +18099,7 @@ function stopResourceSync(){
 }
 
 window.addEventListener('pagehide', flushResourceSync);
+document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'hidden') flushResourceSync(); });
 document.addEventListener('visibilitychange', function(){
   if(document.visibilityState !== 'hidden') return;
   // Handy: beim Wegwischen kommt pagehide in der Übung oft nicht → SVA-Seiten sichern lassen, bevor wir lesen.
@@ -18236,6 +18237,10 @@ function injectExerciseHelpers(html, rid){
     // Seiten, die Enter schon selbst behandeln (z.B. RZG-Quizseiten), nicht doppelt prüfen lassen.
     var mitEnter = !/['"]Enter['"]|keyCode\s*===?\s*13|which\s*===?\s*13/.test(html);
     var script = exerciseHelperScript(rid, mitEnter);
+    // Keine rote Rechtschreib-Wellenlinie in Übungsseiten (Diktate, Lückentexte …): Browser-Prüfung und Autokorrektur aus, auch bei später eingefügten Feldern.
+    script += '<script>(function(){function aus(r){var l=r.querySelectorAll?r.querySelectorAll("textarea,input,[contenteditable]"):[];for(var i=0;i<l.length;i++){var e=l[i];if(e.tagName==="INPUT"&&/^(checkbox|radio|button|submit|range|file|color)$/i.test(e.type||""))continue;e.setAttribute("spellcheck","false");e.setAttribute("autocorrect","off");e.setAttribute("autocapitalize","off");e.setAttribute("data-gramm","false");}}' +
+      'function los(){aus(document);new MutationObserver(function(m){for(var i=0;i<m.length;i++)for(var j=0;j<m[i].addedNodes.length;j++){var n=m[i].addedNodes[j];if(n.nodeType===1){if(/^(TEXTAREA|INPUT)$/.test(n.tagName)||n.isContentEditable)aus({querySelectorAll:function(){return[n];}});aus(n);}}}).observe(document.documentElement,{childList:true,subtree:true});}' +
+      'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",los);else los();})();<\/script>';
     var headRe = /<head(\s[^>]*)?>/i;
     if(headRe.test(out)) return out.replace(headRe, function(m){ return m + script; });
     var idx = out.search(/<script/i);
@@ -24765,6 +24770,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-30-uebung-ohne-wellenlinie', datum:'2026-10-30', fuer:'alle', text:'✍️ In Übungsseiten (z. B. Diktat-Training) werden Wörter nicht mehr rot unterstrichen, und dein Stand wird auch beim Wegwechseln sofort gesichert.'},
   {id:'2026-10-30-diktat-kurz', datum:'2026-10-30', fuer:'lehrer', text:'✂️ Diktat-Prüfungen: Im Monitor gibt es «Kürzeres Diktat». Wer dort angehakt ist, muss nicht das ganze Diktat schreiben – was nach dem zuletzt geschriebenen Wort fehlt, zählt nicht als Fehler. Das Geschriebene wird normal korrigiert.'},
   {id:'2026-10-29-spiele-gross', datum:'2026-10-29', fuer:'lehrer', text:'🔎 Quiz und Spiele (Der grosse Preis, Wer wird Millionär, Quiz-Show, Umfrage-Duell usw.): Fragen, Antworten, Knöpfe und Teamanzeigen sind jetzt deutlich grösser und auf dem Beamer besser lesbar.'},
   {id:'2026-10-29-sva-rueck-block', datum:'2026-10-29', fuer:'lehrer', text:'🎓 SVA › «📋 Projekte der Klasse»: Beim Grobkonzept gibst du die Rückmeldung jetzt pro Block (Thema, Inhalt/Ideen, Fragestellungen …) – unter jedem Feld steht ein eigenes Textfeld mit 💾-Knopf (jeder Knopf speichert alle Blöcke). Das Kind sieht sie in «Mein SVA-Projekt» direkt beim Feld. Die bisherige Gesamt-Rückmeldung (besprochen/überarbeiten) gibt es nicht mehr.'},
