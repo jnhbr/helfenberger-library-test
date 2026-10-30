@@ -3720,6 +3720,18 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
   .duck .dg-brett.dg-vier{background:#2f78d6;}
   .duck .dg-feld{background:#eef3f1;border:3px solid var(--dk-ink);}
   .duck .dg-vier .dg-feld{background:#fff;}
+  .duck .slf-letter{color:#fff;text-shadow:0 8px 0 rgba(0,0,0,.28);}
+  .duck .slf-hit .slf-letter{color:var(--dk-gelb);}
+  .duck .slf-cat{background:#fff;color:var(--dk-ink);border:5px solid var(--dk-ink);border-radius:20px;box-shadow:0 7px 0 rgba(0,0,0,.28);}
+  .duck .slf-cat-fix{background:var(--dk-gelb);}
+  .duck .slf-cat-pkt{background:#eef3f1;}
+  .duck .slf-used{color:rgba(255,255,255,.85);}
+  .duck .slf-clock{display:inline-flex;align-items:center;justify-content:center;background:var(--dk-gelb);color:var(--dk-ink);border:5px solid var(--dk-ink);border-radius:999px;padding:2px 22px;box-shadow:0 6px 0 rgba(0,0,0,.28);}
+  .duck .slf-warn .slf-clock{background:var(--dk-orange);color:#fff;}
+  .duck .slf-status{color:#fff;text-shadow:0 4px 0 rgba(0,0,0,.25);}
+  .duck .slf-over .slf-status{color:var(--dk-gelb);}
+  .duck .slf-stop{background:var(--dk-orange);color:#fff;border:5px solid var(--dk-ink);box-shadow:0 8px 0 rgba(0,0,0,.28);}
+  .duck .slf-glass-bulb{fill:#fff;} .duck .slf-glass-line{stroke:var(--dk-ink);}
   /* Schüler:innen-Gerät: Quiz in der Duck-Bühne */
   .qp-wrap{background:radial-gradient(ellipse at 50% 30%,#2f78d6 0%,#0f2f66 80%);color:#fff;border-radius:28px;padding:18px 16px 22px;border:5px solid #14302c;box-shadow:0 10px 0 rgba(0,0,0,.28);--text:#14302c;--text-muted:#4b6360;--surface:#fff;--surface-2:#eef3f1;max-width:760px;margin:0 auto;}
   .qp-wrap .qp-head{color:#fff;} .qp-wrap .qp-head .btn{background:#fff;color:#14302c;border:3px solid #14302c;border-radius:16px;box-shadow:0 4px 0 rgba(0,0,0,.28);}
@@ -19395,7 +19407,6 @@ function openBeamerTools(initialTab){
   html += '<button class="kz-tab" data-tab="dran" type="button">🎲 Wer ist dran?</button>';
   html += '<button class="kz-tab" data-tab="wuerfel" type="button">🎲 Würfel</button>';
   html += '<button class="kz-tab" data-tab="rad" type="button">🎡 Glücksrad</button>';
-  html += '<button class="kz-tab" data-tab="slf" type="button">🌍 Stadt Land Fluss</button>';
   html += '<div class="kz-bar-spacer"></div>';
   html += mitKnopfHtml('kzMit');
   html += '<button class="kz-close" id="kzClose" type="button" title="Schliessen (Esc)">✕</button>';
@@ -19414,6 +19425,25 @@ function openBeamerTools(initialTab){
   });
   mitKnopfVerdrahten(root.querySelector('#kzMit'), function(){ glueck.klasse = null; glueck.weg = {}; glueck.letzter = null; switchBeamerTab(beamer.tab); });
   switchBeamerTab(beamer.tab);
+}
+
+// 🌍 Stadt Land Fluss als eigenes Spiel (eigene Bühne, nicht mehr im Fenster der Beamer-Werkzeuge).
+var slfSpiel = { overlay:null, cleanups:[] };
+function openSlfSpiel(){
+  if(slfSpiel.overlay) return;
+  var html = '<div class="kz-bar"><div class="kz-bar-title">🌍 Stadt Land Fluss</div><div class="kz-bar-spacer"></div>'+
+    '<button class="kz-close" id="slfClose" type="button" title="Schliessen (Esc)">✕</button></div><div class="kz-stage" id="slfStage"></div>';
+  slfSpiel.overlay = openOverlay(html, function(){
+    slfSpiel.cleanups.forEach(function(fn){ try{ fn(); }catch(e){} });
+    slfSpiel.cleanups = []; slfSpiel.overlay = null;
+  }, 'kz-overlay-beamer kz-frei duck duck-tuerkis');
+  var root = slfSpiel.overlay.el;
+  root.querySelector('#slfClose').addEventListener('click', function(){ slfSpiel.overlay.close(); });
+  // mountStadtLandFluss meldet seine Aufräumer bei beamer.cleanups an: eigene Liste einhängen, damit ein
+  // gleichzeitig offenes Beamer-Werkzeug-Fenster nicht mit abgeräumt wird.
+  var alt = beamer.cleanups; beamer.cleanups = [];
+  try{ mountStadtLandFluss(root.querySelector('#slfStage')); }
+  finally{ slfSpiel.cleanups = beamer.cleanups; beamer.cleanups = alt; }
 }
 
 function runBeamerCleanups(){
@@ -19436,7 +19466,6 @@ function switchBeamerTab(tab){
   if(tab === 'dran'){ mountWerIstDran(stage); return; }
   if(tab === 'wuerfel'){ mountWuerfel(stage); return; }
   if(tab === 'rad'){ mountGlueck(stage); return; }
-  if(tab === 'slf'){ mountStadtLandFluss(stage); return; }
 
   // ⏱ Ruhephase: mit 🚦 Lärmampel oder als 🦒 Stille Safari (Umschalter, pro Gerät gemerkt).
   if(ruheModus() === 'safari'){ mountSafariRuhephase(stage); return; }
@@ -24927,6 +24956,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-30-slf-spiel', datum:'2026-10-30', fuer:'lehrer', text:'🌍 Stadt Land Fluss ist jetzt ein eigenes Spiel (Klassenzimmer › Spiele) mit eigener Bühne und gehört nicht mehr zu den Beamer-Werkzeugen.'},
   {id:'2026-10-30-duck-buehne', datum:'2026-10-30', fuer:'alle', text:'🦆 Neuer Look für Quiz und Spiele: Klassen-Quiz, Schätzmeister, Bingo, Buzzer, Der grosse Preis, Drei gewinnt, Schiffe versenken, Umfrage, Wortwolke und Energizer laufen jetzt auf der bunten Show-Bühne von Simple Duck – mit drehenden Lichtstrahlen, dicken Rändern, gelbem Countdown und der Stockente unten links.'},
   {id:'2026-10-30-kalender-verbergen', datum:'2026-10-30', fuer:'lehrer', text:'🙈 Kalender: Einträge lassen sich für Schüler:innen verbergen (Häkchen im Formular oder Knopf «Verbergen») und später mit «👁 Freigeben» sichtbar schalten.'},
   {id:'2026-10-30-stand-neuer-bleibt', datum:'2026-10-30', fuer:'alle', text:'💾 Dein Übungsstand (z. B. Rechtschreib-Werkstatt) wird beim Öffnen nicht mehr durch einen älteren Stand überschrieben, wenn du auf diesem Gerät schon weiter bist.'},
@@ -32406,7 +32436,7 @@ function kzToolStarten(id){
   if(id === 'material'){ state.route = {name:'kzmaterial'}; render(); }
   else if(id === 'beamer') openBeamerTools('ruhe');
   else if(id === 'zufall') openBeamerTools('dran');
-  else if(id === 'slf') openBeamerTools('slf');
+  else if(id === 'slf') openSlfSpiel();
   else if(id === 'energizer'){ state.route = {name:'energizer'}; render(); }
   else if(id === 'raeume'){ rbu.von = 'klassenzimmer'; state.route = {name:'raeume'}; render(); }
   else if(id === 'figuren'){ state.figVon = null; state.route = {name:'figuren'}; render(); }
