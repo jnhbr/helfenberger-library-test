@@ -24770,6 +24770,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-10-30-pin-ausweichen', datum:'2026-10-30', fuer:'lehrer', text:'📌 «Immer im Vordergrund» öffnet jetzt auch dann ein Fenster, wenn das Bild-in-Bild-Video nicht startet (z. B. in der installierten Chrome-App).'},
   {id:'2026-10-30-uebung-ohne-wellenlinie', datum:'2026-10-30', fuer:'alle', text:'✍️ In Übungsseiten (z. B. Diktat-Training) werden Wörter nicht mehr rot unterstrichen, und dein Stand wird auch beim Wegwechseln sofort gesichert.'},
   {id:'2026-10-30-diktat-kurz', datum:'2026-10-30', fuer:'lehrer', text:'✂️ Diktat-Prüfungen: Im Monitor gibt es «Kürzeres Diktat». Wer dort angehakt ist, muss nicht das ganze Diktat schreiben – was nach dem zuletzt geschriebenen Wort fehlt, zählt nicht als Fehler. Das Geschriebene wird normal korrigiert.'},
   {id:'2026-10-29-spiele-gross', datum:'2026-10-29', fuer:'lehrer', text:'🔎 Quiz und Spiele (Der grosse Preis, Wer wird Millionär, Quiz-Show, Umfrage-Duell usw.): Fragen, Antworten, Knöpfe und Teamanzeigen sind jetzt deutlich grösser und auf dem Beamer besser lesbar.'},
@@ -34743,7 +34744,16 @@ function pipAnfordern(){
       .catch(function(err){ console.error('Bild-in-Bild', err); toast('📌 Bitte nochmals klicken, dann öffnet sich das Fenster.'); });
   };
   if(v.readyState >= 1) los();
-  else v.addEventListener('loadedmetadata', los, {once:true});
+  else {
+    // Kommt das Bild nie (z. B. als installierte Chrome-App), nach 2 s auf das HTML-Fenster ausweichen statt stumm nichts zu tun.
+    var art = pipv.art, id = pipv.id, ok = false;
+    v.addEventListener('loadedmetadata', function(){ ok = true; los(); }, {once:true});
+    setTimeout(function(){
+      if(ok || pipv.video !== v) return;
+      pipStoppen();
+      try{ pipFensterStarten(art, id); }catch(e){ console.error('Bild-in-Bild', e); toast('📌 Das Fenster liess sich nicht öffnen.'); }
+    }, 2000);
+  }
 }
 function pipFensterStarten(art, id){
   var alt = pipv.fenster;
