@@ -3768,7 +3768,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  getFirestore, doc, getDoc, getDocFromCache, getDocs, getDocsFromServer, collection, query, where, onSnapshot, serverTimestamp, increment,
+  getFirestore, doc, getDoc, getDocFromServer, getDocFromCache, getDocs, getDocsFromServer, collection, query, where, onSnapshot, serverTimestamp, increment,
   setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, Bytes, deleteField, arrayUnion, arrayRemove,
   connectFirestoreEmulator, waitForPendingWrites, disableNetwork, enableNetwork
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
@@ -18065,7 +18065,9 @@ function svaSyncBeobachten(rid){
   if(syncState.unsub){ try{ syncState.unsub(); }catch(e){} syncState.unsub = null; }
   if(!state.user || alsSchueler()) return;
   syncState.unsub = onSnapshot(doc(db,'progress', state.user.uid, 'resources', rid), function(snap){
-    if(syncState.resourceId !== rid || !snap.exists() || snap.metadata.hasPendingWrites) return;
+    if(syncState.resourceId !== rid || snap.metadata.hasPendingWrites) return;
+    if(!snap.metadata.fromCache) syncState.remoteOk = true;   // auch «Dokument gibt es noch nicht» ist vom Server bestätigt
+    if(!snap.exists()) return;
     var data = snap.data(), remoteRev = (typeof data.storeRev === 'number') ? data.storeRev : 0;
     if(!snap.metadata.fromCache) syncState.remoteOk = true;
     if(!data.storeJson || remoteRev <= localRev(rid)) return;
@@ -18213,11 +18215,35 @@ async function writeProgressWithHistory(uid, rid, newFields){
   });
 }
 
+// Wurde der Stand beim Öffnen nur aus dem Zwischenspeicher gelesen (Handy: schwaches Netz), blieb remoteOk bei
+// Schüler:innen für immer false – es wurde nie etwas gespeichert (SVA-Grobkonzept, 02.11.2026). Jetzt: beim Server
+// nachfragen; klappt das, wird geschrieben (was hier ungespeichert liegt, gewinnt wie beim Live-Abgleich),
+// sonst bleibt es lokal und es kommt ein deutlicher Hinweis statt Stille.
+var serverPruefung = {laeuft:false, hinweisAm:0};
+function serverStandBestaetigen(rid){
+  if(serverPruefung.laeuft) return;
+  serverPruefung.laeuft = true;
+  getDocFromServer(doc(db,'progress', state.user.uid, 'resources', rid)).then(function(){
+    serverPruefung.laeuft = false;
+    if(syncState.resourceId !== rid) return;
+    syncState.remoteOk = true;
+    writeStore(rid);
+  }, function(err){
+    serverPruefung.laeuft = false;
+    console.error('Server-Stand nicht erreichbar', err);
+    if(Date.now() - serverPruefung.hinweisAm > 60000 && String(rid).indexOf('sva_') === 0){
+      serverPruefung.hinweisAm = Date.now();
+      toast('⚠️ Keine Verbindung: Dein Text ist auf diesem Gerät gesichert, aber noch nicht in der Library. Bitte mit Internet nochmals öffnen.', 'fehler');
+    }
+    if(syncState.resourceId === rid) scheduleStoreWrite(rid);
+  });
+}
+
 function writeStore(rid){
   if(!state.user || syncState.resourceId !== rid) return;
   var payload = buildStorePayload();
   if(!payload.keys.length || payload.json === syncState.lastWritten) return;
-  if(!syncState.remoteOk){ scheduleStoreWrite(rid); return; }   // Server-Stand noch unbestätigt: nichts überschreiben
+  if(!syncState.remoteOk){ serverStandBestaetigen(rid); return; }   // Server-Stand noch unbestätigt: erst beim Server nachfragen, nie still liegen lassen
   if(payload.json.length > SYNC_MAX_BYTES){
     console.warn('Übungsstand zu gross für die Synchronisierung ('+payload.json.length+' Zeichen) — bleibt nur auf diesem Gerät.');
     return;
@@ -18237,6 +18263,7 @@ function writeStore(rid){
   }).catch(function(err){
     console.error('Stand konnte nicht gespeichert werden', err);
     syncState.lastWritten = null;   // beim nächsten Versuch erneut schreiben
+    if(String(rid).indexOf('sva_') === 0) toast('⚠️ Speichern in der Library hat nicht geklappt – dein Text bleibt auf diesem Gerät. Es wird erneut versucht.', 'fehler');
   });
 }
 
