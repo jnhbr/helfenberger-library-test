@@ -3641,7 +3641,7 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
 
   /* ---------- 🦆 Duck-Bühne (Look der Simple-Duck-Quizshow) ----------
      Drehende Lichtstrahlen auf farbiger Bühne, weisse Karten mit dickem Rand und hartem Schatten,
-     gelbe Buchstabenkreise, Stockente unten links. Eigene Bühne wie beim Millionär: unabhängig vom App-Design. */
+     gelbe Buchstabenkreise. Eigene Bühne wie beim Millionär: unabhängig vom App-Design. */
   .duck{--dk-mitte:#2f78d6;--dk-rand:#0f2f66;--dk-ink:#14302c;--dk-gelb:#f6b223;--dk-orange:#f15a12;--dk-gruen:#1f9d63;
     --surface:#fff;--surface-2:#eef3f1;--text:#14302c;--text-muted:#4b6360;--border:#14302c;--brand:#14302c;--brand-contrast:#fff;
     --good:#1f9d63;--good-soft:#d6f2e3;--bad:#e5484d;--bad-soft:#fbdde1;
@@ -3653,8 +3653,6 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
   .duck-gruen{--dk-mitte:#1b8a6b;--dk-rand:#08402f;}
   .duck::before{content:"";position:fixed;left:50%;top:38%;width:300vmax;height:300vmax;margin:-150vmax 0 0 -150vmax;z-index:-1;pointer-events:none;
     background:repeating-conic-gradient(from 0deg,rgba(255,255,255,.10) 0 10deg,transparent 10deg 20deg);animation:dkSpin 160s linear infinite;}
-  .duck::after{content:"";position:fixed;left:14px;bottom:0;width:clamp(70px,9vw,130px);aspect-ratio:476/511;z-index:-1;pointer-events:none;
-    background:url(assets/ente-quiz.png) center bottom/contain no-repeat;filter:drop-shadow(0 6px 0 rgba(0,0,0,.25));}
   @keyframes dkSpin{to{transform:rotate(360deg);}}
   @media (prefers-reduced-motion:reduce){ .duck::before{animation:none;} }
   .duck .kz-bar{background:rgba(0,0,0,.26);border-bottom:none;color:#fff;}
