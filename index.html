@@ -24796,8 +24796,74 @@ function quizEnsureJoined(viaGet){
   });
 }
 
+/* ---------- Vollbild-Wächter (Live-Quiz + Live-Spiele, nur Schülergeräte) ----------
+   Die Seite öffnet im Vollbild. Wer es während einer Frage verlässt (oder die Frage
+   ausserhalb des Vollbilds beginnt), kann diese Frage nicht mehr beantworten; bei
+   der nächsten Frage ist er wieder dabei, sobald er im Vollbild ist. Geräte ohne
+   Vollbild-API (iPhone) bleiben ausgenommen. */
+var vb = { key:null, gesperrt:false, timer:null };
+function vbFs(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+function vbMoeglich(){ var d = document.documentElement; return !!(d.requestFullscreen || d.webkitRequestFullscreen); }
+function vbSchueler(){ var p = state.profile; return !!(p && p.role === 'student' && !alsSchueler() && !isLeitung()); }
+function vbEinschalten(){
+  if(!vbMoeglich() || !vbSchueler() || vbFs()) return;
+  try{
+    var d = document.documentElement, r = (d.requestFullscreen || d.webkitRequestFullscreen).call(d);
+    if(r && r.catch) r.catch(function(){});
+  }catch(e){}
+}
+function vbKontext(){
+  if(!vbMoeglich() || !vbSchueler()) return null;
+  var q = quizLive.session;
+  if(state.route.name === 'quizplay' && quizIsRunning(q)) return {art:'quiz', aktiv:q.state === 'frage', key:'quiz|'+(q.title||'')+'|'+q.qIndex};
+  var s = lsp.session;
+  if(lsp.offen && lspLaeuft(s)) return {art:'lsp', aktiv:s.phase === 'frage', key:'lsp|'+s.spielId+'|'+(s.runde||0)+'|'+(s.nr||0)};
+  return null;
+}
+function vbTick(){
+  var c = vbKontext(), bar = document.getElementById('vbBar');
+  if(!c){
+    vb.key = null; vb.gesperrt = false;
+    if(bar) bar.remove();
+    return;
+  }
+  var fs = vbFs();
+  if(c.aktiv && c.key !== vb.key){ vb.key = c.key; vb.gesperrt = !fs; }
+  else if(c.aktiv && !fs) vb.gesperrt = true;
+  else if(!c.aktiv){ vb.key = null; vb.gesperrt = false; }
+  if(!fs){
+    if(!bar){
+      bar = document.createElement('div');
+      bar.id = 'vbBar';
+      bar.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:100000;background:#b3261e;color:#fff;padding:8px 12px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;font-weight:600;font-size:15px;text-align:center;';
+      bar.innerHTML = '<span id="vbText"></span><button type="button" id="vbBtn" style="background:#fff;color:#b3261e;border:0;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer;">⛶ Vollbild starten</button>';
+      document.body.appendChild(bar);
+      document.getElementById('vbBtn').addEventListener('click', vbEinschalten);
+    }
+    document.getElementById('vbText').textContent = vb.gesperrt
+      ? 'Du hast das Vollbild verlassen – diese Frage kannst du nicht mehr beantworten. Ab der nächsten bist du wieder dabei, wenn du im Vollbild bist.'
+      : 'Quiz und Spiele laufen im Vollbild. Wer es verlässt, kann die aktuelle Frage nicht mehr beantworten.';
+  } else if(bar) bar.remove();
+  if(vb.gesperrt && c.aktiv){
+    var sel = c.art === 'quiz' ? '.qp-wrap [data-choice]' : '.lsp-s [data-ls]';
+    Array.prototype.forEach.call(document.querySelectorAll(sel), function(b){ b.disabled = true; });
+    var note = document.getElementById('qpNote');
+    if(c.art === 'quiz' && note && quizPlay.choice === null){ note.textContent = '🚫 Vollbild verlassen – diese Frage ist gesperrt.'; note.classList.add('qp-note-late'); }
+  }
+}
+document.addEventListener('click', function(e){
+  if(!vb.gesperrt || !e.target || !e.target.closest) return;
+  if(e.target.closest('.qp-wrap [data-choice], .lsp-s [data-ls]')){
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    toast('Vollbild verlassen – diese Frage ist gesperrt.');
+  }
+}, true);
+['fullscreenchange','webkitfullscreenchange'].forEach(function(ev){ document.addEventListener(ev, vbTick); });
+vb.timer = setInterval(vbTick, 300);
+
 function joinQuiz(){
   if(!quizIsRunning(quizLive.session)) return;
+  vbEinschalten();
   // Eigener Spieler-Eintrag mit 0 Punkten; die Punkte setzt danach nur noch
   // das Lehrer-Gerät (siehe firestore.rules). Beim erneuten Beitreten während
   // derselben Runde darf der Eintrag NICHT neu geschrieben werden - das würde
@@ -25142,6 +25208,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-11-03-vollbild-quiz', datum:'2026-11-03', fuer:'alle', text:'⛶ Live-Quizze und Spiele laufen jetzt im Vollbild. Wer es während einer Frage verlässt, kann diese Frage nicht mehr beantworten – bei der nächsten ist man wieder dabei, sobald man im Vollbild ist.'},
   {id:'2026-11-03-bestellungen', datum:'2026-11-03', fuer:'lehrer', text:'🛒 Neu im 🏫 Klassenzimmer: «Bestellungen». Gemeinsame Nachbestell-Listen für Natur und Technik, Textiles Werken und Holz-/Metallwerken – wie das Blatt im Vorbereitungszimmer. Bei Natur und Technik lässt sich der Bachmann-Katalog nach Name oder Nummer durchsuchen und alles Offene mit einem Tipp in den Bachmann-Warenkorb legen. Offene Posten lassen sich kopieren oder als Mail schicken, Bestelltes mit 🔁 nochmals eintragen (nach 4 Wochen wandert es ins Archiv). Jeder Posten hat einen Lieferanten: Bachmann oder ein anderer (z. B. Apotheke); nur Bachmann-Posten gehen in Mail und Warenkorb. ⌘P druckt die Liste als Formular.'},
   {id:'2026-11-03-folien-alleszeigen', datum:'2026-11-03', fuer:'lehrer', text:'🎞️ Folien: «Alles zeigen »»» und «Abschnitt »»» funktionieren jetzt (Klick). Pfeil nach unten überspringt die Lösung, Pfeil rechts geht Klick für Klick weiter, Pfeil hoch deckt wieder alles zu. Gilt für neu hochgeladene Folien.'},
   {id:'2026-11-03-sva-rechtschreibung', datum:'2026-11-03', fuer:'alle', text:'✍️ Im SVA-Ordner (Mein SVA-Projekt, Dossier-Werkstatt) siehst du beim Schreiben wieder rot unterwellt, wenn ein Wort falsch geschrieben ist.'},
@@ -28149,6 +28216,7 @@ function lspSenden(d){
 
 function openLspS(){
   if(!lspLaeuft(lsp.session)) return;
+  vbEinschalten();
   lsp.autoFor = lsp.session.spielId;
   lsp.offen = true; lsp.sSig = null;
   lspPaintS();
