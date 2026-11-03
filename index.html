@@ -18425,7 +18425,7 @@ function exerciseHelperScript(rid, mitEnter){
   '})();<\/script>';
 }
 
-function injectExerciseHelpers(html, rid){
+function injectExerciseHelpers(html, rid, mitRechtschreibung){
   if(!html || !rid) return html;
   try{
     var out = html;
@@ -18454,7 +18454,8 @@ function injectExerciseHelpers(html, rid){
     var mitEnter = !/['"]Enter['"]|keyCode\s*===?\s*13|which\s*===?\s*13/.test(html);
     var script = exerciseHelperScript(rid, mitEnter);
     // Keine rote Rechtschreib-Wellenlinie in Übungsseiten (Diktate, Lückentexte …): Browser-Prüfung und Autokorrektur aus, auch bei später eingefügten Feldern.
-    script += '<script>(function(){function aus(r){var l=r.querySelectorAll?r.querySelectorAll("textarea,input,[contenteditable]"):[];for(var i=0;i<l.length;i++){var e=l[i];if(e.tagName==="INPUT"&&/^(checkbox|radio|button|submit|range|file|color)$/i.test(e.type||""))continue;e.setAttribute("spellcheck","false");e.setAttribute("autocorrect","off");e.setAttribute("autocapitalize","off");e.setAttribute("data-gramm","false");}}' +
+    // Ausnahme: im SVA-Ordner bleibt die Browser-Rechtschreibprüfung an, damit die Schüler:innen ihre Fehler beim Schreiben sehen.
+    if(!mitRechtschreibung) script += '<script>(function(){function aus(r){var l=r.querySelectorAll?r.querySelectorAll("textarea,input,[contenteditable]"):[];for(var i=0;i<l.length;i++){var e=l[i];if(e.tagName==="INPUT"&&/^(checkbox|radio|button|submit|range|file|color)$/i.test(e.type||""))continue;e.setAttribute("spellcheck","false");e.setAttribute("autocorrect","off");e.setAttribute("autocapitalize","off");e.setAttribute("data-gramm","false");}}' +
       'function los(){aus(document);new MutationObserver(function(m){for(var i=0;i<m.length;i++)for(var j=0;j<m[i].addedNodes.length;j++){var n=m[i].addedNodes[j];if(n.nodeType===1){if(/^(TEXTAREA|INPUT)$/.test(n.tagName)||n.isContentEditable)aus({querySelectorAll:function(){return[n];}});aus(n);}}}).observe(document.documentElement,{childList:true,subtree:true});}' +
       'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",los);else los();})();<\/script>';
     var headRe = /<head(\s[^>]*)?>/i;
@@ -18601,7 +18602,7 @@ function renderResource(r){
       frame.addEventListener('load', function(){ try{ frame.contentWindow.focus(); }catch(e){} }, {once:true});
       frame.srcdoc = html.replace(/<head>/i, '<head><script>window.__libLehrer = '+(state.profile.role === 'teacher' ? 'true' : 'false')+';<\/script>');
     } else
-    frame.srcdoc = injectExerciseHelpers(html, r.id);
+    frame.srcdoc = injectExerciseHelpers(html, r.id, r.subject === 'sva');
   }).catch(function(err){
     console.error(err);
     var wrap = document.querySelector('.viewer-frame-wrap');
@@ -25048,6 +25049,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-11-03-sva-rechtschreibung', datum:'2026-11-03', fuer:'alle', text:'✍️ Im SVA-Ordner (Mein SVA-Projekt, Dossier-Werkstatt) siehst du beim Schreiben wieder rot unterwellt, wenn ein Wort falsch geschrieben ist.'},
   {id:'2026-11-03-schiffe-flotte', datum:'2026-11-03', fuer:'lehrer', text:'🚢 Schiffe versenken: Über jedem Meer steht jetzt die ganze Flotte (verschieden lange Schiffe) – getroffene Teile leuchten gelb, versenkte Schiffe rot. Rund um ein versenktes Schiff erscheint das Wasser sofort und ist nicht mehr anklickbar. Die Buchstaben A–F und Zahlen 1–6 sind gross und weiss.'},
   {id:'2026-11-02-stp-spaetabend', datum:'2026-11-02', fuer:'alle', text:'🗓️ Im Stundenplan erscheinen jetzt auch Termine nach 18:30 (z. B. Elterngespräche) – die Abendzeilen sind nur sichtbar, wenn in der Woche etwas darin steht.'},
   {id:'2026-11-02-energizer-lesbar', datum:'2026-11-02', fuer:'lehrer', text:'⚡ Energizer am Beamer wieder gut lesbar: Schritte, Tipp, Timer und Spielhelfer haben dunkle Schrift auf weissen Karten (vorher weiss auf weiss).'},
