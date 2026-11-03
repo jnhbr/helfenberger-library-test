@@ -201,7 +201,7 @@ function formElement(sp, rels, medien, nr){
   if(link) inhalt += '<a class="fl-vollink" href="' + esc(link) + '" target="_blank" rel="noopener"></a>';
   else {
     var sr = hl && hl.a['r:id'] && rels[hl.a['r:id']], sz = sr && !sr.extern && /\/slide$/.test(sr.typ) ? SPRUNG[relPfad('ppt/slides/x', sr.ziel)] : null;
-    if(sz != null) inhalt += '<a class="fl-vollink fl-sprung" href="#" data-sprung="' + sz + '"></a>';
+    if(sz != null) inhalt += '<a class="fl-vollink fl-sprung" href="#" data-sprung="' + sz + '"' + (/Alles zeigen/.test(hl.a.tooltip || '') ? ' data-aktion="alles"' : /Von vorn/.test(hl.a.tooltip || '') ? ' data-aktion="zurueck"' : '') + '></a>';
   }
   return '<div class="fl-el" style="' + st.join(';') + '">' + inhalt + '</div>';
 }
@@ -499,9 +499,10 @@ var DECK_JS = '(' + function(){
   function taste(e){
     if(e.metaKey || e.ctrlKey || e.altKey) return;
     var k = e.key;
-    if(k === 'ArrowDown'){ e.preventDefault(); var sp = fit.querySelectorAll('[data-sprung]'); zeige(sp.length ? +sp[sp.length - 1].getAttribute('data-sprung') : i + 1); }
+    if(k === 'ArrowDown'){ e.preventDefault(); var sp = fit.querySelector('[data-aktion="alles"]'); zeige(sp ? +sp.getAttribute('data-sprung') : i + 1); }
     else if(k === 'ArrowRight' || k === 'PageDown' || k === ' ' || k === 'Enter'){ e.preventDefault(); zeige(i + 1); }
-    else if(k === 'ArrowLeft' || k === 'PageUp' || k === 'Backspace' || k === 'ArrowUp'){ e.preventDefault(); zeige(i - 1); }
+    else if(k === 'ArrowUp'){ e.preventDefault(); var zu = fit.querySelector('[data-aktion="zurueck"]'); zeige(zu ? +zu.getAttribute('data-sprung') : i - 1); }
+    else if(k === 'ArrowLeft' || k === 'PageUp' || k === 'Backspace'){ e.preventDefault(); zeige(i - 1); }
     else if(k === 'Home'){ zeige(0); } else if(k === 'End'){ zeige(N - 1); }
     else if(k === 'f' || k === 'F'){ voll(); }
     else if(k === 'g' || k === 'G'){ uebersicht(); }
