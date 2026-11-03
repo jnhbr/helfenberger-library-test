@@ -9546,6 +9546,42 @@ var AKT_ZIEL = null;
 })();
 var AKT_FENSTER = !!AKT_ZIEL;
 
+// 🖱️ Doppelklick-Datei (.html/.webloc mit Link <Library>#spiel=<Daten>): spielt ein Quiz, eine
+// Blitzumfrage, Schätz-/Millionär-Fragen oder eine Wortwolke direkt, OHNE sie zu speichern.
+// Die Daten stehen nach dem # (gehen nie an einen Server); Format: base64url von deflate-raw(JSON)
+// oder «j.»+base64url(JSON). JSON = {typ:'quiz'|'million'|'schaetz'|'umfrage'|'wolke', raw:{…}}.
+// Abgemeldet bleibt das Spiel in sessionStorage, bis die Lehrperson angemeldet ist.
+var DIREKT_KEY = 'direktspiel_wartet';
+var DIREKT_FERTIG = Promise.resolve();
+(function(){
+  var m = /^#spiel=([A-Za-z0-9_\-.]+)$/.exec(location.hash || '');
+  if(!m) return;
+  try{ history.replaceState(history.state, '', location.pathname + location.search); }catch(e){}
+  var b64 = function(t){ t = t.replace(/-/g, '+').replace(/_/g, '/'); while(t.length % 4) t += '='; var bin = atob(t), u = new Uint8Array(bin.length); for(var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
+  DIREKT_FERTIG = (async function(){
+    var txt;
+    if(m[1].slice(0, 2) === 'j.') txt = new TextDecoder().decode(b64(m[1].slice(2)));
+    else txt = await new Response(new Blob([b64(m[1])]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+    var d = JSON.parse(txt);
+    if(!d || !d.raw || ['quiz', 'million', 'schaetz', 'umfrage', 'wolke'].indexOf(d.typ) < 0) return;
+    sessionStorage.setItem(DIREKT_KEY, JSON.stringify(d));
+  })().catch(function(e){ console.error('Direktspiel', e); });
+})();
+async function direktSpielStarten(){
+  await DIREKT_FERTIG;
+  var roh = null, d = null;
+  try{ roh = sessionStorage.getItem(DIREKT_KEY); }catch(e){}
+  if(!roh) return;
+  try{ d = JSON.parse(roh); }catch(e){}
+  try{ sessionStorage.removeItem(DIREKT_KEY); }catch(e){}
+  if(!d || !d.raw) return;
+  if(!state.profile || state.profile.role !== 'teacher' || alsSchueler()){ toast('Dieses Spiel kann nur eine Lehrperson starten.'); return; }
+  var r = d.raw; if(d.typ === 'quiz' || d.typ === 'million' || d.typ === 'schaetz') r.id = r.id || 'direkt';
+  state.route = {name:'klassenzimmer'}; render();
+  toast('▶︎ Direktstart: «' + (r.title || r.titel || r.frage || 'Spiel') + '» (wird nicht gespeichert)');
+  setTimeout(function(){ kzmStartenHier({typ:d.typ, raw:r}); }, 300);
+}
+
 onAuthStateChanged(auth, authGeaendert);
 async function authGeaendert(user){
   // onAuthStateChanged feuert nicht nur bei An-/Abmeldung, sondern z.B. auch
@@ -9661,6 +9697,7 @@ async function authGeaendert(user){
     startPruefungWatcher();
     startLernphaseWatcher();
     gruppenMitgliederNachtragen().catch(function(err){ console.error('Gruppen-Mitglieder', err); });
+    direktSpielStarten();
     if(AKT_FENSTER){
       // Im Aktivitäts-Fenster keine Einführung/Hinweise — die würden den Start-Dialog verdrängen.
       if(state.profile.role === 'teacher' && !alsSchueler()) aktFensterBoot();
@@ -25208,6 +25245,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-11-04-direktspiel', datum:'2026-11-04', fuer:'lehrer', text:'🖱️ Doppelklick-Spiele: Eine Datei (.html) öffnet die Library und startet Quiz, Blitzumfrage, Schätzfragen oder Wortwolke direkt – ohne etwas zu speichern. Du musst nur angemeldet sein (bzw. dich anmelden).'},
   {id:'2026-11-03-vollbild-quiz', datum:'2026-11-03', fuer:'alle', text:'⛶ Live-Quizze und Spiele laufen jetzt im Vollbild. Wer es während einer Frage verlässt, kann diese Frage nicht mehr beantworten – bei der nächsten ist man wieder dabei, sobald man im Vollbild ist.'},
   {id:'2026-11-03-bestellungen', datum:'2026-11-03', fuer:'lehrer', text:'🛒 Neu im 🏫 Klassenzimmer: «Bestellungen». Gemeinsame Nachbestell-Listen für Natur und Technik, Textiles Werken und Holz-/Metallwerken – wie das Blatt im Vorbereitungszimmer. Bei Natur und Technik lässt sich der Bachmann-Katalog nach Name oder Nummer durchsuchen und alles Offene mit einem Tipp in den Bachmann-Warenkorb legen. Offene Posten lassen sich kopieren oder als Mail schicken, Bestelltes mit 🔁 nochmals eintragen (nach 4 Wochen wandert es ins Archiv). Jeder Posten hat einen Lieferanten: Bachmann oder ein anderer (z. B. Apotheke); nur Bachmann-Posten gehen in Mail und Warenkorb. ⌘P druckt die Liste als Formular.'},
   {id:'2026-11-03-folien-alleszeigen', datum:'2026-11-03', fuer:'lehrer', text:'🎞️ Folien: «Alles zeigen »»» und «Abschnitt »»» funktionieren jetzt (Klick). Pfeil nach unten überspringt die Lösung, Pfeil rechts geht Klick für Klick weiter, Pfeil hoch deckt wieder alles zu. Gilt für neu hochgeladene Folien.'},
