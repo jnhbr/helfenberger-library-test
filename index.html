@@ -9563,23 +9563,58 @@ var DIREKT_FERTIG = Promise.resolve();
     if(m[1].slice(0, 2) === 'j.') txt = new TextDecoder().decode(b64(m[1].slice(2)));
     else txt = await new Response(new Blob([b64(m[1])]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
     var d = JSON.parse(txt);
-    if(!d || !d.raw || ['quiz', 'million', 'schaetz', 'umfrage', 'wolke'].indexOf(d.typ) < 0) return;
+    if(!direktPaket(d)) return;
     sessionStorage.setItem(DIREKT_KEY, JSON.stringify(d));
   })().catch(function(e){ console.error('Direktspiel', e); });
 })();
+// Paket = {titel, spiele:[{typ, raw}]} (oder ein einzelnes {typ, raw}); nur bekannte Arten behalten.
+function direktPaket(d){
+  if(!d) return null;
+  var l = Array.isArray(d.spiele) ? d.spiele : (d.raw ? [d] : []);
+  l = l.filter(function(x){ return x && x.raw && ['quiz', 'million', 'schaetz', 'umfrage', 'wolke'].indexOf(x.typ) >= 0; });
+  if(!l.length) return null;
+  return {titel:String(d.titel || l[0].raw.title || l[0].raw.titel || l[0].raw.frage || 'Spiele').slice(0, 100), spiele:l};
+}
+var DIREKT_ICON = {quiz:'🎮', million:'💰', schaetz:'🎯', umfrage:'📊', wolke:'☁️'};
+function direktName(x){ return String(x.raw.title || x.raw.titel || x.raw.frage || x.typ).slice(0, 90); }
 async function direktSpielStarten(){
   await DIREKT_FERTIG;
   var roh = null, d = null;
   try{ roh = sessionStorage.getItem(DIREKT_KEY); }catch(e){}
   if(!roh) return;
-  try{ d = JSON.parse(roh); }catch(e){}
+  try{ d = direktPaket(JSON.parse(roh)); }catch(e){}
   try{ sessionStorage.removeItem(DIREKT_KEY); }catch(e){}
-  if(!d || !d.raw) return;
+  if(!d) return;
   if(!state.profile || state.profile.role !== 'teacher' || alsSchueler()){ toast('Dieses Spiel kann nur eine Lehrperson starten.'); return; }
-  var r = d.raw; if(d.typ === 'quiz' || d.typ === 'million' || d.typ === 'schaetz') r.id = r.id || 'direkt';
   state.route = {name:'klassenzimmer'}; render();
-  toast('▶︎ Direktstart: «' + (r.title || r.titel || r.frage || 'Spiel') + '» (wird nicht gespeichert)');
-  setTimeout(function(){ kzmStartenHier({typ:d.typ, raw:r}); }, 300);
+  setTimeout(function(){ direktDialog(d); }, 300);
+}
+// 1. Wer macht mit (Klasse/Gruppe)? 2. Was starten? 3. Ein Tipp = sofort los (ohne Team-/Fragenwahl, nichts wird gespeichert).
+function direktDialog(d){
+  var h = '<h3>▶︎ '+esc(d.titel)+'</h3><p class="pr-hinweis">Direktstart – nichts davon wird gespeichert.</p>';
+  h += '<div class="section-label" style="margin:10px 0 6px;">1 · Klasse / Gruppe</div>';
+  h += '<p style="margin:0 0 6px;">Es erscheint bei: <b id="dsText">'+esc(mitKurz())+'</b> <button class="btn btn-ghost btn-sm" id="dsAendern" type="button">👥 Ändern</button></p>';
+  h += '<div class="section-label" style="margin:14px 0 6px;">2 · Was starten? (ein Tipp startet sofort)</div>';
+  d.spiele.forEach(function(x, i){
+    h += '<button class="btn btn-primary" style="display:block;width:100%;text-align:left;margin:0 0 8px;" type="button" data-ds="'+i+'">'+DIREKT_ICON[x.typ]+' '+esc(direktName(x))+'</button>';
+  });
+  h += '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="dsAbbr" type="button">Schliessen</button></div>';
+  openModal(h);
+  mitGruppenLaden().then(function(){ var t = document.getElementById('dsText'); if(t) t.textContent = mitKurz(); });
+  function neu(){ direktDialog(d); }
+  document.getElementById('dsAbbr').addEventListener('click', closeModal);
+  document.getElementById('dsAendern').addEventListener('click', function(){ mitDialog(neu, neu); });
+  document.querySelectorAll('[data-ds]').forEach(function(b){
+    b.addEventListener('click', function(){ var x = d.spiele[+b.getAttribute('data-ds')]; closeModal(); direktStart(x); });
+  });
+}
+function direktStart(x){
+  var r = x.raw, t = direktName(x);
+  if(x.typ === 'quiz'){ r.id = r.id || 'direkt'; startQuizSession(r, 0, null); }
+  else if(x.typ === 'million') spielWahl(t, mioAusQuiz(r));
+  else if(x.typ === 'schaetz') schaetzStart(t, schaetzNorm(r.questions), schaetzOpt().sec);
+  else if(x.typ === 'wolke') wolkeStart(r.frage, Math.max(1, Math.min(5, +r.max || 3)), r.zeigen !== false);
+  else if(x.typ === 'umfrage') umfrageStartSerie(umfrageFragen(r), r.titel || '');
 }
 
 onAuthStateChanged(auth, authGeaendert);
@@ -25245,7 +25280,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-11-04-direktspiel', datum:'2026-11-04', fuer:'lehrer', text:'🖱️ Doppelklick-Spiele: Eine Datei (.html) öffnet die Library und startet Quiz, Blitzumfrage, Schätzfragen oder Wortwolke direkt – ohne etwas zu speichern. Du musst nur angemeldet sein (bzw. dich anmelden).'},
+  {id:'2026-11-04-direktspiel', datum:'2026-11-04', fuer:'lehrer', text:'🖱️ Doppelklick-Spiele: Eine Datei (.html) öffnet die Library. Du wählst Klasse/Gruppe, dann Quiz, Blitzumfrage, Schätzfragen oder Wortwolke, und es startet sofort – ohne etwas zu speichern.'},
   {id:'2026-11-03-vollbild-quiz', datum:'2026-11-03', fuer:'alle', text:'⛶ Live-Quizze und Spiele laufen jetzt im Vollbild. Wer es während einer Frage verlässt, kann diese Frage nicht mehr beantworten – bei der nächsten ist man wieder dabei, sobald man im Vollbild ist.'},
   {id:'2026-11-03-bestellungen', datum:'2026-11-03', fuer:'lehrer', text:'🛒 Neu im 🏫 Klassenzimmer: «Bestellungen». Gemeinsame Nachbestell-Listen für Natur und Technik, Textiles Werken und Holz-/Metallwerken – wie das Blatt im Vorbereitungszimmer. Bei Natur und Technik lässt sich der Bachmann-Katalog nach Name oder Nummer durchsuchen und alles Offene mit einem Tipp in den Bachmann-Warenkorb legen. Offene Posten lassen sich kopieren oder als Mail schicken, Bestelltes mit 🔁 nochmals eintragen (nach 4 Wochen wandert es ins Archiv). Jeder Posten hat einen Lieferanten: Bachmann oder ein anderer (z. B. Apotheke); nur Bachmann-Posten gehen in Mail und Warenkorb. ⌘P druckt die Liste als Formular.'},
   {id:'2026-11-03-folien-alleszeigen', datum:'2026-11-03', fuer:'lehrer', text:'🎞️ Folien: «Alles zeigen »»» und «Abschnitt »»» funktionieren jetzt (Klick). Pfeil nach unten überspringt die Lösung, Pfeil rechts geht Klick für Klick weiter, Pfeil hoch deckt wieder alles zu. Gilt für neu hochgeladene Folien.'},
