@@ -2226,31 +2226,59 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
   .vg-item-spacer{flex:1;}
   .vg-hint{color:var(--text-muted);font-size:13px;line-height:1.55;margin:0 2px 14px;}
   /* ---------- 🛒 Bestellungen ---------- */
-  .bst-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px;}
-  .bst-tab-btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:999px;padding:8px 16px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;}
-  .bst-tab-btn.on{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .bst-wrap{--bst:#0E7490;--bst2:#2563EB;--bst-soft:rgba(14,116,144,.10);}
+  .bst-wrap[data-b="tw"]{--bst:#C026D3;--bst2:#E11D48;--bst-soft:rgba(192,38,211,.10);}
+  .bst-wrap[data-b="hm"]{--bst:#D97706;--bst2:#EA580C;--bst-soft:rgba(217,119,6,.12);}
+  .bst-banner{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:18px 22px;border-radius:var(--radius);color:#fff;margin:6px 0 14px;
+    background:linear-gradient(120deg,var(--bst),var(--bst2));box-shadow:0 14px 30px -14px var(--bst);}
+  .bst-banner img{width:68px;height:68px;border-radius:16px;background:#fff;padding:5px;box-sizing:border-box;box-shadow:0 4px 14px rgba(0,0,0,.25);}
+  .bst-banner-t{flex:1;min-width:180px;}
+  .bst-banner-t b{display:block;font-size:24px;font-weight:800;line-height:1.2;text-shadow:0 2px 10px rgba(0,0,0,.25);}
+  .bst-banner-t span{font-size:14px;opacity:.92;}
+  .bst-stats{display:flex;gap:10px;flex-wrap:wrap;}
+  .bst-stat{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);border-radius:14px;padding:8px 14px;text-align:center;min-width:76px;backdrop-filter:blur(4px);}
+  .bst-stat b{display:block;font-size:22px;font-weight:800;line-height:1.1;}
+  .bst-stat span{font-size:11.5px;opacity:.95;text-transform:uppercase;letter-spacing:.04em;}
+  .bst-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px;}
+  .bst-tab-btn{border:2px solid transparent;background:var(--surface);color:var(--text);border-radius:999px;padding:9px 18px;font:inherit;font-size:14.5px;font-weight:700;cursor:pointer;box-shadow:var(--shadow);transition:transform .12s;}
+  .bst-tab-btn:hover{transform:translateY(-1px);}
+  .bst-tab-btn[data-bb="nt"].on{background:linear-gradient(120deg,#0E7490,#2563EB);color:#fff;}
+  .bst-tab-btn[data-bb="tw"].on{background:linear-gradient(120deg,#C026D3,#E11D48);color:#fff;}
+  .bst-tab-btn[data-bb="hm"].on{background:linear-gradient(120deg,#D97706,#EA580C);color:#fff;}
+  .bst-karte{background:var(--surface);border:1px solid var(--border);border-left:5px solid var(--bst);border-radius:var(--radius);padding:14px 18px;margin-bottom:12px;box-shadow:var(--shadow);}
+  .bst-karte .vg-hint{margin:8px 0 0;}
+  .bst-karte a{color:var(--bst);font-weight:700;}
   .bst-lbl{display:block;font-size:12.5px;font-weight:700;color:var(--text-muted);margin:8px 0 4px;}
-  .bst-treffer{margin-top:6px;max-height:320px;overflow:auto;border-radius:10px;}
-  .bst-treffer-zeile{display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid var(--border);background:var(--surface);font-size:14px;}
-  .bst-nr{font-weight:800;min-width:72px;font-variant-numeric:tabular-nums;}
+  .bst-karte .modal-input:focus{outline:2px solid var(--bst);}
+  .bst-treffer{margin-top:8px;max-height:320px;overflow:auto;border-radius:12px;border:1px solid var(--border);}
+  .bst-treffer:empty{display:none;}
+  .bst-treffer-zeile{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--surface);font-size:14px;}
+  .bst-treffer-zeile:nth-child(even){background:var(--bst-soft);}
+  .bst-nr{font-weight:800;min-width:76px;font-variant-numeric:tabular-nums;color:var(--bst);}
   .bst-name{flex:1;min-width:0;}
-  .bst-pr{color:var(--text-muted);white-space:nowrap;font-size:13px;}
-  .bst-ext{text-decoration:none;font-weight:700;}
+  .bst-pr{color:var(--text-muted);white-space:nowrap;font-size:13px;font-weight:600;}
+  .bst-ext{text-decoration:none;font-weight:800;color:var(--bst);}
   .bst-keine{padding:10px;color:var(--text-muted);font-size:13.5px;}
-  .bst-form{display:grid;grid-template-columns:2fr 80px 1.1fr 100px;gap:8px;margin:10px 0 8px;align-items:center;}
+  .bst-form{display:grid;grid-template-columns:2fr 80px 1.1fr 100px;gap:8px;margin:2px 0 0;align-items:center;}
   .bst-f-bem{grid-column:1 / 4;}
+  .bst-form .btn-primary,.bst-wrap #bstShop{background:linear-gradient(120deg,var(--bst),var(--bst2));border:0;color:#fff;}
   .bst-edit-grid{display:grid;grid-template-columns:80px 1fr 110px;gap:8px;}
-  .bst-blatt{margin-top:14px;}
+  .bst-aktionen{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px;}
+  .bst-aktionen .btn{border-radius:999px;font-weight:700;}
+  .bst-optionen{display:flex;gap:18px;flex-wrap:wrap;}
+  .bst-blatt{margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
   .bst-tab{width:100%;border-collapse:collapse;background:var(--surface);}
-  .bst-tab th,.bst-tab td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top;font-size:14px;}
-  .bst-tab th{background:var(--surface-2);font-size:13px;}
-  .bst-c-anz{width:70px;} .bst-c-preis{width:84px;text-align:right !important;} .bst-c-dat{width:96px;} .bst-c-lp{width:110px;} .bst-c-nr{width:120px;} .bst-c-haken{width:34px;text-align:center !important;} .bst-c-akt{width:130px;white-space:nowrap;}
+  .bst-tab th,.bst-tab td{border-bottom:1px solid var(--border);padding:10px 12px;text-align:left;vertical-align:top;font-size:14px;}
+  .bst-tab th{background:linear-gradient(120deg,var(--bst),var(--bst2));color:#fff;font-size:12.5px;font-weight:800;letter-spacing:.03em;border-bottom:0;}
+  .bst-tab tbody tr:nth-child(even){background:var(--bst-soft);}
+  .bst-tab tbody tr:hover{background:var(--surface-2);}
+  .bst-c-anz{width:70px;} .bst-c-preis{width:84px;text-align:right !important;} .bst-c-dat{width:100px;} .bst-c-lp{width:110px;} .bst-c-nr{width:120px;} .bst-c-haken{width:38px;text-align:center !important;} .bst-c-akt{width:130px;white-space:nowrap;}
+  .bst-tab input[type=checkbox]{width:18px;height:18px;accent-color:var(--bst);cursor:pointer;}
   .bst-erledigt td{color:var(--text-muted);}
   .bst-erledigt .bst-bez{text-decoration:line-through;}
   .bst-bem{font-size:12px;color:var(--text-muted);text-decoration:none;}
-  .bst-summe{margin:10px 2px 0;font-size:13.5px;color:var(--text-muted);}
-  .bst-aktionen{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px;}
-  .bst-optionen{display:flex;gap:18px;flex-wrap:wrap;}
+  .bst-summe{margin:0;padding:12px 16px;font-size:13.5px;color:var(--text-muted);border-top:1px solid var(--border);background:var(--bst-soft);}
+  .bst-summe b{color:var(--bst);font-size:15px;}
   .bst-printkopf,.bst-leer,.bst-fuss{display:none;}
   @page bestellung{size:A4 portrait;margin:1.5cm 1.5cm 2cm;@top-left{content:""}@top-center{content:""}@top-right{content:""}@bottom-left{content:""}@bottom-center{content:""}@bottom-right{content:""}}
   @media print{
@@ -2263,7 +2291,11 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
     .bst-pk-m{text-align:center;border-left:1.5pt solid #000;border-right:1.5pt solid #000;padding:3mm;align-self:stretch;display:flex;flex-direction:column;justify-content:center;}
     .bst-pk-t{font-size:22pt;font-weight:700;line-height:1.2;}
     .bst-pk-u{font-size:15pt;font-weight:700;line-height:1.5;}
+    .bst-blatt{border:0;box-shadow:none;border-radius:0;background:transparent;overflow:visible;margin:0;}
     .bst-tab{background:transparent;}
+    .bst-tab tbody tr:nth-child(even){background:transparent !important;}
+    .bst-tab th{color:#000 !important;padding:1.5mm 2mm;}
+    .bst-summe{background:transparent;border:0;padding:2mm 0;}
     .bst-tab th{background:#e6e6e6 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;border:1pt solid #000;font-size:10.5pt;line-height:1.3;}
     .bst-tab td{border:1pt solid #000;font-size:11.5pt;line-height:1.5;height:10mm;padding:1mm 2mm;}
     .bst-tab tr{break-inside:avoid;}
@@ -32653,10 +32685,9 @@ function bstMenge(r){ var m = String(r.anzahl || '').match(/\d+/); return m ? pa
 
 function renderBestellungen(){
   clearSubjectWatchers(); clearOverviewWatchers();
-  var html = '<div class="bst-wrap">';
+  var html = '<div class="bst-wrap" data-b="'+bst.bereich+'">';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Klassenzimmer</button>'
         + '<button class="btn btn-ghost btn-sm" id="bstDruck" type="button">🖨️ Drucken (⌘P)</button></div>';
-  html += '<h2 class="page-welcome bst-screen" style="margin-bottom:6px;">'+bildIconHtml('kz-bestellungen','🛒',40)+' Bestellungen</h2>';
   html += '<div class="bst-tabs bst-screen">';
   BST_BEREICHE.forEach(function(b){
     html += '<button class="bst-tab-btn'+(b.id === bst.bereich ? ' on' : '')+'" data-bb="'+b.id+'" type="button">'+b.icon+' '+esc(b.name)+'</button>';
@@ -32746,6 +32777,34 @@ function bstZuBachmann(b){
   });
 }
 
+/* Einmalige Übernahme des handschriftlichen Blatts (Foto vom 3.11.2026, Chemie/Biologie) in die NT-Liste. */
+var BST_BLATT = [
+  ['Natronlauge 0,1 mol/l (0,1 N)', '2', '', '2026-03-10', 'Rhiner', '2026-06-12'],
+  ['Reagenzgläser 20 mm Ø', '', 'L5360', '2026-03-17', 'Rhiner', '2026-06-12'],
+  ['Ethanol', '4–6', '', '2026-06-11', 'Stoller', '2026-06-12'],
+  ['Filterpapier Ø 185 mm', '2', '', '2026-06-02', 'Rhiner', ''],
+  ['Holzspäne/Kiefernspäne', '8', 'C1632', '2026-09-08', 'Stolz', ''],
+  ['Latexhandschuhe', '', '', '2026-09-25', 'Stolz', ''],
+  ['Universalindikator (fl.)', '4x', 'C3900', '2026-10-24', 'Stolz', ''],
+  ['Schwefelsäure 0,5 mol/l', '3x', 'C3544', '2026-11-03', 'Stolz', ''],
+  ['Schwefelsäure 0,05 mol/l', '5x', 'C3542', '2026-11-03', 'Stolz', '']
+];
+function bstBlattUebernehmen(){
+  bstKatalogLaden(function(){
+    var preise = {};
+    bst.katalog.eintraege.forEach(function(e){ if(typeof e.preis === 'number') preise[e.nr.toLowerCase()] = e.preis; });
+    var jobs = [], t = Date.now();
+    BST_BLATT.forEach(function(z, i){
+      var daten = { bereich:'nt', bez:z[0], anzahl:z[1], nr:z[2], preis:(z[2] && preise[z[2].toLowerCase()] !== undefined ? preise[z[2].toLowerCase()] : null), bem:'',
+        datum:z[3], lehrer:z[4] || rbuIch(), vonUid:state.user.uid, bestellt:!!z[5], bestelltAm:z[5], ord:t + i };
+      var ref = doc(collection(db, 'bestellungen'));
+      jobs.push(setDoc(ref, daten).then(function(){ daten.id = ref.id; bst.rows.push(daten); }));
+    });
+    Promise.all(jobs).then(function(){ paintBestellungen(); toast('Blatt übernommen.'); })
+      .catch(function(err){ console.error(err); toast('Konnte nicht gespeichert werden.'); });
+  });
+}
+
 function paintBestellungen(){
   var host = document.getElementById('bstBody');
   if(!host) return;
@@ -32753,28 +32812,35 @@ function paintBestellungen(){
   var alle = bst.rows.filter(function(r){ return r.bereich === b.id; }).sort(function(x, y){ return (x.ord || 0) - (y.ord || 0); });
   var rows = alle.filter(function(r){ return !(bst.nurOffen && r.bestellt) && (bst.archiv || !bstArchiviert(r)); });
   var imArchiv = alle.filter(bstArchiviert).length;
-  var h = '<div class="bst-screen">';
+  var offenAlle = alle.filter(function(r){ return !r.bestellt; }), summeAlle = 0;
+  offenAlle.forEach(function(r){ if(typeof r.preis === 'number') summeAlle += r.preis * bstMenge(r); });
+  var h = '<div class="bst-screen bst-banner"><img src="assets/icons/kz-bestellungen.webp" alt=""><div class="bst-banner-t"><b>'+b.icon+' '+esc(b.name)+'</b><span>Bestellungen – gemeinsame Liste aller Lehrpersonen</span></div>'
+        + '<div class="bst-stats"><div class="bst-stat"><b>'+offenAlle.length+'</b><span>offen</span></div>'
+        + '<div class="bst-stat"><b>'+(alle.length - offenAlle.length)+'</b><span>bestellt</span></div>'
+        + (summeAlle ? '<div class="bst-stat"><b>'+bstChf(summeAlle)+'</b><span>CHF offen</span></div>' : '') + '</div></div>';
+  h += '<div class="bst-screen">';
   if(b.katalog){
-    h += '<div class="bst-suche"><label class="bst-lbl" for="bstSuche">🔎 Im Bachmann-Katalog suchen (Name oder Nummer)</label>'
+    h += '<div class="bst-suche bst-karte"><label class="bst-lbl" for="bstSuche">🔎 Im Bachmann-Katalog suchen (Name oder Nummer)</label>'
        + '<input id="bstSuche" class="modal-input" type="search" placeholder="z. B. Universalindikator oder C3900" autocomplete="off">'
        + '<div id="bstTreffer" class="bst-treffer"></div>'
        + '<p class="vg-hint" id="bstKatHinweis">Katalog von <a href="https://bachmann-lehrmittel.ch/" target="_blank" rel="noopener">bachmann-lehrmittel.ch</a>. Preise exkl. MwSt. Antippen übernimmt Bezeichnung, Nummer und Preis ins Formular.</p></div>';
   } else {
     h += '<p class="vg-hint">Für diesen Bereich gibt es keinen Katalog: Bezeichnung, Bestellnummer und Lieferant von Hand eintragen.</p>';
   }
-  h += '<div class="bst-form">'
+  if(b.id === 'nt' && !alle.length) h += '<p class="vg-hint">Die Liste ist noch leer. <button class="btn btn-ghost btn-sm" id="bstBlatt" type="button">📥 Einträge vom Papierblatt übernehmen</button> (Natronlauge … Schwefelsäure, Stand 3.11.2026)</p>';
+  h += '<div class="bst-karte"><div class="bst-form">'
      + '<input id="bstBez" class="modal-input bst-f-bez" type="text" maxlength="200" placeholder="Genaue Bezeichnung">'
      + '<input id="bstAnz" class="modal-input bst-f-anz" type="text" maxlength="30" placeholder="Anzahl">'
      + '<input id="bstNr" class="modal-input bst-f-nr" type="text" maxlength="60" placeholder="'+(b.katalog ? 'Bestellnummer' : 'Bestellnr. / Lieferant')+'">'
      + '<input id="bstPreis" class="modal-input bst-f-preis" type="text" inputmode="decimal" maxlength="10" placeholder="Preis CHF">'
      + '<input id="bstBem" class="modal-input bst-f-bem" type="text" maxlength="300" placeholder="Bemerkung (freiwillig)">'
-     + '<button class="btn btn-primary btn-sm" id="bstAdd" type="button">＋ Eintragen</button></div>';
-  h += '<div class="bst-aktionen"><button class="btn btn-ghost btn-sm" id="bstKop" type="button">📋 Offene Posten kopieren</button>'
+     + '<button class="btn btn-primary btn-sm" id="bstAdd" type="button">＋ Eintragen</button></div></div>';
+  h += '<div class="bst-karte"><div class="bst-aktionen"><button class="btn btn-ghost btn-sm" id="bstKop" type="button">📋 Offene Posten kopieren</button>'
      + '<button class="btn btn-ghost btn-sm" id="bstMail" type="button">✉️ Als Mail</button>'
      + (b.katalog ? '<button class="btn btn-primary btn-sm" id="bstShop" type="button" title="Legt alle offenen Posten mit Katalognummer in den Bachmann-Warenkorb">🛒 Bei Bachmann bestellen</button>' : '')
      + '</div>';
   h += '<div class="bst-optionen"><label class="gr-opt"><input type="checkbox" id="bstNurOffen"'+(bst.nurOffen ? ' checked' : '')+'> Bestellte ausblenden (auch im Ausdruck)</label>'
-     + '<label class="gr-opt"><input type="checkbox" id="bstArchiv"'+(bst.archiv ? ' checked' : '')+'> Archiv zeigen: bestellt vor über 4 Wochen ('+imArchiv+')</label></div>';
+     + '<label class="gr-opt"><input type="checkbox" id="bstArchiv"'+(bst.archiv ? ' checked' : '')+'> Archiv zeigen: bestellt vor über 4 Wochen ('+imArchiv+')</label></div></div>';
   h += '</div>';
 
   h += '<div class="bst-blatt">';
@@ -32832,6 +32898,7 @@ function paintBestellungen(){
     var o = bstOffeneText(b); if(!o.n){ toast('Keine offenen Posten.'); return; }
     window.location.href = 'mailto:?subject='+encodeURIComponent(o.titel)+'&body='+encodeURIComponent(o.titel+'\n\n'+o.zeilen.join('\n'));
   });
+  var blatt = document.getElementById('bstBlatt'); if(blatt) blatt.addEventListener('click', function(){ blatt.disabled = true; bstBlattUebernehmen(); });
   var shop = document.getElementById('bstShop'); if(shop) shop.addEventListener('click', function(){ bstZuBachmann(b); });
   Array.prototype.forEach.call(host.querySelectorAll('[data-neu]'), function(btn){
     btn.addEventListener('click', function(){
