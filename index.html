@@ -33048,12 +33048,13 @@ function bstKopieren(text, meldung){
 /* Legt die offenen Posten mit bekannter Katalognummer per Formular in den Bachmann-Warenkorb (Shopware: /checkout/line-item/add,
    ohne CSRF-Token; ein Formular-POST in einem neuen Tab genügt, kein fetch nötig). */
 function bstZuBachmann(b){
+  window.open('https://bachmann-lehrmittel.ch/account/login?redirectTo=frontend.checkout.cart.page', 'bachmannShop'); // sofort im Klick, sonst blockt der Browser das Fenster
   bstKatalogLaden(function(){
     var nachNr = {};
     bst.katalog.eintraege.forEach(function(e){ if(e.id) nachNr[e.nr.toLowerCase()] = e; });
     var offen = bst.rows.filter(function(r){ return r.bereich === b.id && !r.bestellt && bstLief(r) === 'bachmann'; });
     var f = document.createElement('form');
-    f.method = 'post'; f.action = 'https://bachmann-lehrmittel.ch/checkout/line-item/add'; f.target = '_blank'; f.style.display = 'none';
+    f.method = 'post'; f.action = 'https://bachmann-lehrmittel.ch/checkout/line-item/add'; f.target = 'bachmannShop'; f.style.display = 'none';
     var feld = function(n, v){ var i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); return i; };
     feld('redirectTo', 'frontend.checkout.cart.page');
     var drin = 0, fehlen = [], gesehen = {};
@@ -33068,8 +33069,19 @@ function bstZuBachmann(b){
       gesehen[e.id] = { q:feld(pre+'[quantity]', String(m)), m:m }; drin++;
     });
     if(!drin){ toast('Kein offener Posten hat eine Bachmann-Nummer aus dem Katalog.'); return; }
-    document.body.appendChild(f); f.submit(); document.body.removeChild(f);
-    toast(drin+' Artikel im Bachmann-Warenkorb.'+(fehlen.length ? ' Nicht dabei (keine Katalognummer): '+fehlen.join(', ') : ''));
+    /* Der Warenkorb geht beim Anmelden bei Bachmann verloren (neue Sitzung). Darum: zuerst die Anmeldung öffnen, erst danach die Artikel
+       in denselben, nun angemeldeten Tab legen. */
+    openModal(
+      '<h3>🛒 Bei Bachmann anmelden</h3>'+
+      '<p>1. Im neuen Tab bei Bachmann anmelden.<br>2. Hier auf «Artikel in den Warenkorb» klicken – dann liegen '+drin+' Artikel im Warenkorb, bereit zum Bestellen auf Rechnung.'+(fehlen.length ? '<br><small>Nicht dabei (keine Katalognummer): '+esc(fehlen.join(', '))+'</small>' : '')+'</p>'+
+      '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button>'+
+      '<button class="btn btn-primary btn-sm" id="modalOk" type="button">Artikel in den Warenkorb</button></div>'
+    );
+    document.getElementById('modalCancel').addEventListener('click', closeModal);
+    document.getElementById('modalOk').addEventListener('click', function(){
+      document.body.appendChild(f); f.submit(); document.body.removeChild(f); closeModal();
+      toast(drin+' Artikel im Bachmann-Warenkorb.');
+    });
   });
 }
 
