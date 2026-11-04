@@ -6069,13 +6069,14 @@ function fachQuellen(subjectId){
   var wahl = fachLpWahl[subjectId];
   if(wahl){
     // Standard (Gruppe oder Klassenseite) trotzdem ermitteln, damit er im Wechsler markiert wird.
-    delete fachLpWahl[subjectId];
-    return fachQuellen(subjectId).then(function(norm){
-      fachLpWahl[subjectId] = wahl;
-      // Die gewählte Seite wird in renderSubject statt der eigenen gelesen (fachQuelleKlasse): Ordnerbaum, «Aktuell» und Zähler stimmen dann.
+    // Die gewählte Seite wird in renderSubject statt der eigenen gelesen (fachQuelleKlasse): Ordnerbaum, «Aktuell» und Zähler stimmen dann.
+    return fachQuellenStandard(subjectId).then(function(norm){
       return {fremd:[], ohneEigene:false, wahl:wahl, standardSeite:fachStandardSeite(norm)};
     });
   }
+  return fachQuellenStandard(subjectId);
+}
+function fachQuellenStandard(subjectId){
   return loadMitgliedGruppen().then(function(list){
     var hier = list.filter(function(g){ return g.ownerKlasse && gruppeHatFach(g, subjectId); });
     var fremd = [], proSeite = {};
