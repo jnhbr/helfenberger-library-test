@@ -6798,7 +6798,7 @@ function earlybirdLadenDatum(datum){
 // aus der offenen Klasse / total). Schüler:innen sehen nur die kommenden Termine,
 // für die sie eingetragen sind – sonst gar keinen Earlybird.
 function earlybirdKalenderLaden(){
-  if(!state.user) return Promise.resolve([]);
+  if(!state.user || istPraktikum()) return Promise.resolve([]);   // Praktikum/Zivi: Earlybird gesperrt (firestore.rules)
   var lehrer = state.profile.role === 'teacher';
   if(!lehrer){
     var kommend = earlybirdKommende();
@@ -12706,7 +12706,7 @@ function pwLaden(){
 }
 // Beim Anmelden: fertige Passwörter melden (nur die eigenen Anfragen).
 function pwHinweis(){
-  if(!state.profile || state.profile.role !== 'teacher' || isLeitung()) return;
+  if(!state.profile || state.profile.role !== 'teacher' || isLeitung() || istPraktikum()) return;
   pwLaden().then(function(list){
     var fertig = list.filter(function(a){ return a.status === 'erledigt' && a.vonUid === state.user.uid; });
     var offenJan = istJan() ? list.filter(function(a){ return a.status === 'offen'; }).length : 0;
