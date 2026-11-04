@@ -23833,7 +23833,14 @@ function quizWatcherUmstellen(klasse){
   quizLive.session = null;
   startQuizWatcher();
 }
-function quizIsRunning(s){ return !!(s && s.state && s.state !== 'idle' && liveFuerMich(s)); }
+function quizIsRunning(s){
+  if(!(s && s.state && s.state !== 'idle' && liveFuerMich(s))) return false;
+  // Lebenszeichen wie bei Wortwolke/Umfrage (4.11.2026): Wurde das Lehrergerät ohne «Beenden» geschlossen,
+  // blieb «Quiz läuft — mitmachen» stehen. Ohne Lebenszeichen seit 10 Min. gilt das Quiz als beendet.
+  if(s.lebt) return Date.now() - s.lebt < LIVE_ALT_MS;
+  var u = s.updatedAt && s.updatedAt.toMillis ? s.updatedAt.toMillis() : 0;
+  return !u || Date.now() - u < LIVE_OHNE_HERZ_MS;
+}
 // Das Quiz kann in mehreren Klassen zugleich laufen (siehe liveZielLaden): geschrieben wird in jede,
 // gelesen werden Antworten und Spieler aller beteiligten Klassen.
 function quizZiel(){ return quizLive.ziel || (quizLive.session && quizLive.session.klassen ? quizLive.session : null); }
@@ -23886,9 +23893,12 @@ function startQuizWatcher(){
     updateQuizBanner();
     if(state.route.name === 'quizplay') renderQuizPlay();
   }, function(err){ listenerFehler('Quiz-Listener', err, stopQuizWatcher, startQuizWatcher); });
+  // Ohne neue Daten kommt kein Snapshot: Knopf regelmässig neu beurteilen (Lebenszeichen abgelaufen).
+  quizLive.bannerTick = setInterval(updateQuizBanner, 30000);
 }
 function stopQuizWatcher(){
   if(quizLive.unsub){ quizLive.unsub(); quizLive.unsub = null; }
+  clearInterval(quizLive.bannerTick); quizLive.bannerTick = null;
   // Die beiden hier hingen früher weiter an Firestore, auch nach dem Abmelden.
   if(quizLive.unsubPlayers){ quizLive.unsubPlayers(); quizLive.unsubPlayers = null; }
   if(quizLive.unsubAnswers){ quizLive.unsubAnswers(); quizLive.unsubAnswers = null; }
@@ -24289,7 +24299,7 @@ function startQuizSession(quiz, teamN, klasse){
     return liveSetzen(QUIZ_SESSION[1], quizLive.ziel, {
       quizId: quiz.id, title: quiz.title, state:'lobby', qIndex:-1,
       totalQ: (quiz.questions||[]).length, question:null, sec:0, startedAt:0,
-      correctIndex:-1, stats:[], teamN: teamN, teams:{}, updatedAt: serverTimestamp()
+      correctIndex:-1, stats:[], teamN: teamN, teams:{}, lebt: Date.now(), updatedAt: serverTimestamp()
     });
   }).then(function(){ openQuizHost(quiz); })
     .catch(function(err){ console.error(err); toast('Quiz konnte nicht gestartet werden.'); });
@@ -24302,6 +24312,7 @@ function openQuizHost(quiz){
         + '<button class="kz-close" id="qhClose" type="button" title="Quiz beenden">✕</button></div>';
   html += '<div class="qh-stage" id="qhStage"></div>';
   quizLive.overlay = openOverlay(html, function(){
+    clearInterval(quizLive.herz); quizLive.herz = null;
     if(quizLive.unsubAnswers){ quizLive.unsubAnswers(); quizLive.unsubAnswers = null; }
     if(quizLive.unsubPlayers){ quizLive.unsubPlayers(); quizLive.unsubPlayers = null; }
     clearInterval(quizLive.tick);
@@ -24319,6 +24330,13 @@ function openQuizHost(quiz){
       if(quizLive.overlay) quizLive.overlay.close();
     }, true);
   });
+
+  // 💓 Lebenszeichen, solange die Quiz-Bühne offen ist
+  clearInterval(quizLive.herz);
+  quizLive.herz = setInterval(function(){
+    quizSetDoc({ lebt:Date.now() }, {merge:true}).catch(function(){});
+  }, LIVE_HERZ_MS);
+  quizSetDoc({ lebt:Date.now() }, {merge:true}).catch(function(){});
 
   quizLive.answered = {};
   var offen = [
@@ -25440,6 +25458,7 @@ const NEUIGKEITEN = [
   {id:'2026-10-08-lernstand-ordner', datum:'2026-10-08', fuer:'lehrer', text:'📈 Die Lernstand-Übersicht ist neu nach Fach und Ordner geordnet, wie in der Fachansicht – mit Suchfeld. SIKORE, alle Übungstrainer, Karteikarten, Werkstatt, Lesereise, Voci und die Diktat-Auswertung stehen dort, wo die Übung liegt. Der Stand wird erst beim Aufklappen geladen, darum öffnet die Seite viel schneller.'},
   {id:'2026-10-08-klassenwahl-schlank', datum:'2026-10-08', fuer:'lehrer', text:'🏫 Klasse wechseln: Zuoberst steht nur noch deine eigene Seite, darunter alle Klassen. «⭐ Meine Seiten» gibt es nicht mehr. ⚡ Die Energizer kommen ohne Fotos aus – die Liste ist kürzer und lädt schneller.'},
   {id:'2026-10-08-schneller', datum:'2026-10-08', fuer:'alle', text:'⚡ Die Library startet schneller: Sie öffnet sich sofort aus dem Speicher deines Geräts und holt Neues im Hintergrund. Gibt es eine neue Version, lädt sie von selbst neu – oder unten erscheint kurz «🔄 Neue Version», wenn du gerade etwas machst.'},
+  {id:'2026-11-04-quiz-banner-weg', datum:'2026-11-04', fuer:'alle', text:'🎮 «Quiz läuft — mitmachen» verschwindet jetzt von selbst, wenn die Lehrperson das Quiz nicht mehr offen hat.'},
   {id:'2026-10-08-spiele-sus', datum:'2026-10-08', fuer:'alle', text:'🎲 Neue Spiele im Unterricht: 🎯 Schätzmeister (eine Zahl schätzen – wer am nächsten liegt, gewinnt), 🎱 Bingo (jedes Gerät hat eine eigene Karte) und 🔔 Buzzer (wer zuerst drückt, darf antworten). Startet deine Lehrperson ein Spiel, erscheint es von selbst auf deinem Gerät – sonst oben auf «… läuft — mitmachen» tippen.'},
   {id:'2026-10-08-spiele-rubrik', datum:'2026-10-08', fuer:'lehrer', text:'🎮 Im Klassenzimmer gibt es neu die Rubrik «Spiele» mit allen Spielen an einem Ort. Neu sind sechs Spiele: 📱 auf den Geräten der Klasse 🎯 Schätzmeister, 🎱 Bingo und 🔔 Buzzer; 📽️ nur am Beamer in Teams 🏆 Der grosse Preis, ⭕ Drei gewinnt (auch Vier gewinnt) und 🚢 Schiffe versenken. Klassen-Quiz, Wer wird Millionär, Stadt Land Fluss und die Energizer stehen jetzt auch dort.'},
   {id:'2026-10-08-spiele-fragen', datum:'2026-10-08', fuer:'lehrer', text:'💰 Ein Fragen-Set für alle Spiele: Aus den Millionär-Sets werden «Spiel-Sets». Bingo, Buzzer, Der grosse Preis, Drei gewinnt und Schiffe versenken spielen damit – oder mit jedem Klassen-Quiz und mit Fragen aus einer Übung («📚 Aus einer Übung»). Beim Set steht dafür «🎲 Anderes Spiel», im Fach-Ordner fragt «▶︎ Starten» nach dem Spiel. Neu im Editor: eine freiwillige Kategorie pro Frage – daraus macht «Der grosse Preis» die Spalten. Für den Schätzmeister gibt es eigene Schätz-Sets (eine Zeile pro Frage: Frage | Zahl | Einheit) oder «⚡ Spontan spielen».'},
