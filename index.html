@@ -6060,6 +6060,9 @@ async function gruppeEintraegeNachfuehren(id, ownerKlasse, data){
    keiner Gruppe der eigenen Klassenseite (z. B. Englisch bei Strebel statt bei
    der Klassenlehrperson), wird die eigene Klassenseite im Fach ausgeblendet.
    «🏫 Alle Fächer»-Gruppen bringen nur Übungen dazu, blenden aber nie aus. */
+function fachQuelleKlasse(subjectId){
+  return (state.profile.role !== 'teacher' && !isLeitung() && fachLpWahl[subjectId]) || state.klasse;
+}
 var fachLpWahl = {};   // Fach → vom Schüler gewählte Lehrpersonen-Seite (nur bis die Library neu geladen wird)
 function fachQuellen(subjectId){
   if(state.profile.role === 'teacher' || isLeitung()) return Promise.resolve({fremd:[], ohneEigene:false});
@@ -6069,10 +6072,8 @@ function fachQuellen(subjectId){
     delete fachLpWahl[subjectId];
     return fachQuellen(subjectId).then(function(norm){
       fachLpWahl[subjectId] = wahl;
-      var std = fachStandardSeite(norm);
-      var fq = wahl === state.klasse ? {fremd:[], ohneEigene:false} : {fremd:[{klasse:wahl, lp:klasseInfo(wahl).lp, gruppen:[]}], ohneEigene:true};
-      fq.wahl = wahl; fq.standardSeite = std;
-      return fq;
+      // Die gewählte Seite wird in renderSubject statt der eigenen gelesen (fachQuelleKlasse): Ordnerbaum, «Aktuell» und Zähler stimmen dann.
+      return {fremd:[], ohneEigene:false, wahl:wahl, standardSeite:fachStandardSeite(norm)};
     });
   }
   return loadMitgliedGruppen().then(function(list){
@@ -16176,7 +16177,8 @@ function renderSubject(subjectId, folderId){
 
   bkFachLaden(subjectId);
 
-  var qf = query(kcol('folders'), where('subject','==',subjectId));
+  var quelleKl = fachQuelleKlasse(subjectId);
+  var qf = query(kcolFor(quelleKl, 'folders'), where('subject','==',subjectId));
   state.folderUnsub = onSnapshot(qf, function(snap){
     state.folders = [];
     snap.forEach(function(d){ state.folders.push(Object.assign({id:d.id}, d.data())); });
@@ -16185,7 +16187,7 @@ function renderSubject(subjectId, folderId){
     maybeRender();
   }, function(err){ console.error(err); loaded.fold = true; maybeRender(); });
 
-  var qr = query(kcol('resources'), where('subject','==',subjectId));
+  var qr = query(kcolFor(quelleKl, 'resources'), where('subject','==',subjectId));
   state.resourceUnsub = onSnapshot(qr, function(snap){
     state.resources = [];
     snap.forEach(function(d){ var r = Object.assign({id:d.id}, d.data()); if(fuerRolleSichtbar(r)) state.resources.push(r); });
