@@ -18189,12 +18189,46 @@ function saveTrackedKeys(rid, tracked){
 function lokalNeuerAls(lok, rem){
   try{ var a = JSON.parse(lok), b = JSON.parse(rem); return !!(a && b && typeof a.savedAt === 'number' && typeof b.savedAt === 'number' && a.savedAt > b.savedAt); }catch(e){ return false; }
 }
+// Lesereise «Wir Kinder vom Bahnhof Zoo» (kbz_lesereise_v1): ein Stand = alle Stationen in einem Block. Wer zuletzt schreibt,
+// würde sonst die Stationen des anderen Geräts löschen (Handy: Station 13/14 gelöst, Laptop mit altem Stand lädt hoch → weg,
+// 04.11.2026). Darum Stationen einzeln zusammenführen: gelöst schlägt offen, sonst gewinnt der Stand mit dem neueren savedAt.
+// Rückgabe {json, lokal, remote}: lokal/remote = ob von dieser Seite eine Station ins Ergebnis kam, die der andere Stand nicht hat.
+// Ein Zurücksetzen (neuerer Stand ohne eine gelöste Station) bleibt gültig und wird nicht wiederbelebt.
+var LESEREISE_KEY = 'kbz_lesereise_v1';
+function lesereiseZusammen(lokStr, remStr){
+  try{
+    var A = JSON.parse(lokStr), B = JSON.parse(remStr);
+    if(!A || !B || typeof A.st !== 'object' || typeof B.st !== 'object' || !A.st || !B.st) return null;
+    var aNeuer = (A.savedAt || 0) >= (B.savedAt || 0), Base = aNeuer ? A : B, Alt = aNeuer ? B : A;
+    var gel = function(o){ return Object.keys(o.st).some(function(i){ return o.st[i] && o.st[i].done; }); };
+    if(!gel(Base)) return {json: JSON.stringify(Base), lokal: aNeuer, remote: !aNeuer};
+    var st = {}, lokal = false, remote = false;
+    Object.keys(A.st).concat(Object.keys(B.st)).forEach(function(i){
+      if(Object.prototype.hasOwnProperty.call(st, i)) return;
+      var a = A.st[i], b = B.st[i], w;
+      if(!a || !b) w = a || b;
+      else if(!!a.done !== !!b.done) w = a.done ? a : b;
+      else if(a.done) w = aNeuer ? a : b;
+      else w = JSON.stringify(a).length >= JSON.stringify(b).length ? a : b;
+      st[i] = w;
+      if(w === a && JSON.stringify(a) !== JSON.stringify(b)) lokal = true;
+      if(w === b && JSON.stringify(a) !== JSON.stringify(b)) remote = true;
+    });
+    var m = Object.assign({}, Base); m.st = st; m.savedAt = Math.max(A.savedAt || 0, B.savedAt || 0);
+    if(Alt.teacher && !m.teacher) m.teacher = Alt.teacher;
+    return {json: JSON.stringify(m), lokal: lokal, remote: remote};
+  }catch(e){ return null; }
+}
 function applyRemoteStore(keys, store){
   var behalten = false;
   keys.forEach(function(k){
     if(k.indexOf(LIB_PREFIX) === 0) return;
     if(Object.prototype.hasOwnProperty.call(store, k)){
       var lok = lsGet(k);
+      if(k === LESEREISE_KEY && lok !== null && lok !== store[k]){
+        var z = lesereiseZusammen(lok, store[k]);
+        if(z){ lsSet(k, z.json); if(z.lokal) behalten = true; return; }
+      }
       if(lok !== null && lok !== store[k] && lokalNeuerAls(lok, store[k])){ behalten = true; return; }
       lsSet(k, store[k]);
     }
@@ -18384,6 +18418,20 @@ async function writeProgressWithHistory(uid, rid, newFields){
     console.error('Lernstand konnte vor dem Schreiben nicht gelesen werden', e);
   }
 
+  // Lesereise: nie Stationen löschen, die ein anderes Gerät schon in der Cloud hat (siehe lesereiseZusammen).
+  if(newFields.storeJson && before && before.storeJson){
+    try{
+      var ns = JSON.parse(newFields.storeJson), bs = JSON.parse(before.storeJson);
+      if(ns[LESEREISE_KEY] && bs[LESEREISE_KEY]){
+        var z = lesereiseZusammen(ns[LESEREISE_KEY], bs[LESEREISE_KEY]);
+        if(z && z.remote){
+          ns[LESEREISE_KEY] = z.json;
+          newFields.storeJson = JSON.stringify(ns);
+          setLocalRev(rid, 0);   // beim nächsten Öffnen den zusammengeführten Stand holen
+        }
+      }
+    }catch(e){ console.error('Lesereise zusammenführen', e); }
+  }
   var merged = Object.assign({}, before||{}, newFields);
   var oldSummary = learnedSummary(before);
   var newSummary = learnedSummary(merged);
@@ -25303,6 +25351,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-11-04-lesereise-sync', datum:'2026-11-04', fuer:'alle', text:'Lesereise: Was du am Handy gelöst hast, geht auf dem Laptop nicht mehr verloren – die Stationen werden jetzt zusammengeführt.'},
   {id:'2026-11-04-direktspiel', datum:'2026-11-04', fuer:'lehrer', text:'🖱️ Doppelklick-Spiele: Eine Datei (.html) öffnet die Library. Du wählst Klasse/Gruppe, dann Quiz, Blitzumfrage, Schätzfragen oder Wortwolke, und es startet sofort – ohne etwas zu speichern.'},
   {id:'2026-11-03-vollbild-quiz', datum:'2026-11-03', fuer:'alle', text:'⛶ Live-Quizze und Spiele laufen jetzt im Vollbild. Wer es während einer Frage verlässt, kann diese Frage nicht mehr beantworten – bei der nächsten ist man wieder dabei, sobald man im Vollbild ist.'},
   {id:'2026-11-03-bestellungen', datum:'2026-11-03', fuer:'lehrer', text:'🛒 Neu im 🏫 Klassenzimmer: «Bestellungen». Gemeinsame Nachbestell-Listen für Natur und Technik, Textiles Werken und Holz-/Metallwerken – wie das Blatt im Vorbereitungszimmer. Bei Natur und Technik lässt sich der Bachmann-Katalog nach Name oder Nummer durchsuchen und alles Offene mit einem Tipp in den Bachmann-Warenkorb legen. Offene Posten lassen sich kopieren oder als Mail schicken, Bestelltes mit 🔁 nochmals eintragen (nach 4 Wochen wandert es ins Archiv). Jeder Posten hat einen Lieferanten: Bachmann oder ein anderer (z. B. Apotheke); nur Bachmann-Posten gehen in Mail und Warenkorb. ⌘P druckt die Liste als Formular.'},
