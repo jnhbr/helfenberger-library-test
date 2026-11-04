@@ -6157,10 +6157,17 @@ var fremdeUebCache = {};
 function fremdeUebungen(klasse, subjectId){
   var key = klasse+'|'+subjectId, c = fremdeUebCache[key];
   if(c && Date.now() - c.t < 5*60*1000) return c.p;
-  var p = Promise.all([
-    getDocs(query(kcolFor(klasse, 'folders'), where('subject','==',subjectId))),
-    getDocs(query(kcolFor(klasse, 'resources'), where('subject','==',subjectId)))
-  ]).then(function(res){
+  function laden(){
+    return Promise.all([
+      getDocs(query(kcolFor(klasse, 'folders'), where('subject','==',subjectId))),
+      getDocs(query(kcolFor(klasse, 'resources'), where('subject','==',subjectId)))
+    ]);
+  }
+  // Direkt nach der Anmeldung ist das Token für Firestore manchmal noch nicht bereit: einmal mit frischem Token wiederholen.
+  var p = laden().catch(function(err){
+    if(!(err && err.code === 'permission-denied') || !auth.currentUser) throw err;
+    return auth.currentUser.getIdToken(true).then(laden);
+  }).then(function(res){
     var folders = {}, resources = [];
     res[0].forEach(function(d){ folders[d.id] = Object.assign({id:d.id}, d.data()); });
     res[1].forEach(function(d){ var r = Object.assign({id:d.id}, d.data()); if(fuerRolleSichtbar(r) && !r.imHub) resources.push(r); });
@@ -6802,7 +6809,7 @@ function earlybirdLadenDatum(datum){
 // aus der offenen Klasse / total). Schüler:innen sehen nur die kommenden Termine,
 // für die sie eingetragen sind – sonst gar keinen Earlybird.
 function earlybirdKalenderLaden(){
-  if(!state.user || istPraktikum()) return Promise.resolve([]);   // Praktikum/Zivi: Earlybird gesperrt (firestore.rules)
+  if(!state.user || istPraktikum() || istPraktikumKlasse(state.klasse)) return Promise.resolve([]);   // Praktikum/Zivi: Earlybird gesperrt (firestore.rules)
   var lehrer = state.profile.role === 'teacher';
   if(!lehrer){
     var kommend = earlybirdKommende();
@@ -12710,13 +12717,13 @@ function pwLaden(){
 }
 // Beim Anmelden: fertige Passwörter melden (nur die eigenen Anfragen).
 function pwHinweis(){
-  if(!state.profile || state.profile.role !== 'teacher' || isLeitung() || istPraktikum()) return;
+  if(!state.profile || state.profile.role !== 'teacher' || isLeitung() || istPraktikum() || istPraktikumKlasse(state.klasse)) return;
   pwLaden().then(function(list){
     var fertig = list.filter(function(a){ return a.status === 'erledigt' && a.vonUid === state.user.uid; });
     var offenJan = istJan() ? list.filter(function(a){ return a.status === 'offen'; }).length : 0;
     if(fertig.length) toast('🔑 Neues Passwort bereit für '+fertig.map(function(a){ return a.name; }).join(', ')+' – ⚙️ Einstellungen.');
     else if(offenJan) toast('🔑 '+offenJan+' offene Passwort-Anfrage'+(offenJan === 1 ? '' : 'n')+' – node admin/passwort-reset.js --ja');
-  }).catch(function(err){ console.error('Passwort-Anfragen', err); });
+  }).catch(function(err){ if(!(err && err.code === 'permission-denied')) console.error('Passwort-Anfragen', err); });
 }
 function openPasswortAnfragen(){
   openModal('<h3>🔑 Passwort zurücksetzen</h3>'+
