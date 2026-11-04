@@ -6114,7 +6114,7 @@ function fachLpWahlKnopfZeichnen(subjectId, fq){
 }
 async function openFachLpWahl(subjectId, fq){
   var aktuell = (fq && fq.wahl) || fachStandardSeite(fq) || state.klasse;
-  openModal('<h3>👩‍🏫 Bei wem arbeitest du?</h3><div class="spinner-wrap" id="lpWahlListe">Suche Lehrpersonen mit Übungen …</div>'+
+  openModal('<h3>👩‍🏫 Bei wem arbeitest du?</h3><div class="spinner-wrap" id="lpWahlListe">Lade Lehrpersonen …</div>'+
     '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button></div>', 'modal-wide');
   document.getElementById('modalCancel').addEventListener('click', closeModal);
   var kandidaten = KLASSEN.filter(function(k){ return k.art !== 'praktikum'; });
@@ -6124,7 +6124,9 @@ async function openFachLpWahl(subjectId, fq){
     return getDocs(query(kcolFor(k.id, 'resources'), where('subject','==',subjectId), fsLimit(1)))
       .then(function(sn){ return !sn.empty; }).catch(function(){ return false; });
   }));
-  var liste = kandidaten.filter(function(k, i){ return treffer[i]; });
+  var hatInhalt = {};
+  kandidaten.forEach(function(k, i){ hatInhalt[k.id] = treffer[i]; });
+  var liste = kandidaten.slice();
   liste.sort(function(a, b){
     var ra = a.id === eigene ? 0 : 1, rb = b.id === eigene ? 0 : 1;
     return ra - rb || a.lp.localeCompare(b.lp, 'de');
@@ -6136,7 +6138,7 @@ async function openFachLpWahl(subjectId, fq){
   box.innerHTML = '<div class="klassen-wahl klassen-wahl-grid">'+liste.map(function(k){
     var akt = k.id === aktuell;
     var info = (k.id === std ? ' (deine Lehrperson)' : '')+(k.art === 'klasse' ? ' · '+esc(k.id) : k.art === 'flp' ? ' · FLP' : ' · ISF');
-    return '<button class="btn '+(akt ? 'btn-primary' : 'btn-ghost')+'" type="button" data-lpw="'+esc(k.id)+'"><span><b>'+esc(k.lp)+'</b>'+info+(akt ? ' ✓' : '')+'</span></button>';
+    return '<button class="btn '+(akt ? 'btn-primary' : 'btn-ghost')+'" type="button" data-lpw="'+esc(k.id)+'"><span><b>'+esc(k.lp)+'</b>'+info+(akt ? ' ✓' : '')+(hatInhalt[k.id] ? '' : ' <span class="muted" style="font-weight:400;">· noch keine Übungen</span>')+'</span></button>';
   }).join('')+'</div>';
   Array.prototype.forEach.call(box.querySelectorAll('[data-lpw]'), function(btn){
     btn.addEventListener('click', function(){
