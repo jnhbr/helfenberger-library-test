@@ -3880,7 +3880,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  getFirestore, doc, getDoc, getDocFromServer, getDocFromCache, getDocs, getDocsFromServer, collection, query, where, onSnapshot, serverTimestamp, increment,
+  getFirestore, doc, getDoc, getDocFromServer, getDocFromCache, getDocs, getDocsFromServer, collection, query, where, limit as fsLimit, onSnapshot, serverTimestamp, increment,
   setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, Bytes, deleteField, arrayUnion, arrayRemove,
   connectFirestoreEmulator, waitForPendingWrites, disableNetwork, enableNetwork, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
@@ -6060,8 +6060,21 @@ async function gruppeEintraegeNachfuehren(id, ownerKlasse, data){
    keiner Gruppe der eigenen Klassenseite (z. B. Englisch bei Strebel statt bei
    der Klassenlehrperson), wird die eigene Klassenseite im Fach ausgeblendet.
    «🏫 Alle Fächer»-Gruppen bringen nur Übungen dazu, blenden aber nie aus. */
+var fachLpWahl = {};   // Fach → vom Schüler gewählte Lehrpersonen-Seite (nur bis die Library neu geladen wird)
 function fachQuellen(subjectId){
   if(state.profile.role === 'teacher' || isLeitung()) return Promise.resolve({fremd:[], ohneEigene:false});
+  var wahl = fachLpWahl[subjectId];
+  if(wahl){
+    // Standard (Gruppe oder Klassenseite) trotzdem ermitteln, damit er im Wechsler markiert wird.
+    delete fachLpWahl[subjectId];
+    return fachQuellen(subjectId).then(function(norm){
+      fachLpWahl[subjectId] = wahl;
+      var std = fachStandardSeite(norm);
+      var fq = wahl === state.klasse ? {fremd:[], ohneEigene:false} : {fremd:[{klasse:wahl, lp:klasseInfo(wahl).lp, gruppen:[]}], ohneEigene:true};
+      fq.wahl = wahl; fq.standardSeite = std;
+      return fq;
+    });
+  }
   return loadMitgliedGruppen().then(function(list){
     var hier = list.filter(function(g){ return g.ownerKlasse && gruppeHatFach(g, subjectId); });
     var fremd = [], proSeite = {};
@@ -6076,6 +6089,63 @@ function fachQuellen(subjectId){
       !echt.some(function(g){ return g.ownerKlasse === state.klasse; });
     return {fremd:fremd, ohneEigene:ohneEigene};
   }).catch(function(err){ console.error(err); return {fremd:[], ohneEigene:false}; });
+}
+
+/* 👩‍🏫 Lehrpersonen-Wechsler im Fach (seit 04.11.2026): Standard ist die Lehrperson, bei der man das Fach hat
+   (Klassenseite oder 👥 Gruppe). Mit einem Klick auf den Namen neben dem Fachtitel lässt sich jede Lehrperson
+   wählen, die in diesem Fach Übungen hat. Der Fortschritt hängt an der Übungs-ID (progress/{uid}/resources/{id}),
+   gleiche Übungen bei mehreren Lehrpersonen teilen ihn also. Die Wahl gilt nur bis zum Neuladen. */
+function fachStandardSeite(fq){
+  if(fq && fq.wahl) return null;
+  if(fq && fq.ohneEigene && fq.fremd.length) return fq.fremd[0].klasse;
+  return state.klasse;
+}
+function fachLpLabel(fq){
+  var k = (fq && fq.wahl) || fachStandardSeite(fq) || state.klasse;
+  return klasseInfo(k).lp || k;
+}
+function fachLpWahlKnopfZeichnen(subjectId, fq){
+  var b = document.getElementById('lpWahlBtn');
+  if(!b) return;
+  b.textContent = '👩‍🏫 '+fachLpLabel(fq)+' ▾';
+  b.hidden = false;
+  b.classList.toggle('lp-fremd', !!(fq && fq.wahl && fq.wahl !== (fq.standardSeite || state.klasse)));
+  b.onclick = function(){ openFachLpWahl(subjectId, fq); };
+}
+async function openFachLpWahl(subjectId, fq){
+  var aktuell = (fq && fq.wahl) || fachStandardSeite(fq) || state.klasse;
+  openModal('<h3>👩‍🏫 Bei wem arbeitest du?</h3><div class="spinner-wrap" id="lpWahlListe">Suche Lehrpersonen mit Übungen …</div>'+
+    '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button></div>', 'modal-wide');
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  var kandidaten = KLASSEN.filter(function(k){ return k.art !== 'praktikum'; });
+  var eigene = state.klasse;
+  var treffer = await Promise.all(kandidaten.map(function(k){
+    if(k.id === eigene || k.id === aktuell) return Promise.resolve(true);
+    return getDocs(query(kcolFor(k.id, 'resources'), where('subject','==',subjectId), fsLimit(1)))
+      .then(function(sn){ return !sn.empty; }).catch(function(){ return false; });
+  }));
+  var liste = kandidaten.filter(function(k, i){ return treffer[i]; });
+  liste.sort(function(a, b){
+    var ra = a.id === eigene ? 0 : 1, rb = b.id === eigene ? 0 : 1;
+    return ra - rb || a.lp.localeCompare(b.lp, 'de');
+  });
+  var box = document.getElementById('lpWahlListe');
+  if(!box) return;
+  var std = fachStandardSeite(fq) || (fq && fq.standardSeite) || eigene;
+  box.className = '';
+  box.innerHTML = '<div class="klassen-wahl klassen-wahl-grid">'+liste.map(function(k){
+    var akt = k.id === aktuell;
+    var info = (k.id === std ? ' (deine Lehrperson)' : '')+(k.art === 'klasse' ? ' · '+esc(k.id) : k.art === 'flp' ? ' · FLP' : ' · ISF');
+    return '<button class="btn '+(akt ? 'btn-primary' : 'btn-ghost')+'" type="button" data-lpw="'+esc(k.id)+'"><span><b>'+esc(k.lp)+'</b>'+info+(akt ? ' ✓' : '')+'</span></button>';
+  }).join('')+'</div>';
+  Array.prototype.forEach.call(box.querySelectorAll('[data-lpw]'), function(btn){
+    btn.addEventListener('click', function(){
+      var id = btn.getAttribute('data-lpw');
+      if(id === std) delete fachLpWahl[subjectId]; else fachLpWahl[subjectId] = id;
+      closeModal();
+      renderSubject(subjectId, null);
+    });
+  });
 }
 
 // Übungen + Ordner einer anderen Seite in einem Fach (5 Min. zwischengespeichert).
@@ -6180,9 +6250,9 @@ function gruppenFachHtmlLaden(subjectId){
           quellen.map(function(x){
             return '<button type="button" class="btn btn-sm '+(x.p.klasse === wahl ? 'btn-primary' : 'btn-ghost')+'" data-gwahl="'+esc(x.p.klasse)+'" aria-pressed="'+(x.p.klasse === wahl)+'">'+esc(x.p.lp)+'</button>';
           }).join('')+'</div>'+
-          '<div class="muted" style="font-size:13px;margin:0 0 6px;">'+gruppenNamen(q.p)+'</div>';
+          (q.p.gruppen.length ? '<div class="muted" style="font-size:13px;margin:0 0 6px;">'+gruppenNamen(q.p)+'</div>' : '');
       } else {
-        html += '<div class="section-label">👥 Bei '+esc(q.p.lp)+' <span class="muted" style="font-weight:400;">· '+gruppenNamen(q.p)+'</span></div>';
+        html += '<div class="section-label">'+(q.p.gruppen.length ? '👥 Bei '+esc(q.p.lp)+' <span class="muted" style="font-weight:400;">· '+gruppenNamen(q.p)+'</span>' : '👩‍🏫 Übungen von '+esc(q.p.lp))+'</div>';
       }
       html += gruppenOrdnerHtml(q.d.folders, q.liste, null, q.p.klasse, 0, alle);
       box.innerHTML = html;
@@ -15997,7 +16067,7 @@ function renderSubject(subjectId, folderId){
 
   var html = '';
   html += '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn">&larr; Alle Fächer</button></div>';
-  html += '<div class="subject-head"><div class="subject-visual" style="background:'+s.soft+';">'+s.icon+'</div><h2>'+s.name+'</h2></div>';
+  html += '<div class="subject-head"><div class="subject-visual" style="background:'+s.soft+';">'+s.icon+'</div><h2>'+s.name+'</h2>'+(!isTeacher && !isLeitung() ? '<button class="btn btn-ghost btn-sm" id="lpWahlBtn" type="button" hidden title="Lehrperson wechseln: Übungen einer anderen Lehrperson ansehen"></button>' : '')+'</div>';
   html += '<div class="crumbs" id="crumbs"></div>';
   if(subjectId === 'sva') html += svaKopfHtml(isTeacher);
 
@@ -16078,7 +16148,7 @@ function renderSubject(subjectId, folderId){
   state.fachQuellen = null;
   if(!loaded.gr){
     fachQuellen(subjectId).then(function(fq){
-      if(state.route.name === 'subject' && state.route.subject === subjectId) state.fachQuellen = fq;
+      if(state.route.name === 'subject' && state.route.subject === subjectId){ state.fachQuellen = fq; fachLpWahlKnopfZeichnen(subjectId, fq); }
     }).then(function(){ loaded.gr = true; maybeRender(); });
   }
   // Karteikarten-Sets der Klasse (nach dem ersten Mal aus dem Zwischenspeicher).
@@ -25418,6 +25488,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-11-04-lp-wechsler', datum:'2026-11-04', fuer:'alle', text:'👩‍🏫 Im Fach steht neben dem Titel deine Lehrperson. Tippe darauf, dann kannst du die Übungen einer anderen Lehrperson ansehen und machen. Dein Fortschritt gilt bei gleichen Übungen überall. Nach dem Neuöffnen bist du wieder bei deiner Lehrperson.'},
   {id:'2026-11-04-lesereise-sync', datum:'2026-11-04', fuer:'alle', text:'Lesereise: Was du am Handy gelöst hast, geht auf dem Laptop nicht mehr verloren – die Stationen werden jetzt zusammengeführt.'},
   {id:'2026-11-04-direktspiel', datum:'2026-11-04', fuer:'lehrer', text:'🖱️ Doppelklick-Spiele: Eine Datei (.html) öffnet die Library. Du wählst Klasse/Gruppe, dann Quiz, Blitzumfrage, Schätzfragen oder Wortwolke, und es startet sofort – ohne etwas zu speichern.'},
   {id:'2026-11-03-vollbild-quiz', datum:'2026-11-03', fuer:'alle', text:'⛶ Live-Quizze und Spiele laufen jetzt im Vollbild. Wer es während einer Frage verlässt, kann diese Frage nicht mehr beantworten – bei der nächsten ist man wieder dabei, sobald man im Vollbild ist.'},
