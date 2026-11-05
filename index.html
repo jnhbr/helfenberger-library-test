@@ -4317,6 +4317,10 @@ function istPraktikumKlasse(k){ return String(k || '').indexOf('praktikum') === 
 // und lehrerVoll()). Gesperrt sind Lernstand und Klassenübersichten, Online-Prüfungen,
 // Earlybird, Vergessen-Zähler, Schulden und das Zurücksetzen von Passwörtern.
 function istPraktikum(){ return !!(state.profile && state.profile.role === 'teacher' && !state.profile.alsAnsicht && istPraktikumKlasse(state.profile.klasse)); }
+// Der Zivi ist für den Earlybird zuständig: sieht und bearbeitet ihn wie eine Lehrperson
+// (firestore.rules: isZivi()), die übrige Auswertung bleibt gesperrt.
+function istZivi(){ return istPraktikum() && state.profile.klasse === 'praktikum-zivi'; }
+function praktikumGesperrt(route){ return istPraktikum() && PRAKTIKUM_GESPERRT.indexOf(route) >= 0 && !(route === 'earlybird' && istZivi()); }
 function darfAuswertenApp(){ return !!(state.profile && state.profile.role === 'teacher' && !istPraktikum()); }
 var PRAKTIKUM_GESPERRT = ['lernstand', 'werkstatt', 'lesereise', 'diktatauswertung', 'earlybird', 'vergessen', 'pruefungen', 'pruefung'];
 var PRAKTIKUM_KZ_AUS = ['vergessen', 'pruefung'];
@@ -4324,7 +4328,7 @@ function renderPraktikumGesperrt(){
   clearSubjectWatchers(); clearOverviewWatchers();
   var html = '<div class="back-row"><button class="btn btn-ghost btn-sm" id="backBtn" type="button">&larr; Startseite</button></div>';
   html += '<h2 class="page-welcome" style="margin-bottom:6px;">🔒 Nicht verfügbar</h2>';
-  html += '<div class="empty-state">Dieser Bereich ist für Praktikums- und Zivi-Konten gesperrt. Lernstand, Prüfungen, Earlybird und der Vergessen-Zähler sind den Lehrpersonen vorbehalten.</div>';
+  html += '<div class="empty-state">Dieser Bereich ist für Praktikums- und Zivi-Konten gesperrt. Lernstand, Prüfungen, Earlybird (ausser für den Zivi) und der Vergessen-Zähler sind den Lehrpersonen vorbehalten.</div>';
   renderChrome(html);
   document.getElementById('backBtn').addEventListener('click', function(){ goHome(); });
 }
@@ -6809,7 +6813,7 @@ function earlybirdLadenDatum(datum){
 // aus der offenen Klasse / total). Schüler:innen sehen nur die kommenden Termine,
 // für die sie eingetragen sind – sonst gar keinen Earlybird.
 function earlybirdKalenderLaden(){
-  if(!state.user || istPraktikum() || istPraktikumKlasse(state.klasse)) return Promise.resolve([]);   // Praktikum/Zivi: Earlybird gesperrt (firestore.rules)
+  if(!state.user || ((istPraktikum() || istPraktikumKlasse(state.klasse)) && !istZivi())) return Promise.resolve([]);   // Praktikum: Earlybird gesperrt, Zivi nicht (firestore.rules)
   var lehrer = state.profile.role === 'teacher';
   if(!lehrer){
     var kommend = earlybirdKommende();
@@ -11367,7 +11371,7 @@ function renderChrome(innerHtml){
   if(!isTeacher){ html += '<button class="btn btn-ghost btn-sm topbar-bell" id="streakBtn" type="button">'+NEU_ICON.flamme+' <b>0</b></button>'; }
   if(!isTeacher){ html += '<button class="btn btn-ghost btn-sm topbar-bell topbar-besen" id="aemtliBtn" type="button" title="Ämtli">'+NEU_ICON.aemtli+'</button>'; }
   if(!isTeacher){ html += '<button class="btn btn-ghost btn-sm topbar-bell" id="notenBtn" type="button" title="Notenrechner">'+NEU_ICON.noten+'</button>'; }
-  if(isTeacher && !istPraktikum()){ html += '<button class="btn btn-ghost btn-sm topbar-bell" id="earlybirdBtn" type="button" title="Earlybird">'+NEU_ICON.earlybird+'</button>'; }
+  if(isTeacher && (!istPraktikum() || istZivi())){ html += '<button class="btn btn-ghost btn-sm topbar-bell" id="earlybirdBtn" type="button" title="Earlybird">'+NEU_ICON.earlybird+'</button>'; }
   html += '<button class="btn btn-ghost btn-sm topbar-bell" id="neuBtn" type="button" title="Neuigkeiten">'+NEU_ICON.neuigkeiten+'</button>';
   html += '<button class="btn btn-ghost btn-sm topbar-bell" id="fragenBtn" type="button" title="Anonyme Fragebox">'+NEU_ICON.fragebox+'<span class="topbar-badge" id="fragenBadge" hidden>0</span></button>';
   html += '<button class="btn btn-ghost btn-sm topbar-bell" id="searchBtn" type="button" title="Suche">'+NEU_ICON.suche+'</button>';
@@ -25513,6 +25517,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-11-05-zivi-earlybird', datum:'2026-11-05', fuer:'lehrer', text:'🐦 Earlybird: Das Zivi-Konto sieht und bearbeitet den Earlybird jetzt wie eine Lehrperson (eintragen, Aufträge, abhaken, Liste drucken) – der Zivi ist dafür zuständig. Die übrige Auswertung bleibt für Praktikum/Zivi gesperrt.'},
   {id:'2026-11-04-sync-nachfragen', datum:'2026-11-04', fuer:'lehrer', text:'🔄 Übungsstand zwischen Handy und Computer: Ist die Übung auf beiden Geräten offen, holt sie den neueren Stand jetzt beim Zurückwechseln und alle 20 Sekunden selbst.'},
   {id:'2026-11-04-lp-wechsler', datum:'2026-11-04', fuer:'alle', text:'👩‍🏫 Im Fach steht neben dem Titel deine Lehrperson. Tippe darauf, dann kannst du die Übungen einer anderen Lehrperson ansehen und machen. Dein Fortschritt gilt bei gleichen Übungen überall. Nach dem Neuöffnen bist du wieder bei deiner Lehrperson.'},
   {id:'2026-11-04-lesereise-sync', datum:'2026-11-04', fuer:'alle', text:'Lesereise: Was du am Handy gelöst hast, geht auf dem Laptop nicht mehr verloren – die Stationen werden jetzt zusammengeführt.'},
@@ -50016,7 +50021,7 @@ function render(){
   }
   if(state.route.name === 'login'){ renderLogin(); return; }
   if(!state.profile){ app.innerHTML = '<div class="spinner-wrap">Lädt …</div>'; return; }
-  if(istPraktikum() && PRAKTIKUM_GESPERRT.indexOf(state.route.name) >= 0){ renderPraktikumGesperrt(); return; }
+  if(praktikumGesperrt(state.route.name)){ renderPraktikumGesperrt(); return; }
   if(state.route.name === 'home'){ renderHome(); return; }
   if(state.route.name === 'subject'){ renderSubject(state.route.subject, state.route.folderId || null); return; }
   if(state.route.name === 'gruppenfach'){ renderGruppenFach(); return; }
