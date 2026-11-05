@@ -25735,6 +25735,7 @@ const NEUIGKEITEN = [
   {id:'2026-09-27-gruppen-stundenplan', datum:'2026-09-27', fuer:'lehrer', text:'👥 Alle Gruppen der Schule sind jetzt aus der Gruppen-Excel und dem Stundenplan (1. Semester) eingerichtet – Niveaugruppen, Halbklassen, Wahlfächer und Fächer, die eine ganze Klasse bei dir hat. Deine Schüler:innen sehen im Fach deine Übungen; die Übungen der Klassenseite blenden sich in diesem Fach aus. Neu gibt es die Gruppenfächer NT und RZG (mehrere Fächer zusammen). Unter 👥 Meine Gruppen kannst du alles anpassen.'},
   {id:'2026-09-27-uebersicht-klassenwahl', datum:'2026-09-27', fuer:'lehrer', text:'📊 Klassenübersichten (Karteikarten, Trainer, SIKORE, Tipptrainer, Voci) und 📈 Lernstand zeigen zuerst nur deine Klasse. Oben bei «Klasse» kannst du eine andere Klasse wählen oder «🌍 Alle Klassen» – dann kommen alle aus anderen Klassen dazu, die das schon geübt haben (im Lernstand eine Klasse aufs Mal).'},
   {id:'2026-09-27-uebung-ordnermenu', datum:'2026-09-27', fuer:'lehrer', text:'📁 «➕ Neue Prüfung»: Die Übung wählst du jetzt in einem Ordner-Menü statt in einer langen Liste – Fach › Ordner › Übung, die Ordner gehen beim Darüberfahren auf (Tippen geht auch).'},
+  {id:'2026-11-05-pruefung-differenzieren', datum:'2026-11-05', fuer:'lehrer', text:'🎯 Prüfungen differenzieren: Im Monitor jeder Bildtrainer-Prüfung (und der Pöstlergeografie) gibt es «🎯 Differenzieren». Du wählst pro Person eine eigene Antwortart, z. B. 🟢 Auswahl (leicht) für eine Schülerin, während die Klasse eintippt. Alle haben dieselben Fragen; die Stufe gilt, sobald die Person startet, und steht im Monitor hinter dem Namen.'},
   {id:'2026-09-27-pruefung-verraet-nichts', datum:'2026-09-27', fuer:'lehrer', text:'🕵️ Prüfungen: Keine Aufgabe verrät mehr die Antwort einer anderen (z. B. «Welcher Kanton ist markiert?» und «Hauptort von Aargau?» mit demselben Kanton). Beim Zusammenstellen wird so eine Aufgabe weggelassen; im 🧩 Baukasten steht eine ⚠️-Warnung. Pöstlergeografie und Bildtrainer brauchen dafür die neue Fassung der Übung.'},
   {id:'2026-09-27-pruefung-zusatzmaterial', datum:'2026-09-27', fuer:'alle', text:'📝 Prüfungen im Fach-Ordner stehen jetzt unten beim Zusatzmaterial – ab zwei Stück in einem eigenen Ordner «📝 Prüfungen».'},
   {id:'2026-09-27-pruefung-ganze-klasse', datum:'2026-09-27', fuer:'lehrer', text:'📝 Prüfung für «Ganze Klasse»: In der Übersicht erscheinen nur noch die Schüler:innen dieser Klasse – keine Gruppen-Mitglieder aus anderen Klassen mehr (die sind nur dabei, wenn du unter «Für» die 👥 Gruppe wählst).'},
@@ -36919,6 +36920,13 @@ function pruefZuschlag(p, uid){
   var z = +p.zuschlag[uid == null ? (state.user && state.user.uid) : uid];
   return z > 0 ? Math.min(200, z) : 0;
 }
+// 🎯 Differenzieren (Bildtrainer, Pöstlergeografie): p.differenz = {uid: Wert der Option «Antwortart» (diff)} — die Person
+// schreibt dieselben Fragen, aber in ihrer eigenen Stufe (z. B. 🟢 Auswahl statt Eintippen). Von der Lehrperson im Monitor gesetzt.
+function pruefDiffFuer(p, uid){
+  if(!p || !p.differenz || pruefArt(p) !== 'nativ') return null;
+  var v = p.differenz[uid == null ? (state.user && state.user.uid) : uid];
+  return v != null && v !== '' ? String(v) : null;
+}
 function pruefZeitMinFuer(p, uid){ return Math.round((+p.zeitMin || 0) * (1 + pruefZuschlag(p, uid) / 100) * 10) / 10; }
 function pruefZeitMinText(p, uid){ var m = pruefZeitMinFuer(p, uid); return String(m).replace('.', ','); }
 function pruefFrist(p, t, uid){ return p && +p.zeitMin > 0 && t && t.startMs ? t.startMs + Math.round(pruefZeitMinFuer(p, uid) * 60000) : null; }
@@ -37527,6 +37535,7 @@ async function pruefStarten(p, weiter, vorschau){
     // noch diese Fassung hochgeladen ist: Namen hier herausnehmen.
     html = html.split("'Deine Wahl: <b>' + esc(exAnswerLabel(q, EX.ans[q.key])) + '</b>'").join("'✔️ <b>Auf der Karte markiert</b> – du kannst deine Wahl noch ändern.'");
     var cfg = Object.assign({}, p.cfg || {}, (p.cfg && p.cfg.optionen) || {}, {titel:p.titel, seed:p.seed, personSeed:pruefPersonSeed(uid), antworten:saved});
+    var dv = pruefDiffFuer(p, uid); if(dv != null) cfg.diff = dv;   // 🎯 eigene Antwortart/Schwierigkeit dieser Person
     var inject = '<script>window.__GEO_PRUEFUNG=' + JSON.stringify(cfg).replace(/</g, '\\u003c') + ';<\/script>';
     var headRe = /<head(\s[^>]*)?>/i;
     html = headRe.test(html) ? html.replace(headRe, function(m){ return m + inject; }) : inject + html;
@@ -40691,6 +40700,7 @@ function pruefMonitorZeichnen(){
   if(!skPapier) h += '<button class="btn btn-ghost btn-sm" data-a="vorschau" type="button">👀 Ausprobieren</button>';
   if(!skPapier && p.diktat) h += '<button class="btn btn-sm '+(p.diktatKurz && Object.keys(p.diktatKurz).length ? 'btn-primary' : 'btn-ghost')+'" data-a="diktatkurz" type="button" title="Für einzelne Personen zählt nicht, was nach dem zuletzt geschriebenen Wort fehlt">✂️ Kürzeres Diktat</button>';
   if(!skPapier && +p.zeitMin > 0 && pruefArt(p) !== 'tippen') h += '<button class="btn btn-sm '+(p.zuschlag && Object.keys(p.zuschlag).length ? 'btn-primary' : 'btn-ghost')+'" data-a="zuschlag" type="button" title="Nachteilsausgleich: einzelnen Personen mehr Zeit geben — auch während die Prüfung läuft">♿ Zeitzuschlag</button>';
+  if(!skPapier && pruefArt(p) === 'nativ' && !p.diktat && p.cfg && (p.cfg.optionen || {}).diff != null) h += '<button class="btn btn-sm '+(p.differenz && Object.keys(p.differenz).length ? 'btn-primary' : 'btn-ghost')+'" data-a="differenz" type="button" title="Einzelne Personen schreiben dieselbe Prüfung in einer leichteren (oder anderen) Antwortart — auch Bildtrainer">🎯 Differenzieren</button>';
   if(pruefArt(p) === 'sikore') h += '<button class="btn btn-ghost btn-sm" data-a="sikoreDruck" type="button">🖨️ Blätter drucken</button>';
   h += '<button class="btn btn-ghost btn-sm" data-a="bearbeiten" type="button">✏️ Bearbeiten</button>';
   h += '<button class="btn btn-ghost btn-sm" data-a="ablegen" type="button" title="In einem Ordner des Fachs ablegen – die Klasse sieht sie dort erst nach dem Freigeben">📁 Ablegen</button>';
@@ -40750,7 +40760,7 @@ function pruefMonitorZeichnen(){
       : (p.diktat ? (t.beantwortet || 0)+' Wörter geschrieben' : pruefArt(p) === 'tippen' ? (t.beantwortet || 0)+' Zeichen getippt' : (t.beantwortet || 0)+' / '+anzahl+' beantwortet') + (pruefFrist(p, t, r.uid) ? ' · ⏱ ' + (pruefZeitUm(p, t, r.uid) ? 'Zeit um' : Math.ceil((pruefFrist(p, t, r.uid) - Date.now()) / 60000) + ' Min. übrig') + (pruefZuschlag(p, r.uid) ? ' (♿ +' + pruefZuschlag(p, r.uid) + ' %)' : '') : '');
     var vs = t && t.verstoesse && t.verstoesse.length ? ' · <span class="pr-vs" title="'+esc(t.verstoesse.map(function(v){ return new Date(v.at).toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'})+' '+v.grund; }).join('\n'))+'">⚠️ '+t.verstoesse.length+'× verlassen</span>' : '';
     var sebMark = !t ? '' : t.seb ? ' <span title="im Safe Exam Browser">🛡️</span>' : p.seb ? ' <small class="pr-vs">⚠️ ohne SEB</small>' : '';
-    h += '<div class="pr-zeile '+st.cls+'"><div class="pr-name">'+esc(r.name)+sebMark+pruefSpracheMark(t)+(pruefArt(p) === 'sikore' && p.levels && p.levels[r.uid] ? ' <small>· Level '+esc(String(p.levels[r.uid]))+'</small>' : '')+'</div><div class="pr-st">'+esc(st.txt)+'</div><div class="pr-fort">'+fort+vs+'</div><div class="pr-akt">';
+    h += '<div class="pr-zeile '+st.cls+'"><div class="pr-name">'+esc(r.name)+sebMark+pruefSpracheMark(t)+(pruefDiffFuer(p, r.uid) != null ? ' <small title="Differenziert: eigene Antwortart">🎯 '+esc(pruefDiffName(p, pruefDiffFuer(p, r.uid)))+'</small>' : '')+(pruefArt(p) === 'sikore' && p.levels && p.levels[r.uid] ? ' <small>· Level '+esc(String(p.levels[r.uid]))+'</small>' : '')+'</div><div class="pr-st">'+esc(st.txt)+'</div><div class="pr-fort">'+fort+vs+'</div><div class="pr-akt">';
     if(t && t.status === 'gesperrt') h += '<button class="btn btn-primary btn-sm" data-e="'+esc(r.uid)+'" type="button">🔓 Entsperren</button>';
     if(t && t.status === 'abgegeben' && r.erg) h += '<button class="btn btn-ghost btn-sm" data-d="'+esc(r.uid)+'" type="button">Details</button>';
     if(t) h += '<button class="btn btn-ghost btn-sm" data-r="'+esc(r.uid)+'" type="button" title="Teilnahme löschen — die Person kann neu beginnen">↺</button>';
@@ -40853,6 +40863,52 @@ function pruefZuschlagDialog(p){
     updateDoc(pruefRef(p.id), {zuschlag:map}).then(function(){ closeModal(); toast(Object.keys(map).length ? '♿ Zeitzuschlag für '+Object.keys(map).length+' Person'+(Object.keys(map).length === 1 ? '' : 'en')+' gespeichert.' : 'Kein Zeitzuschlag mehr.'); }).catch(pruefFehler);
   });
 }
+/* ---------- 🎯 Differenzieren-Dialog ----------
+   Pro Person eine eigene Antwortart (Option «diff» der Übung, z. B. 🟢 Auswahl (leicht) … 🟣 Eintippen exakt).
+   Die Werte liest die Library aus der Übung selbst (pruefProbe), darum geht es für alle Bildtrainer und die
+   Pöstlergeografie. Gilt für alle, die noch nicht gestartet haben (wer schon schreibt, behält seine Stufe). */
+function pruefDiffOption(info){
+  return ((info && info.optionen) || []).filter(function(o){ return o.id === 'diff'; })[0] || null;
+}
+function pruefDiffName(p, v){
+  var n = p.cfg && p.cfg.diffWerte && p.cfg.diffWerte[v];
+  return n ? String(n).replace(/\s*\(.*$/, '') : 'Stufe ' + v;
+}
+function pruefDifferenzDialog(p){
+  var teil = pruef.teil[p.id] || {}, roster = pruefRosterFuer(p);
+  if(!roster){ toast('Klasse wird noch geladen …'); return; }
+  openModal('<h3>🎯 Differenzieren</h3><p class="pr-hinweis">Übung wird ausgelesen …</p>');
+  pruefProbe(p.contentId).then(function(info){
+    var o = pruefDiffOption(info);
+    if(!o){ closeModal(); uiInfo('🎯 Differenzieren', 'Diese Übung hat keine einstellbare Antwortart. Lade bei der Übung die neue Fassung mit «Datei ersetzen» hoch.'); return; }
+    var rows = pruefMonitorZeilen(p, teil, roster).sort(function(a, b){ return a.name.localeCompare(b.name, 'de'); });
+    var cur = p.cfg && p.cfg.optionen && p.cfg.optionen.diff != null ? String(p.cfg.optionen.diff) : String(o.standard);
+    var klasse = (o.werte.filter(function(w){ return String(w[0]) === cur; })[0] || [cur, cur])[1];
+    var jetzt = p.differenz || {};
+    var h = '<h3>🎯 Differenzieren</h3><p>Alle schreiben dieselben Fragen. Die Klasse arbeitet in <b>' + esc(klasse) + '</b>; hier gibst du einzelnen Personen eine andere Stufe, z. B. 🟢 leicht. Gilt, sobald die Person die Prüfung (neu) startet.</p>' +
+      '<div style="max-height:calc(46vh/var(--lz,1));overflow:auto;margin:8px 0;">';
+    rows.forEach(function(r){
+      var gestartet = !!r.t, w = jetzt[r.uid] != null ? String(jetzt[r.uid]) : '';
+      h += '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:3px 0;"><span>' + esc(r.name) + (gestartet ? ' <small>(hat gestartet)</small>' : '') + '</span>' +
+        '<select class="modal-input" data-df="' + esc(r.uid) + '" style="width:auto;margin:0;"' + (gestartet ? ' disabled' : '') + '><option value="">wie Klasse</option>' +
+        o.werte.map(function(x){ return '<option value="' + esc(String(x[0])) + '"' + (String(x[0]) === w ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join('') + '</select></div>';
+    });
+    h += '</div><div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Abbrechen</button><button class="btn btn-primary btn-sm" id="dfOk" type="button">Speichern</button></div>';
+    openModal(h);
+    document.getElementById('modalCancel').addEventListener('click', closeModal);
+    document.getElementById('dfOk').addEventListener('click', function(){
+      var map = {};
+      // Wer schon gestartet hat, behält die bisherige Stufe.
+      Object.keys(jetzt).forEach(function(u){ if(teil[u]) map[u] = jetzt[u]; });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-df]'), function(sel){ if(!sel.disabled && sel.value !== '') map[sel.getAttribute('data-df')] = sel.value; });
+      var werte = {}; o.werte.forEach(function(x){ werte[String(x[0])] = x[1]; });
+      updateDoc(pruefRef(p.id), {differenz:map, 'cfg.diffWerte':werte}).then(function(){
+        closeModal(); var n = Object.keys(map).length;
+        toast(n ? '🎯 Differenziert für ' + n + ' Person' + (n === 1 ? '' : 'en') + ' gespeichert.' : 'Niemand mehr differenziert.');
+      }).catch(pruefFehler);
+    });
+  }).catch(function(err){ console.error(err); closeModal(); uiInfo('🎯 Differenzieren', 'Die Übung konnte nicht ausgelesen werden.'); });
+}
 // Entsperren: die Zeit der Person stand während der Sperre still. Startzeit um
 // die Sperrdauer nach hinten schieben. Bei «Seite neu geladen» (z. B. Akku leer)
 // zählt das letzte Lebenszeichen als Beginn der Sperre, nicht der Neustart.
@@ -40926,6 +40982,7 @@ function pruefMonitorVerdrahten(p){
     }
     else if(a === 'pip') pipStarten('pruef', p.id);
     else if(a === 'zuschlag') pruefZuschlagDialog(p);
+    else if(a === 'differenz') pruefDifferenzDialog(p);
     else if(a === 'diktatkurz') pruefDiktatKurzDialog(p);
     else if(a === 'bearbeiten'){ if(pruefArt(p) === 'sikore') sikoreEditor(p); else if(pruefArt(p) === 'tippen') tippPrEditor(p); else if(pruefArt(p) === 'mt') mtPrEditor(p); else if(p.rsw) rswPrEditor(p); else pruefEditor(p); }
     else if(a === 'sikoreDruck') sikoreDruckDialog(p);
