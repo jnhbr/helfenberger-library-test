@@ -25517,6 +25517,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-11-06-diktat-korrektur', datum:'2026-11-06', fuer:'lehrer', text:'✍️ Diktat-Korrektur: Doppelte Leerschläge und fehlende Leerschläge nach Satzzeichen zählen nicht mehr als Fehler. Im Abgaben-PDF steht der geschriebene Text jetzt mit den Fehlern in Rot und dem Richtigen in [ ].'},
   {id:'2026-11-05-zivi-earlybird', datum:'2026-11-05', fuer:'lehrer', text:'🐦 Earlybird: Das Zivi-Konto sieht und bearbeitet den Earlybird jetzt wie eine Lehrperson (eintragen, Aufträge, abhaken, Liste drucken) – der Zivi ist dafür zuständig. Die übrige Auswertung bleibt für Praktikum/Zivi gesperrt.'},
   {id:'2026-11-04-sync-nachfragen', datum:'2026-11-04', fuer:'lehrer', text:'🔄 Übungsstand zwischen Handy und Computer: Ist die Übung auf beiden Geräten offen, holt sie den neueren Stand jetzt beim Zurückwechseln und alle 20 Sekunden selbst.'},
   {id:'2026-11-04-lp-wechsler', datum:'2026-11-04', fuer:'alle', text:'👩‍🏫 Im Fach steht neben dem Titel deine Lehrperson. Tippe darauf, dann kannst du die Übungen einer anderen Lehrperson ansehen und machen. Dein Fortschritt gilt bei gleichen Übungen überall. Nach dem Neuöffnen bist du wieder bei deiner Lehrperson.'},
@@ -38487,17 +38488,17 @@ function pruefBankBewerten(p, loes, antworten, korrektur, uid){
    Zeile und zählen pro Wort. */
 function pruefDiktatTokens(t){
   // Wörter und Satzzeichen getrennt: jedes Satzzeichen ist ein eigenes Token
-  // (fehlendes Komma = 1 Fehler, das Wort davor bleibt richtig).
+  // (fehlendes Komma = 1 Fehler, das Wort davor bleibt richtig). Abstände
+  // zählen nie: doppelte Leerschläge und fehlende Leerschläge nach einem
+  // Satzzeichen («Hallo,Welt») sind kein Fehler. sp = stand ein Leerschlag davor.
   var out = [];
-  String(t || '').replace(/[„“”«»‹›"]/g, '"').replace(/[‘’‚`´]/g, "'").replace(/\.\.\./g, '…').replace(/—/g, '–')
-    .split(/\s+/).forEach(function(w){
-      var m = w.match(/^([^\p{L}\p{N}]*)([\s\S]*?)([^\p{L}\p{N}]*)$/u);
-      if(!m) return;
-      var zeichen = function(g){ Array.from(g).forEach(function(c){ if(c === '-') c = '–'; out.push({roh:c, k:c, z:true}); }); };
-      zeichen(m[1]);
-      if(m[2]) out.push({roh:m[2], k:m[2].replace(/ß/g, 'ss')});
-      zeichen(m[3]);
-    });
+  var s = String(t || '').replace(/[„“”«»‹›"]/g, '"').replace(/[‘’‚`´]/g, "'").replace(/\.\.\./g, '…').replace(/—/g, '–');
+  var re = /\p{N}+(?:[.,]\p{N}+)+|[\p{L}\p{N}]+(?:['\-–][\p{L}\p{N}]+)*|\S/gu, m;
+  while((m = re.exec(s))){
+    var w = m[0], sp = m.index > 0 && /\s/.test(s.charAt(m.index - 1));
+    if(/^[\p{L}\p{N}]/u.test(w)) out.push({roh:w, k:w.replace(/ß/g, 'ss').replace(/[–]/g, '-'), sp:sp});
+    else out.push({roh:w, k:w === '-' ? '–' : w, z:true, sp:sp});
+  }
   return out;
 }
 function pruefDiktatDetails(q, L, v, korrektur, kurz){
@@ -38515,18 +38516,28 @@ function pruefDiktatDetails(q, L, v, korrektur, kurz){
   var T = [];
   for(var i=0;i<=n;i++) T.push(new Uint16Array(m+1));
   for(i=n-1;i>=0;i--) for(var j=m-1;j>=0;j--) T[i][j] = A[i].k === B[j].k ? T[i+1][j+1] + 1 : Math.max(T[i+1][j], T[i][j+1]);
-  var fehler = [], del = [], ins = [], letztA = -1;
+  var fehler = [], del = [], ins = [], letztA = -1, markB = {}, fehltB = {};
   // Innerhalb einer Lücke nur Wort mit Wort und Zeichen mit Zeichen paaren.
-  function paaren(dl, il, pos){
+  function paaren(dl, il, pos, jb){
     var k = Math.min(dl.length, il.length);
-    for(var x=0;x<k;x++) letztA = Math.max(letztA, dl[x]), fehler.push({id:q.id + '~' + dl[x], pos:dl[x], n:1, a:B[il[x]].roh, r:A[dl[x]].roh, art:'falsch'});
-    if(dl.length > k) fehler.push({id:q.id + '~' + dl[k], pos:dl[k], n:dl.length - k, a:'–', r:dl.slice(k).map(function(x){ return A[x].roh; }).join(' '), art:'fehlt'});
-    if(il.length > k) fehler.push({id:q.id + '~+' + il[k], pos:pos, n:il.length - k, a:il.slice(k).map(function(x){ return B[x].roh; }).join(' '), r:'(nichts)', art:'zuviel'});
+    for(var x=0;x<k;x++){
+      letztA = Math.max(letztA, dl[x]); fehler.push({id:q.id + '~' + dl[x], pos:dl[x], n:1, a:B[il[x]].roh, r:A[dl[x]].roh, art:'falsch'});
+      markB[il[x]] = {id:q.id + '~' + dl[x], r:A[dl[x]].roh};
+    }
+    if(dl.length > k){
+      var rt = dl.slice(k).map(function(x){ return A[x].roh; }).join(' ');
+      fehler.push({id:q.id + '~' + dl[k], pos:dl[k], n:dl.length - k, a:'–', r:rt, art:'fehlt'});
+      (fehltB[jb] = fehltB[jb] || []).push({id:q.id + '~' + dl[k], pos:dl[k], r:rt});
+    }
+    if(il.length > k){
+      fehler.push({id:q.id + '~+' + il[k], pos:pos, n:il.length - k, a:il.slice(k).map(function(x){ return B[x].roh; }).join(' '), r:'(nichts)', art:'zuviel'});
+      il.slice(k).forEach(function(x){ markB[x] = {id:q.id + '~+' + il[k], r:null}; });
+    }
   }
   function lueckeAbschliessen(){
     var wortD = function(x){ return !A[x].z; }, wortI = function(x){ return !B[x].z; };
-    paaren(del.filter(wortD), ins.filter(wortI), i);
-    paaren(del.filter(function(x){ return !wortD(x); }), ins.filter(function(x){ return !wortI(x); }), i);
+    paaren(del.filter(wortD), ins.filter(wortI), i, j);
+    paaren(del.filter(function(x){ return !wortD(x); }), ins.filter(function(x){ return !wortI(x); }), i, j);
     del = []; ins = [];
   }
   i = 0; j = 0;
@@ -38553,7 +38564,20 @@ function pruefDiktatDetails(q, L, v, korrektur, kurz){
   });
   var max = n || 1, pkt = Math.max(0, max - zaehlt);
   var nw = A.slice(0, n).filter(function(x){ return !x.z; }).length, mw = B.filter(function(x){ return !x.z; }).length;
-  var info = {id:q.id, info:true, f:'Diktat: ' + zaehlt + ' Fehler · ' + mw + ' von ' + nw + ' Wörtern geschrieben' + (rest ? ' · kürzeres Diktat: Rest (' + rest + ' Wörter/Zeichen) nicht gewertet' : ''), a:'', ok:zaehlt === 0, pkt:pkt, max:max};
+  // Geschriebener Text mit Korrektur: Fehler rot, das Richtige in [ ]; gestrichene Fehler (ok) normal.
+  var segs = [];
+  for(var jj=0;jj<=m;jj++){
+    (fehltB[jj] || []).forEach(function(e){
+      if(kurz && e.pos > letztA) return;
+      if(korrektur[e.id]) return;
+      segs.push({t:'[' + e.r + ']', rot:true, sp:/[\p{L}\p{N}]/u.test(e.r)});
+    });
+    if(jj === m) break;
+    var mk = markB[jj], bad = mk && !korrektur[mk.id];
+    segs.push({t:B[jj].roh, rot:!!bad, strich:!!(bad && mk.r === null), sp:B[jj].sp});
+    if(bad && mk.r !== null) segs.push({t:'[' + mk.r + ']', rot:true, sp:!B[jj].z});
+  }
+  var info = {id:q.id, segs:segs, info:true, f:'Diktat: ' + zaehlt + ' Fehler · ' + mw + ' von ' + nw + ' Wörtern geschrieben' + (rest ? ' · kürzeres Diktat: Rest (' + rest + ' Wörter/Zeichen) nicht gewertet' : ''), a:'', ok:zaehlt === 0, pkt:pkt, max:max};
   return [info].concat(rows);
 }
 function pruefDiktatWoerter(t){ return pruefDiktatTokens(t).filter(function(x){ return !x.z; }).length; }
@@ -41193,6 +41217,10 @@ function pruefAbgabeBlatt(p, r){
     if(q.typ === 'diktat') texte.push({titel:'Geschriebener Text', text:String((t.antworten || {})[q.id] || '–')});
   });
   var am = pruefMs(t.abgegebenAm) || pruefMs(p.freigegebenAm) || Date.now();
+  texte.forEach(function(tx){
+    var inf = (erg.details || []).filter(function(d){ return d.info && d.segs; })[0];
+    if(inf){ tx.segs = inf.segs; tx.titel = 'Geschriebener Text (Fehler rot, richtig in [ ])'; }
+  });
   var pk = p.diktat ? (erg.max - erg.punkte) + ' Fehler' : pruefArt(p) === 'tippen' ? erg.punkte + ' Netto-Anschläge/Min.' + (erg.fehler != null ? ', ' + erg.fehler + ' Fehler' : '')
     : pruefZahlText(erg.punkte) + ' von ' + pruefZahlText(erg.max) + ' Punkten';
   var details = (erg.details || []).map(function(d){ return Object.assign({}, d, {bilder:[]}); });
@@ -41335,7 +41363,22 @@ async function pruefPdf(blaetter, doppelseitig, bildMap){
     // Diktat: der geschriebene Text
     (b.texte || []).forEach(function(tx){
       platz(ZA * 3); text(svaWinText(tx.titel), B, G, M, y, ZA); y += ZA;
-      zeilen(svaUmbruch(tx.text, N, G, CW), N, G, M, ZA); y += 10;
+      if(tx.segs){
+        // Wort für Wort setzen: Fehler rot (falsche Wörter durchgestrichen), Korrektur in [ ] rot
+        var cx = M, ps = tx.segs.filter(function(g){ return g.t; });
+        platz(ZA);
+        ps.forEach(function(g){
+          var w = breite(g.t, N, G), sw = g.sp && cx > M ? breite(' ', N, G) : 0;
+          if(cx > M && cx + sw + w > M + CW){ y += ZA; platz(ZA); cx = M; sw = 0; }
+          cx += sw;
+          if(g.rot) ops.push('1 0 0 rg 1 0 0 RG');
+          text(svaWinText(g.t), N, G, cx, y, ZA);
+          if(g.strich) linie(cx, y + ZA/2, cx + w, y + ZA/2);
+          if(g.rot) ops.push('0 g 0 G');
+          cx += w;
+        });
+        y += ZA + 10;
+      } else { zeilen(svaUmbruch(tx.text, N, G, CW), N, G, M, ZA); y += 10; }
     });
     if(b.diktat && b.details.length > 1){ platz(ZA * 2); text(svaWinText('Fehler'), B, G, M, y, ZA); y += ZA + 2; }
     var nr = 0;
