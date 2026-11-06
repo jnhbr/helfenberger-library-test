@@ -25613,7 +25613,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-11-06-individuelle-uebung', datum:'2026-11-06', fuer:'lehrer', text:'📌 Individuelle Übung: Bei jeder Übung unter «⋯» gibt es «👤 Individuell zuweisen». Die gewählten Personen sehen die Übung im Fach ganz unten unter «📌 Individuelle Übung». Gelöst = grün (wiederholen geht immer), nach 7 Tagen wandert sie ins 🗄️ Archiv.'},
+  {id:'2026-11-06-individuelle-uebung', datum:'2026-11-06', fuer:'lehrer', text:'📌 Individuelle Übung: Im 🏫 Klassenzimmer gibt es die Kachel «Individuelle Übungen» (Fach, Übung, Personen wählen; dazu die Übersicht, wer gelöst hat). Auch bei jeder Übung unter «⋯» gibt es «👤 Individuell zuweisen». Die gewählten Personen sehen die Übung im Fach ganz unten unter «📌 Individuelle Übung». Gelöst = grün (wiederholen geht immer), nach 7 Tagen wandert sie ins 🗄️ Archiv.'},
   {id:'2026-11-06-individuelle-uebung-sus', datum:'2026-11-06', fuer:'alle', text:'📌 Neu: Ganz unten im Fach kann «Individuelle Übung» stehen – extra für dich, damit du deine Fehler übst. Gelöst = grün, nach 7 Tagen im Archiv.'},
   {id:'2026-11-06-bestell-archiv', datum:'2026-11-06', fuer:'lehrer', text:'🗄️ Bestellungen: Was bestellt ist, wandert schon am Tag danach ins Archiv (vorher nach 4 Wochen).'},
   {id:'2026-11-06-praep-bachmann', datum:'2026-11-06', fuer:'lehrer', text:'🛒 Präp-Planungen: Der Block «Bei Bachmann bestellen» hat einen Knopf, der alle noch offenen Posten direkt in 🏫 Klassenzimmer › Bestellungen einträgt.'},
@@ -33061,6 +33061,7 @@ var KZ_TILES = [
   { id:'sitzplan', bereich:'orga', icon:'🪑', name:'Sitzplan',            desc:'Möbel stellen, Plätze verteilen, Regeln, Zufall und gespeicherte Varianten.' },
   { id:'aemtli',  bereich:'orga', icon:'🧹', name:'Ämtliplan',            desc:'Rotiert von allein bis zu den Sommerferien, Ferienwochen fallen raus.' },
   { id:'vergessen', bereich:'orga', icon:'🗒', name:'Vergessen-Zähler',     desc:'Wer eine Abgabe verpasst hat — automatisch aus der Abgabe-Checkliste.' },
+  { id:'indiv', bereich:'material', icon:'📌', name:'Individuelle Übungen', desc:'Einzelnen Schüler:innen eine Übung zuweisen (z. B. zum Fehler-Üben). Sie erscheint ganz unten im Fach, wird grün beim Lösen und wandert nach 7 Tagen ins Archiv.' },
   { id:'bestellungen', bereich:'material', icon:'🛒', name:'Bestellungen',      desc:'Material nachbestellen: Natur und Technik (mit Bachmann-Katalogsuche), Textiles Werken, Holz-/Metallwerken – gemeinsame Listen zum Ausdrucken.' },
   { id:'raeume',  bereich:'orga', icon:'🚪', name:'Räume',               desc:'Was ist gerade frei? Bio-Zimmer, Turnhalle, Singsaal … für eine Lektion oder jede Woche reservieren.' }
 ];
@@ -33134,6 +33135,59 @@ function renderKlassenzimmer(){
     });
   });
 }
+/* 📌 Klassenzimmer-Kachel «Individuelle Übungen»: neu zuweisen (Fach › Übung › Personen) und Übersicht, wer was hat und gelöst hat. */
+function indivVerwaltung(){
+  var h = '<h3>📌 Individuelle Übungen</h3>'+
+    '<label class="modal-label">Neu zuweisen: Fach</label><select id="ivFach" class="modal-input"><option value="">– Fach wählen –</option>'+
+      SUBJECTS.map(function(f){ return '<option value="'+esc(f.id)+'">'+esc(f.name)+'</option>'; }).join('')+'</select>'+
+    '<label class="modal-label">Übung</label><select id="ivUeb" class="modal-input" disabled><option value="">– erst Fach wählen –</option></select>'+
+    '<div class="modal-actions" style="justify-content:flex-start;"><button class="btn btn-primary btn-sm" id="ivWahl" type="button" disabled>👤 Personen wählen …</button></div>'+
+    '<div class="section-label">Bisher zugewiesen</div><div id="ivListe" style="max-height:calc(36vh/var(--lz,1));overflow:auto;"><p class="muted">Wird geladen …</p></div>'+
+    '<div class="modal-actions"><button class="btn btn-ghost btn-sm" id="modalCancel" type="button">Schliessen</button></div>';
+  openModal(h);
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  var fachSel = document.getElementById('ivFach'), uebSel = document.getElementById('ivUeb'), wahl = document.getElementById('ivWahl'), geladen = {};
+  fachSel.addEventListener('change', function(){
+    var f = fachSel.value; wahl.disabled = true; uebSel.disabled = true;
+    if(!f){ uebSel.innerHTML = '<option value="">– erst Fach wählen –</option>'; return; }
+    uebSel.innerHTML = '<option value="">Wird geladen …</option>';
+    getDocs(query(kcol('resources'), where('subject', '==', f))).then(function(snap){
+      geladen = {}; var liste = [];
+      snap.forEach(function(d){ var r = Object.assign({id: d.id}, d.data()); if(!indivIst(r) && !r.kzm && !r.virtual && !r.nurLehrer && !r.imHub){ geladen[r.id] = r; liste.push(r); } });
+      liste.sort(function(a, b){ return String(a.title || a.fileName).localeCompare(String(b.title || b.fileName), 'de'); });
+      uebSel.innerHTML = '<option value="">– Übung wählen –</option>'+liste.map(function(r){ return '<option value="'+esc(r.id)+'">'+esc(r.title || r.fileName)+'</option>'; }).join('');
+      uebSel.disabled = false;
+    }).catch(function(err){ console.error(err); uebSel.innerHTML = '<option value="">Konnte nicht laden</option>'; });
+  });
+  uebSel.addEventListener('change', function(){ wahl.disabled = !geladen[uebSel.value]; });
+  wahl.addEventListener('click', function(){ var r = geladen[uebSel.value]; if(r) indivZuweisenDialog(r); });
+  // Übersicht
+  getDocs(query(kcol('resources'), where('indiv.uid', '>', ''))).then(function(snap){
+    var rows = []; snap.forEach(function(d){ rows.push(Object.assign({id: d.id}, d.data())); });
+    var host = document.getElementById('ivListe'); if(!host) return;
+    if(!rows.length){ host.innerHTML = '<p class="muted">Noch nichts zugewiesen.</p>'; return; }
+    var uids = {}; rows.forEach(function(r){ uids[r.indiv.uid] = true; });
+    return Promise.all(Object.keys(uids).map(function(u){
+      return getDoc(doc(db, 'progress', u, 'erledigt', 'liste')).then(function(sn){ uids[u] = (sn.exists() && sn.data().ids) || {}; }).catch(function(){ uids[u] = {}; });
+    })).then(function(){
+      rows.sort(function(a, b){ return String(a.indiv.name).localeCompare(String(b.indiv.name), 'de') || String(b.indiv.am).localeCompare(String(a.indiv.am)); });
+      var fachName = function(id){ var f = subjectById(id); return f ? f.name : id; };
+      host.innerHTML = rows.map(function(r){
+        var t = uids[r.indiv.uid]['iu_'+r.id];
+        var st = typeof t === 'number' ? '<span class="chip-indiv">✅ gelöst '+new Date(t).toLocaleDateString('de-CH')+(Date.now() - t > INDIV_ARCHIV_TAGE * 86400000 ? ' · Archiv' : '')+'</span>' : '<span class="muted">○ offen</span>';
+        return '<div class="lp-check" style="justify-content:space-between;gap:8px;"><span><b>'+esc(r.indiv.name)+'</b> · '+esc(fachName(r.subject))+' · '+esc(r.title || r.fileName)+' '+st+'</span>'+
+          '<button class="btn btn-ghost btn-sm" type="button" data-iuweg="'+esc(r.id)+'" title="Zuweisung entfernen">🗑️</button></div>';
+      }).join('');
+      Array.prototype.forEach.call(host.querySelectorAll('[data-iuweg]'), function(b){
+        b.addEventListener('click', function(){
+          b.disabled = true;
+          deleteDoc(kdoc('resources', b.getAttribute('data-iuweg'))).then(function(){ var z = b.parentNode; if(z && z.parentNode) z.parentNode.removeChild(z); toast('Zuweisung entfernt.'); })
+            .catch(function(err){ console.error(err); b.disabled = false; toast('Hat nicht geklappt.'); });
+        });
+      });
+    });
+  }).catch(function(err){ console.error(err); var host = document.getElementById('ivListe'); if(host) host.innerHTML = '<p class="muted">Liste konnte nicht geladen werden.</p>'; });
+}
 function kzToolStarten(id){
   if(id === 'material'){ state.route = {name:'kzmaterial'}; render(); }
   else if(id === 'beamer') openBeamerTools('ruhe');
@@ -33158,6 +33212,7 @@ function kzToolStarten(id){
   else if(id === 'aemtli'){ aemtliUi.view = 'plan'; aemtliUi.scrollTo = 'now'; state.route = {name:'aemtliplan'}; render(); }
   else if(id === 'vergessen'){ state.route = {name:'vergessen'}; render(); }
   else if(id === 'bestellungen'){ state.route = {name:'bestellungen'}; render(); }
+  else if(id === 'indiv') indivVerwaltung();
 }
 
 /* ===================== 🛒 BESTELLUNGEN (Klassenzimmer) =====================
