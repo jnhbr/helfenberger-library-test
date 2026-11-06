@@ -38444,7 +38444,7 @@ function pruefBankBewerten(p, loes, antworten, korrektur, uid){
   var details = [];
   (p.fragen || []).forEach(function(q){
     var L = loes[q.id]; if(!L) return;
-    if(q.typ === 'diktat'){ details = details.concat(pruefDiktatDetails(q, L, antworten[q.id], korrektur, !!(uid && p.diktatKurz && p.diktatKurz[uid]))); return; }
+    if(q.typ === 'diktat'){ details = details.concat(pruefDiktatDetails(q, L, antworten[q.id], korrektur, !!(uid && p.diktatKurz && p.diktatKurz[uid]), [p.titel, p.resourceTitel])); return; }
     if(q.typ === 'luecke' || q.typ === 'hoeren'){ details.push(rswBewerten(q, L, antworten[q.id], korrektur)); return; }
     var v = antworten[q.id], max = +q.punkte > 0 ? +q.punkte : (L.punkte || 1), pkt = 0, a = '–', hinweis = '';
     if(q.typ === 'mc'){ if(v != null && q.optionen[v] != null) a = q.optionen[v]; pkt = v === L.loesung ? max : 0; }
@@ -38501,7 +38501,7 @@ function pruefDiktatTokens(t){
   }
   return out;
 }
-function pruefDiktatDetails(q, L, v, korrektur, kurz){
+function pruefDiktatDetails(q, L, v, korrektur, kurz, titel){
   var orig = (L.text || []).join(' '), ein = String(v || '');
   (L.alt || []).forEach(function(g){
     var vs = String(g).split('|'), kanon = vs.filter(function(x){ return orig.indexOf(x) >= 0; })[0] || vs[0];
@@ -38512,6 +38512,24 @@ function pruefDiktatDetails(q, L, v, korrektur, kurz){
     });
   });
   var A = pruefDiktatTokens(orig), B = pruefDiktatTokens(ein), n = A.length, m = B.length;
+  // Hat jemand den Titel der Prüfung/Übung vorne dazugeschrieben (oft ohne Enter, direkt vor dem Text),
+  // zählt das nicht als Fehler: führende Wörter, die zum Titel passen (auch nur dessen Ende, z. B.
+  // «Der Verräter» aus «Prüfung Der Verräter»), werden vorher abgetrennt und normal gezeigt.
+  var titelB = [], kl = function(x){ return x.k.toLowerCase(); }, kand = [];
+  (titel || []).forEach(function(t){
+    var W = pruefDiktatTokens(t).filter(function(x){ return !x.z; });
+    for(var st=0; st<W.length; st++) kand.push(W.slice(st));
+  });
+  kand.sort(function(x, y){ return y.length - x.length; });
+  for(var ci=0; ci<kand.length; ci++){
+    var cd = kand[ci], wk = function(arr){ return arr.length >= cd.length && cd.every(function(w, x){ return kl(arr[x]) === kl(w); }); };
+    if(wk(B) && !wk(A)){
+      var drop = cd.length;
+      while(drop < B.length && B[drop].z && !(A[0] && A[0].z && A[0].k === B[drop].k)) drop++;
+      titelB = B.splice(0, drop); m = B.length;
+      break;
+    }
+  }
   // LCS-Tabelle von hinten, dann vorwärts ablaufen
   var T = [];
   for(var i=0;i<=n;i++) T.push(new Uint16Array(m+1));
@@ -38565,7 +38583,7 @@ function pruefDiktatDetails(q, L, v, korrektur, kurz){
   var max = n || 1, pkt = Math.max(0, max - zaehlt);
   var nw = A.slice(0, n).filter(function(x){ return !x.z; }).length, mw = B.filter(function(x){ return !x.z; }).length;
   // Geschriebener Text mit Korrektur: Fehler rot, das Richtige in [ ]; gestrichene Fehler (ok) normal.
-  var segs = [];
+  var segs = titelB.map(function(x){ return {t:x.roh, rot:false, sp:x.sp}; });
   for(var jj=0;jj<=m;jj++){
     (fehltB[jj] || []).forEach(function(e){
       if(kurz && e.pos > letztA) return;
