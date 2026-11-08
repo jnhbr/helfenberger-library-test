@@ -18701,7 +18701,17 @@ function historyDazu(before, merged, payload){
 // Stand schreiben, ohne Fremdes blind zu überschreiben (04.11.2026: ein Laptop mit altem Stand ersetzte die Stationen vom
 // Handy). In einer Transaktion wird der aktuelle Cloud-Stand gelesen; hat ein anderes Gerät seit unserem letzten Abgleich
 // (basisRev) geschrieben, wird zusammengeführt und der überschriebene Stand als «vorher» im selben Dokument aufgehoben.
-async function standTransaktion(ref_, newFields, basisRev){
+// 08.11.2026: Im Hintergrund-Tab wirft der Firestore-SDK (10.13.0) mitten in runTransaction «INTERNAL ASSERTION FAILED:
+// Unexpected state»; das Promise bleibt dann hängen. Darum Zeitlimit: danach greift der Fallback in writeProgressWithHistory.
+function standTransaktion(ref_, newFields, basisRev){
+  var lauf = standTransaktionLauf(ref_, newFields, basisRev);
+  lauf.catch(function(){});
+  return new Promise(function(ok, fehl){
+    var t = setTimeout(function(){ fehl(new Error('Transaktion Zeitlimit')); }, 15000);
+    lauf.then(function(r){ clearTimeout(t); ok(r); }, function(e){ clearTimeout(t); fehl(e); });
+  });
+}
+async function standTransaktionLauf(ref_, newFields, basisRev){
   return runTransaction(db, async function(tx){
     var snap = await tx.get(ref_), before = snap.exists() ? snap.data() : null;
     var f = Object.assign({}, newFields), zusammen = false;
