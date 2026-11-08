@@ -25755,6 +25755,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-11-08-varianten-ein-fenster', datum:'2026-11-08', fuer:'lehrer', text:'🧍 Angepasste Prüfungsvarianten stehen jetzt im selben Fenster wie die Hauptprüfung: unter der geöffneten Prüfung folgen alle Varianten mit eigenen Knöpfen (Freigeben, Beenden, Resultate …) und Teilnehmerliste.'},
   {id:'2026-11-08-schulden-aufschlag', datum:'2026-11-08', fuer:'lehrer', text:'💸 Schulden: Bei jeder Person gibt es «📈 Aufschlag bei Nichtzahlen» – nach X Wochen steigt der Betrag um CHF Y, auf Wunsch danach alle Z Wochen wieder (optional mit Höchstzahl). Die Schüler:innen sehen in ihrer Sprechblase immer, bis wann und um wie viel es teurer wird. Bezahlt: «Alles beglichen» oder 🗑 am Eintrag.'},
   {id:'2026-11-08-schulden-aufschlag-sus', datum:'2026-11-08', fuer:'alle', text:'💸 Schulden: In der Sprechblase steht jetzt, bis wann du zahlen musst, damit der Betrag nicht steigt.'},
   {id:'2026-11-08-pruefung-varianten', datum:'2026-11-08', fuer:'lehrer', text:'📝 Prüfung differenzieren: Bei einer Prüfung «➕ Angepasste Variante» wählen (Knopf bei den Prüfungsknöpfen oder im Bearbeiten-Dialog), Personen ankreuzen (z. B. Lernzielanpassung) und Bereiche, Umfang, Antwortart, Anzahl Fragen, Gewichtung und Notenmassstab frei einstellen. Die Angekreuzten sehen nur die Variante, bei der Hauptprüfung fallen sie weg; beliebig viele Varianten möglich. Jede Variante hat eigenes Monitoring, Resultate und Note.'},
@@ -37631,7 +37632,8 @@ function syncPruefTeilWatchers(){
   pruef.list.forEach(function(p){
     if(teacher){
       // Lehrperson: laufende Prüfungen immer (für den Knopf oben), andere nur, solange sie offen angeschaut werden.
-      if(p.status === 'offen' || (state.route.name === 'pruefung' && state.route.id === p.id)) want[p.id] = true;
+      var rp = state.route.name === 'pruefung' ? pruefById(state.route.id) : null, rroot = rp ? (rp.variantenVon || rp.id) : null;
+      if(p.status === 'offen' || (state.route.name === 'pruefung' && state.route.id === p.id) || (rroot && (p.id === rroot || p.variantenVon === rroot))) want[p.id] = true;
     } else if(p.status === 'offen' || p.status === 'beendet'){
       want[p.id] = true;
     }
@@ -41241,21 +41243,9 @@ function pruefErgebnis(p, t){
   }
   return typeof t.punkte === 'number' ? {punkte:t.punkte, max:t.max, details:t.details || []} : null;
 }
-function pruefMonitorZeichnen(){
-  var el = document.getElementById('prMon');
-  if(!el || state.route.name !== 'pruefung') return;
-  var p = pruefById(state.route.id);
-  if(!pruef.unsub || (!p && !pruef.list.length)){ el.innerHTML = '<div class="empty-state">Wird geladen …</div>'; return; }
-  if(!p){ el.innerHTML = '<div class="empty-state">Diese Prüfung gibt es nicht mehr.</div>'; return; }
-  if(pruefArt(p) === 'bank' && !pruef.loes[p.id] && !pruef.loesLaedt){
-    pruef.loesLaedt = true;
-    pruefLoesungLaden(p.id).then(function(){ pruef.loesLaedt = false; pruefMonitorZeichnen(); }, function(err){ pruef.loesLaedt = false; console.error(err); });
-  }
-  var teil = pruef.teil[p.id], roster = pruefRosterFuer(p), anzahl = pruefAnzahl(p);
-  var h = '<h2 class="page-welcome" style="margin-bottom:6px;">📝 '+esc(p.titel)+' '+pruefStatusBadge(p)+'</h2>';
-  h += '<p class="kz-intro">'+esc(pruefBeschreibung(p, true))+'</p>';
+function pruefMonitorKnoepfe(p, skPapier){
+  var h = '';
   h += '<div class="back-row" style="flex-wrap:wrap;">';
-  var skPapier = pruefArt(p) === 'sikore' && p.modus === 'papier';
   if(skPapier) h += '<button class="btn '+(p.resultateFrei ? 'btn-ghost' : 'btn-primary')+' btn-sm" data-a="resultate" type="button">'+(p.resultateFrei ? '🙈 Resultate verbergen' : '📣 Resultate freigeben')+'</button>';
   if(p.status === 'entwurf' && !skPapier) h += '<button class="btn btn-primary btn-sm" data-a="freigeben" type="button">▶️ Freigeben</button>';
   if(pruefWartet(p)) h += '<button class="btn btn-primary btn-sm" data-a="los" type="button">▶️ Test starten</button>';
@@ -41279,19 +41269,10 @@ function pruefMonitorZeichnen(){
   if(!skPapier && p.status !== 'entwurf') h += '<button class="btn btn-ghost btn-sm" data-a="download" type="button" title="Pro Person ein PDF mit Antworten, Punkten, Note und Unterschriftszeile für die Eltern – plus ein Sammel-PDF zum Drucken">📄 Abgaben herunterladen</button>';
   if(p.status !== 'offen') h += '<button class="btn btn-ghost btn-sm" data-a="loeschen" type="button">🗑 Löschen</button>';
   h += '</div>';
-  if(p.seb && !skPapier){
-    h += '<div class="pr-warte-box pr-seb-box">🛡️ <b>Nur im Safe Exam Browser.</b> Wer die Prüfung in einem normalen Browser öffnet, bekommt den Knopf «Im Safe Exam Browser öffnen» – '+
-      'SEB startet dann direkt in der Library, dort anmelden. Link zum Weitergeben: <code>'+esc(sebLink())+'</code> '+
-      '<a class="btn btn-ghost btn-sm" href="'+esc(sebDateiPfad())+'" download>⬇️ SEB-Datei</a></div>';
-  }
-  if(skPapier){
-    // Nicht mitten im Eintippen neu zeichnen (Intervall/Snapshot).
-    if(document.activeElement && document.activeElement.classList.contains('sk-papier-in') && el.contains(document.activeElement)) return;
-    el.innerHTML = h + (roster ? sikorePapierZeilen(p, roster) : '<div class="empty-state">Klasse wird geladen …</div>');
-    pruefMonitorVerdrahten(p); sikorePapierVerdrahten(p);
-    return;
-  }
-  if(!teil || !roster){ el.innerHTML = h + '<div class="empty-state">Klasse wird geladen …</div>'; pruefMonitorVerdrahten(p); return; }
+  return h;
+}
+function pruefMonitorKoerper(p, teil, roster, anzahl){
+  var h = '';
   var rows = pruefMonitorZeilen(p, teil, roster);
   var z = {ab:0, gesperrt:0, laeuft:0, nix:0, warte:0}, notenListe = [];
   rows.forEach(function(r){
@@ -41336,6 +41317,59 @@ function pruefMonitorZeichnen(){
     h += '</div></div>';
   });
   h += '</div>';
+  return h;
+}
+// Hauptprüfung und angepasste Varianten (Lernzielanpassung) im selben Fenster:
+// alle anderen Prüfungen der Gruppe stehen mit eigenen Knöpfen unter der geöffneten.
+function pruefMonitorGruppe(p){
+  var root = p.variantenVon || p.id, h = '';
+  pruef.list.filter(function(x){ return x.id !== p.id && (x.id === root || x.variantenVon === root); })
+    .sort(function(a, b){ return (b.id === root) - (a.id === root) || String(a.titel).localeCompare(String(b.titel), 'de'); })
+    .forEach(function(x){
+      var teil = pruef.teil[x.id], roster = pruefRosterFuer(x);
+      pruef.loesV = pruef.loesV || {};
+      if(pruefArt(x) === 'bank' && !pruef.loes[x.id] && !pruef.loesV[x.id]){
+        pruef.loesV[x.id] = 1;
+        pruefLoesungLaden(x.id).then(function(){ pruefMonitorZeichnen(); }, function(err){ console.error(err); });
+      }
+      h += '<div class="pr-variante" data-vid="'+esc(x.id)+'" style="margin-top:30px;border-top:3px solid var(--border);padding-top:14px;">';
+      h += '<h3 style="margin:0 0 6px;">'+(x.id === root ? '📝 Hauptprüfung' : '🧍 Angepasste Variante')+': '+esc(x.titel)+' '+pruefStatusBadge(x)+'</h3>';
+      h += '<p class="kz-intro">'+esc(pruefBeschreibung(x, true))+'</p>';
+      h += pruefMonitorKnoepfe(x, false);
+      h += (teil && roster) ? pruefMonitorKoerper(x, teil, roster, pruefAnzahl(x)) : '<div class="empty-state">Wird geladen …</div>';
+      h += '</div>';
+    });
+  return h;
+}
+function pruefMonitorZeichnen(){
+  var el = document.getElementById('prMon');
+  if(!el || state.route.name !== 'pruefung') return;
+  var p = pruefById(state.route.id);
+  if(!pruef.unsub || (!p && !pruef.list.length)){ el.innerHTML = '<div class="empty-state">Wird geladen …</div>'; return; }
+  if(!p){ el.innerHTML = '<div class="empty-state">Diese Prüfung gibt es nicht mehr.</div>'; return; }
+  if(pruefArt(p) === 'bank' && !pruef.loes[p.id] && !pruef.loesLaedt){
+    pruef.loesLaedt = true;
+    pruefLoesungLaden(p.id).then(function(){ pruef.loesLaedt = false; pruefMonitorZeichnen(); }, function(err){ pruef.loesLaedt = false; console.error(err); });
+  }
+  var teil = pruef.teil[p.id], roster = pruefRosterFuer(p), anzahl = pruefAnzahl(p);
+  var h = '<h2 class="page-welcome" style="margin-bottom:6px;">📝 '+esc(p.titel)+' '+pruefStatusBadge(p)+'</h2>';
+  h += '<p class="kz-intro">'+esc(pruefBeschreibung(p, true))+'</p>';
+  var skPapier = pruefArt(p) === 'sikore' && p.modus === 'papier';
+  h += pruefMonitorKnoepfe(p, skPapier);
+  if(p.seb && !skPapier){
+    h += '<div class="pr-warte-box pr-seb-box">🛡️ <b>Nur im Safe Exam Browser.</b> Wer die Prüfung in einem normalen Browser öffnet, bekommt den Knopf «Im Safe Exam Browser öffnen» – '+
+      'SEB startet dann direkt in der Library, dort anmelden. Link zum Weitergeben: <code>'+esc(sebLink())+'</code> '+
+      '<a class="btn btn-ghost btn-sm" href="'+esc(sebDateiPfad())+'" download>⬇️ SEB-Datei</a></div>';
+  }
+  if(skPapier){
+    // Nicht mitten im Eintippen neu zeichnen (Intervall/Snapshot).
+    if(document.activeElement && document.activeElement.classList.contains('sk-papier-in') && el.contains(document.activeElement)) return;
+    el.innerHTML = h + (roster ? sikorePapierZeilen(p, roster) : '<div class="empty-state">Klasse wird geladen …</div>');
+    pruefMonitorVerdrahten(p); sikorePapierVerdrahten(p);
+    return;
+  }
+  if(!teil || !roster){ el.innerHTML = h + '<div class="empty-state">Klasse wird geladen …</div>'; pruefMonitorVerdrahten(p); return; }
+  h += pruefMonitorKoerper(p, teil, roster, anzahl) + pruefMonitorGruppe(p);
   el.innerHTML = h;
   pruefMonitorVerdrahten(p);
 }
@@ -41524,10 +41558,12 @@ function pruefDiktatKurzDialog(p){
     updateDoc(pruefRef(p.id), {diktatKurz:map}).then(function(){ closeModal(); toast(Object.keys(map).length ? '✂️ Kürzeres Diktat für '+Object.keys(map).length+' Person'+(Object.keys(map).length === 1 ? '' : 'en')+' gespeichert.' : 'Alle schreiben das ganze Diktat.'); }).catch(pruefFehler);
   });
 }
-function pruefMonitorVerdrahten(p){
+function pruefMonitorVerdrahten(p0){
   var el = document.getElementById('prMon');
   el.onclick = function(e){
     var b = e.target.closest('button'); if(!b) return;
+    // Knöpfe in einem Variantenblock gelten für diese Prüfung, nicht für die geöffnete.
+    var vc = b.closest('[data-vid]'), p = (vc && pruefById(vc.getAttribute('data-vid'))) || p0;
     var a = b.getAttribute('data-a'), eu = b.getAttribute('data-e'), du = b.getAttribute('data-d'), ru = b.getAttribute('data-r');
     var teil = pruef.teil[p.id] || {};
     if(eu){ updateDoc(teilRef(p.id, eu), pruefEntsperrUpd(p, teil[eu])).then(function(){ toast('Entsperrt.'); }).catch(pruefFehler); return; }
@@ -41588,6 +41624,10 @@ function pruefMonitorVerdrahten(p){
         batch.delete(loesRef(p.id));
         batch.delete(pruefRef(p.id));
         await batch.commit();
+        if(p.variantenVon){
+          var hp = pruefById(p.variantenVon);
+          if(hp && Array.isArray(hp.mitglieder)) await updateDoc(pruefRef(hp.id), {mitglieder:hp.mitglieder.concat((p.mitglieder || []).filter(function(u){ return hp.mitglieder.indexOf(u) < 0; }))}).catch(function(err){ console.error(err); });
+        }
         state.route = {name:'pruefungen'}; render();
       }catch(err){ pruefFehler(err); }
     }, true);
