@@ -4877,7 +4877,9 @@ var erledigt = { ids:{}, loaded:false, uid:null };
 function erledigtRef(){ return doc(db, 'progress', state.user.uid, 'erledigt', 'liste'); }
 
 function erledigtLoad(){
-  if(!state.user || state.profile.role === 'teacher') return Promise.resolve({});
+  if(!state.user) return Promise.resolve({});
+  // Lehrpersonen haben keine Häkchen, gelten aber als «geladen» (sonst zeichnete die Fachseite endlos neu und fror ein).
+  if(state.profile.role === 'teacher'){ erledigt.loaded = true; erledigt.uid = state.user.uid; return Promise.resolve({}); }
   if(erledigt.loaded && erledigt.uid === state.user.uid) return Promise.resolve(erledigt.ids);
   return getDoc(erledigtRef()).then(function(snap){
     erledigt.ids = (snap.exists() && snap.data().ids) || {};
