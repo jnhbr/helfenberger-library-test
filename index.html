@@ -3060,7 +3060,7 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
   /* ▶️ Weitermachen (Startseite): zuletzt geöffnete Übungen */
   #weiterWidget{position:relative;}
   .weiter{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
-  .weiter-titel{align-self:center;font-size:13px;font-weight:700;color:var(--text-muted);padding:0 4px;}
+  .weiter-bild{align-self:center;width:40px;height:40px;object-fit:contain;flex:none;}
   .weiter-chip{--c:#94A3B8;flex:1 1 190px;min-width:0;display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-left:5px solid var(--c);border-radius:13px;background:var(--surface);box-shadow:var(--shadow);font:inherit;color:inherit;text-align:left;cursor:pointer;}
   .weiter-chip:hover{background:color-mix(in srgb, var(--c) 10%, var(--surface));}
   .weiter-chip > span:first-child{font-size:20px;}
@@ -11929,7 +11929,7 @@ function weiterZeichnen(){
   }
   if(!zeigen.length){ el.removeAttribute('data-ausblendbar'); el.innerHTML = ''; return; }
   el.setAttribute('data-ausblendbar', 'start:weiter');
-  el.innerHTML = '<div class="weiter"><span class="weiter-titel">▶️ Weitermachen</span>' + zeigen.map(function(z, i){
+  el.innerHTML = '<div class="weiter"><img class="weiter-bild" src="assets/icons/start-weiter.webp" alt="Weitermachen" title="Weitermachen: zuletzt geöffnet">' + zeigen.map(function(z, i){
     return '<button type="button" class="weiter-chip" data-weiter="'+i+'" style="--c:'+z.s.color+'">'+
       '<span>'+(z.r.pdf ? '📄' : z.r.externalUrl || z.r.linkUrl ? '🔗' : '✏️')+'</span>'+
       '<div><b>'+esc(z.r.title || z.r.fileName)+'</b><small>'+esc(z.s.name)+' · '+weiterWann(z.t)+'</small></div></button>';
