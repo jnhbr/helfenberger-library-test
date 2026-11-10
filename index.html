@@ -25856,6 +25856,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-11-10-praep-bloecke', datum:'2026-11-10', fuer:'lehrer', text:'🎯 Freie Präp (Mathe Kapitel 3): Das Tagesziel setzt du selbst – jede Aufgabe des Arbeitsplans einzeln ankreuzen. Lektionen baust du aus Blöcken: ✏️ Arbeitsblock (Aufgaben, Sozialform, still/flüstern, Minuten, Notiz), 📓 Theorie, ⚡ Energizer, 🔢 Schätzquiz oder 🎮 ein Spiel aus dem Klassenzimmer (z. B. Schiffe versenken). Vorgeschlagene Energizer und Quiz lassen sich mit ✕ entfernen. Bisherige Einträge bleiben erhalten.'},
   {id:'2026-11-10-weitermachen', datum:'2026-11-10', fuer:'alle', text:'▶️ Neu auf der Startseite: «Weitermachen» zeigt deine zuletzt geöffneten Übungen – ein Klick und du bist wieder drin. Stört es dich? Mit «✏️ Anordnen» kannst du es ausblenden.'},
   {id:'2026-11-08-varianten-ein-fenster', datum:'2026-11-08', fuer:'lehrer', text:'🧍 Angepasste Prüfungsvarianten stehen jetzt im selben Fenster wie die Hauptprüfung: unter der geöffneten Prüfung folgen alle Varianten mit eigenen Knöpfen (Freigeben, Beenden, Resultate …) und Teilnehmerliste.'},
   {id:'2026-11-08-schulden-aufschlag', datum:'2026-11-08', fuer:'lehrer', text:'💸 Schulden: Bei jeder Person gibt es «📈 Aufschlag bei Nichtzahlen» – nach X Wochen steigt der Betrag um CHF Y, auf Wunsch danach alle Z Wochen wieder (optional mit Höchstzahl). Die Schüler:innen sehen in ihrer Sprechblase immer, bis wann und um wie viel es teurer wird. Bezahlt: «Alles beglichen» oder 🗑 am Eintrag.'},
@@ -32248,6 +32249,23 @@ window.hlEnergizer = {
       if(en.overlay && en.overlay.el) en.overlay.el.style.zIndex = '1500';   // über dem (Pseudo-)Vollbild des Viewers
       return true;
     });
+  }
+};
+
+/* Für die 🔒 Unterrichtsplanung im Viewer (freie Präp, Block «🎮 Aus der Library»): Spiele und Live-Werkzeuge
+   des Klassenzimmers auflisten und eines im eigenen Fenster öffnen – die Präp bleibt dahinter offen. Nur für Lehrpersonen. */
+window.hlKlassenzimmer = {
+  liste: function(){
+    if(!state.profile || state.profile.role !== 'teacher') return Promise.resolve([]);
+    return Promise.resolve(KZ_TILES.filter(function(t){ return aktToolOk(t.id) || AKT_FREI[t.id]; })
+      .map(function(t){ return {id:t.id, icon:t.icon, name:t.name}; }));
+  },
+  oeffnen: function(id){
+    if(!state.profile || state.profile.role !== 'teacher') return false;
+    if(!(aktToolOk(id) || AKT_FREI[id])) return false;
+    if(!aktFensterMoeglich()){ toast('Bitte im 🏫 Klassenzimmer öffnen – hier geht kein eigenes Fenster auf.'); return false; }
+    aktFensterOeffnen('tool:' + id);
+    return true;
   }
 };
 
