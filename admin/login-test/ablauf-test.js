@@ -62,10 +62,12 @@ async function seed(){
   // Eine Prüfung als Entwurf, so wie der Editor sie ablegt: Fragen ohne Lösungen, Lösungen nur für die Lehrperson.
   await db.doc('klassen/' + K + '/pruefungen/' + PID).set({ titel: 'Ablauf-Prüfung', skala: { typ: 'dbk' }, punkteFuer6: null, fehlerAbzug: null, rundung: 0.1,
     fach: 'mathe', gewicht: 1, zeitMin: null, art: 'bank', diktat: false, subject: 'mathe', seed: 1, bilder: [], maxPunkte: 4,
+    // 🎯 Lernziele: q0/q1 über die Frage-ID der Übung (qid → Lernziel 1 bzw. 2), q2 direkt (lz).
+    resourceId: 'r_lz', resourceTitel: 'Lernziel-Übung',
     fragen: [
-      { id: 'q0', typ: 'tf', frage: 'Die Erde ist rund.', kat: 'Test', punkte: 1 },
-      { id: 'q1', typ: 'mc', frage: 'Wie viel gibt 2 + 2?', kat: 'Test', punkte: 2, optionen: ['3', '4', '5'] },
-      { id: 'q2', typ: 'text', frage: 'Wie heisst die Bundesstadt der Schweiz?', kat: 'Test', punkte: 1 }
+      { id: 'q0', typ: 'tf', frage: 'Die Erde ist rund.', kat: 'Test', punkte: 1, qid: 'q1' },
+      { id: 'q1', typ: 'mc', frage: 'Wie viel gibt 2 + 2?', kat: 'Test', punkte: 2, optionen: ['3', '4', '5'], qid: 'q3' },
+      { id: 'q2', typ: 'text', frage: 'Wie heisst die Bundesstadt der Schweiz?', kat: 'Test', punkte: 1, lz: [3] }
     ],
     cfg: { optionen: {}, optNamen: {}, anzahl: 3, mischen: false }, status: 'entwurf', resultateFrei: false, createdAt: B.TS, createdBy: 'u_testlehrer' });
   await db.doc('klassen/' + K + '/pruefungen/' + PID + '/intern/loesung').set({ loesungen: {
@@ -220,6 +222,14 @@ const feldWert = p => feld(p).inputValue().catch(() => null);
     const zeilen = await lp.$$eval('#prMon .pr-zeile', els => els.map(e => e.innerText.replace(/\s+/g, ' ')));
     ok(/4 \/ 4 Pkt/.test(zeilen.find(z => /^Anna/.test(z)) || '') && /1 \/ 4 Pkt/.test(zeilen.find(z => /^Ben/.test(z)) || ''), 'Monitor korrigiert sofort: Anna 4 / 4, Ben 1 / 4 Punkte');
 
+    // 🎯 Punkte pro Lernziel im Monitor (Anna alles richtig; Ben: Lernziel 1 richtig, 2 falsch, 3 leer).
+    await lp.click('#prMon [data-a="lernziele"]');
+    await lp.waitForSelector('.lz-raster tbody tr.lz-schnitt');
+    const lzr = await lp.$$eval('.lz-raster tbody tr', l => l.map(e => e.innerText.replace(/\s+/g, ' ')));
+    ok(/^Anna 1\/1 2\/2 1\/1/.test(lzr.find(z => /^Anna/.test(z)) || '') && /^Ben 1\/1 0\/2 0\/1/.test(lzr.find(z => /^Ben/.test(z)) || ''), 'Monitor › «🎯 Lernziele»: Anna 1/1 2/2 1/1, Ben 1/1 0/2 0/1');
+    ok(/^Klasse 100 % 50 % 50 %/.test(lzr.find(z => /^Klasse/.test(z)) || ''), 'Zeile «Klasse»: 100 %, 50 %, 50 %');
+    await lp.click('#lzZu');
+
     // Erst beenden, dann lassen sich die Resultate freigeben.
     await lp.click('#prMon [data-a="beenden"]');
     await lp.click('.modal button:has-text("Beenden")');
@@ -235,6 +245,17 @@ const feldWert = p => feld(p).inputValue().catch(() => null);
     await anna.waitForSelector('.pr-resultat');
     const res = (await anna.$eval('.pr-resultat', e => e.innerText)).replace(/\s+/g, ' ');
     ok(/Note 6/.test(res) && /4/.test(res), 'Anna öffnet ihr Resultat: Note 6 mit 4 Punkten (' + res + ')');
+    await anna.waitForSelector('#prLz .lz-pr-zeile');
+    const lza = (await anna.$eval('#prLz', e => e.innerText)).replace(/\s+/g, ' ');
+    ok(/So steht es bei deinen Lernzielen/.test(lza) && /2 \/ 2 P\./.test(lza) && (await anna.$$('#prLz [data-lzpr]')).length === 0, 'Annas Resultat zeigt die Punkte pro Lernziel, ohne «Dazu üben» (alles erreicht)');
+    await bis(async () => /Prüfungsresultat/.test(await ben.$eval('#pruefungBtn', e => e.hidden ? '' : e.innerText).catch(() => '')), 'Ben sieht «Prüfungsresultat»', 30000);
+    if(await ben.isVisible('.modal button:has-text("Verstanden")')) await ben.click('.modal button:has-text("Verstanden")');
+    await ben.click('#pruefungBtn');
+    await ben.waitForSelector('#prLz [data-lzpr="2"]');
+    ok((await ben.$$('#prLz [data-lzpr]')).length === 1 && /0 \/ 2 P\./.test(await ben.$eval('#prLz', e => e.innerText)), 'Bens Resultat: Lernziel 2 mit 0 / 2 P. und «Dazu üben» (Lernziel 3 hat keine Übungsfragen)');
+    await ben.click('#prLz [data-lzpr="2"]');
+    await bis(async () => (await ben.frameLocator('#resourceFrame').locator('#start').textContent().catch(() => '')) === 'Lernziel 2:q3', 'Übung startet mit Lernziel 2');
+    ok(true, '«Dazu üben» im Resultat öffnet die Übung mit der Frage von Lernziel 2');
     for(const p of [lp, anna, ben]) await p.context().close();
   });
 
@@ -338,7 +359,8 @@ const feldWert = p => feld(p).inputValue().catch(() => null);
     const raster = await lp.$$eval('.lz-raster tbody tr', l => l.map(e => e.innerText.replace(/\s+/g, ' ')));
     const za = raster.find(z => /^Anna/.test(z)) || '', zb = raster.find(z => /^Ben/.test(z)) || '';
     ok(/1\/2 ?🟢/.test(za) && /0\/1 ?🟡/.test(za) && /– ?🔴/.test(za), 'Lehrperson: Annas Zeile zeigt 1/2 🟢, 0/1 🟡, – 🔴');
-    ok(/0\/2/.test(zb) && !/🟢|🟡|🔴/.test(zb), 'Ben: nichts geübt, keine Einschätzung');
+    // Ben hat die Übung nur aus dem Prüfungsresultat geöffnet (dort meldete sie 🔴 für Lernziel 3), selbst nichts eingeschätzt.
+    ok(/0\/2/.test(zb) && !/🟢|🟡/.test(zb), 'Ben: nichts geübt, keine eigene Einschätzung in der Library');
     if(process.env.DEBUG_DIR) await lp.screenshot({ path: process.env.DEBUG_DIR + '/lz-raster.png' });
     for(const p of [anna, lp]) await p.context().close();
   });
