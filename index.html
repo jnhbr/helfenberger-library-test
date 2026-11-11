@@ -25878,6 +25878,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-11-11-lernphase-zwei-tabs', datum:'2026-11-11', fuer:'lehrer', text:'📚 Lernphase: Wer die Library in zwei Tabs oder Fenstern offen hat, wird nicht mehr fälschlich rot — der Tab im Hintergrund überschreibt den Tab, in dem gearbeitet wird, nicht mehr.'},
   {id:'2026-11-10-datum-sortiert', datum:'2026-11-10', fuer:'lehrer', text:'📅 Material mit Datum im Titel (z. B. «Di 03.11. · Rollenkarten») steht jetzt immer chronologisch, nicht mehr nach Wochentag sortiert.'},
   {id:'2026-11-10-praep-spielset', datum:'2026-11-10', fuer:'lehrer', text:'🎮 Freie Präp: Beim Block «Aus der Library» wählst du jetzt Spiel, Fach und Set und startest es mit «▶ In der Library öffnen» direkt aus der Planung (eigenes Fenster). Ein Ziel kann mit «↪ weiter» über mehrere Tage gehen.'},
   {id:'2026-11-10-praep-schaetzfragen', datum:'2026-11-10', fuer:'lehrer', text:'🔢 Freie Präp: Ein neuer Schätzquiz-Block schlägt jetzt gleich eine Schätzfrage mit Auflösung vor – 🎲 «Andere Frage» wechselt sie. Jede Frage kommt nur einmal dran.'},
@@ -36797,10 +36798,32 @@ function lphIstDrin(){
   if(f && lph.aktiv && lph.aktiv.nurFach && lph.aktiv.nurFach.id) return true;
   return !!f && (!n || !n.id || String(f.rid) === String(n.id));
 }
+// Mehrere Library-Tabs (⧉ Neues Fenster, zweiter Tab): alle melden ins selbe
+// Präsenz-Dokument. Der Tab im Hintergrund darf den Tab, in dem gearbeitet wird,
+// nicht mit «raus» überschreiben — wer drin ist, hinterlegt das für die anderen.
+var LPH_TAB_KEY = 'lib_lph_drin', LPH_TAB_ID = Math.random().toString(36).slice(2);
+function lphTabLesen(){ try{ return JSON.parse(localStorage.getItem(LPH_TAB_KEY) || 'null'); }catch(e){ return null; } }
+function lphTabMerken(drin){
+  try{
+    if(drin) localStorage.setItem(LPH_TAB_KEY, JSON.stringify({t:LPH_TAB_ID, ts:Date.now(), p:(lph.aktiv && lph.aktiv.startMs) || 0}));
+    else { var x = lphTabLesen(); if(x && x.t === LPH_TAB_ID) localStorage.removeItem(LPH_TAB_KEY); }
+  }catch(e){}
+}
+function lphAndererTabDrin(){
+  var x = lphTabLesen();
+  return !!x && x.t !== LPH_TAB_ID && x.p === ((lph.aktiv && lph.aktiv.startMs) || 0) && Date.now() - x.ts < LPH_HB_MS * 1.5;
+}
 function lphMelden(heartbeat, erzwungenRaus){
   if(!lph.aktiv || !state.user || alsSchueler()) return;
   var drin = erzwungenRaus ? false : lphIstDrin();
   var falsch = !erzwungenRaus && !drin && lphImFenster();
+  lphTabMerken(drin);
+  if(!drin && lphAndererTabDrin()){
+    // Ein anderer Tab ist am richtigen Ort: dieser hier schweigt.
+    if(lph.entprellt){ clearTimeout(lph.entprellt); lph.entprellt = null; }
+    lph.drin = false; lph.falsch = falsch; lph.erste = false;
+    return;
+  }
   if(!heartbeat && drin === lph.drin && falsch === lph.falsch) return;
   // Mit eigenem Übungsfenster flackert hasFocus() beim Klicken kurz: «raus» erst
   // melden, wenn es nach 2 s noch stimmt.
