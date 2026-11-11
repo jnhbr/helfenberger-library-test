@@ -498,6 +498,40 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
   .modal-overlay.show{display:flex;}
   .modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 24px 60px rgba(0,0,0,.28);width:100%;max-width:440px;max-height:calc(85vh/var(--lz,1));overflow:auto;padding:22px;}
   .modal-wide{max-width:640px;}
+  /* 🎯 Lernziele (Pilot) */
+  #lzKarte:not(:empty){margin-bottom:14px;display:flex;flex-direction:column;gap:10px;}
+  .lz-karte{background:var(--surface);border:1px solid var(--border);border-left:5px solid #2e9e6b;border-radius:var(--radius-sm);padding:14px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .lz-k-icon{font-size:26px;line-height:1;}
+  .lz-k-text{flex:1;min-width:180px;display:flex;flex-direction:column;gap:2px;}
+  .lz-k-text small{color:var(--text-muted);font-size:13px;}
+  .lz-k-knoepfe{display:flex;gap:8px;flex-wrap:wrap;}
+  .modal.lz-modal{max-width:720px;}
+  .modal.lz-modal.lz-modal-breit{max-width:1040px;}
+  .lz-lead{color:var(--text-muted);font-size:14px;margin:4px 0 12px;line-height:1.6;}
+  .lz-zeile{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--border);}
+  .lz-nr{flex:0 0 30px;height:30px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
+  .lz-haupt{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;}
+  .lz-text{font-size:15px;line-height:1.4;}
+  .lz-klein{color:var(--text-muted);font-size:12.5px;}
+  .lz-tipp{font-size:12.5px;color:#8a5a00;background:#fff4d6;border-radius:6px;padding:4px 8px;align-self:flex-start;}
+  .lz-balken{height:8px;border-radius:99px;background:var(--bg);border:1px solid var(--border);overflow:hidden;}
+  .lz-balken span{display:block;height:100%;border-radius:99px;background:#9aa3ad;}
+  .lz-b-gruen span{background:#2e9e6b;} .lz-b-gelb span{background:#e0a100;} .lz-b-rot span{background:#d9534f;}
+  .lz-knoepfe{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .lz-wahl{font:inherit;font-size:13px;padding:6px 12px;border-radius:99px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;}
+  .lz-wahl.lz-w-r.an{background:#fde3e1;border-color:#d9534f;color:#8f1d19;font-weight:700;}
+  .lz-wahl.lz-w-a.an{background:#fff0c2;border-color:#e0a100;color:#6e4e00;font-weight:700;}
+  .lz-wahl.lz-w-g.an{background:#d8f3e5;border-color:#2e9e6b;color:#14613d;font-weight:700;}
+  .lz-ueben{margin-left:auto;}
+  .lz-raster-wrap{overflow:auto;max-height:60vh;border:1px solid var(--border);border-radius:var(--radius-sm);}
+  .lz-raster{border-collapse:collapse;width:100%;font-size:13px;}
+  .lz-raster th,.lz-raster td{border:1px solid var(--border);padding:6px 6px;text-align:center;white-space:nowrap;}
+  .lz-raster thead th{position:sticky;top:0;background:var(--surface);z-index:1;}
+  .lz-raster .lz-name{text-align:left;font-weight:600;position:sticky;left:0;background:var(--surface);}
+  .lz-z{color:#1c1c1c;} span.lz-z{display:inline-block;padding:1px 8px;border-radius:6px;font-size:12px;}
+  .lz-z-gruen{background:#bfe8d2;} .lz-z-gelb{background:#ffe59a;} .lz-z-rot{background:#f6c1be;} .lz-z-leer{background:#e9ecef;color:#555;}
+  .lz-p{margin-left:3px;font-size:10px;vertical-align:middle;}
+  .lz-legende{font-size:13px;color:var(--text-muted);margin:12px 0 0;padding-left:26px;line-height:1.6;}
   .modal.ued-modal{max-width:980px;width:100%;height:calc(88vh/var(--lz,1));max-height:calc(88vh/var(--lz,1));display:flex;flex-direction:column;overflow:hidden;}
   .ued-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px;}
   .ued-tabs .btn.active{background:var(--brand);color:#fff;}
@@ -16303,6 +16337,7 @@ function renderSubject(subjectId, folderId){
     html += '<div class="upload-progress" id="uploadProgress"></div>';
   }
 
+  html += '<div id="lzKarte"></div>';
   html += '<div id="resourceList" class="resource-list"><div class="empty-state">Wird geladen …</div></div>';
   if(!isTeacher) html += '<div id="gruppenFach" class="resource-list"></div>';
   // 📮 Briefkästen stehen zuunterst – zuerst kommt das Material (Wunsch von Jan, 05.10.2026).
@@ -16421,6 +16456,225 @@ var fachNachlaufGetan = null;
 // jeder Snapshot-Änderung und nach jeder Navigation in einen Unterordner
 // aufgerufen — die Firestore-Listener bleiben dabei bestehen (sie hängen am
 // ganzen Fach, nicht am einzelnen Ordner).
+/* =====================================================================
+   🎯 LERNZIELE (Pilot seit 11.11.2026, Biologie «Funktionen des Körpers» Teil 2)
+   =====================================================================
+   Ein Ordner kann Lernziel-Sets tragen. Nur Ordner mit Sets zeigen etwas an.
+   Daten: klassen/{k}/folders/{id}.lernziele = [{id, titel, ziele:[{nr, text}],
+            fragen:{<resourceId>:{<frageId>:[nr, …]}}}]   (schreibt admin/lernziele-import.js)
+          progress/{uid}/erledigt/lernziele = {<setId>:{<nr>:'r'|'a'|'g'|''}}
+            (Selbsteinschätzung; Lehrpersonen lesen mit, gleiche Regel wie erledigt/liste)
+   Übungsstand pro Lernziel: aus progress/{uid}/resources/{rid}.stats (richtig
+   gelöste Fragen, die dem Lernziel zugeordnet sind) — keine neuen Collections.
+   Übung ↔ Library (postMessage): die Übung meldet {__libBereit, ziele} und
+   {__libLernziel, idx, val}; die Library antwortet mit {__libLernziele} und,
+   nach «Dazu üben», mit {__libStart:{ids, titel}}. idx = Stelle in set.ziele.
+   ===================================================================== */
+var lz = {uid:null, eigen:null, laedt:null, bekannt:{}, start:null};
+var LZ_WERTE = [['r','keine Ahnung'],['a','teilweise'],['g','erreicht']];
+var LZ_ZU_UEBUNG = {r:'red', a:'amber', g:'green'}, LZ_VON_UEBUNG = {red:'r', amber:'a', green:'g'};
+function lzSets(folderId){
+  var f = folderById(folderId);
+  return f && Array.isArray(f.lernziele) ? f.lernziele.filter(function(s){ return s && s.id && Array.isArray(s.ziele) && s.ziele.length; }) : [];
+}
+function lzRef(uid){ return doc(db, 'progress', uid, 'erledigt', 'lernziele'); }
+function lzEigenLaden(){
+  if(!state.user) return Promise.resolve({});
+  if(lz.uid !== state.user.uid){ lz.uid = state.user.uid; lz.eigen = null; lz.laedt = null; }
+  if(lz.eigen) return Promise.resolve(lz.eigen);
+  if(!lz.laedt) lz.laedt = getDoc(lzRef(state.user.uid)).then(function(s){ lz.eigen = s.exists() ? s.data() : {}; return lz.eigen; },
+    function(err){ console.error('Lernziele', err); lz.laedt = null; return {}; });
+  return lz.laedt;
+}
+function lzSetzen(set, nr, wert){
+  if(!state.user) return;
+  function tun(eigen){
+    var m = eigen[set.id] = eigen[set.id] || {};
+    if((m[nr] || '') === wert) return;
+    m[nr] = wert;
+    var neu = {}; neu[set.id] = {}; neu[set.id][nr] = wert;
+    setDoc(lzRef(state.user.uid), neu, {merge:true}).catch(function(err){ console.error('Lernziele speichern', err); });
+  }
+  // Schon geladen → sofort (der Dialog zeichnet gleich danach neu).
+  if(lz.eigen && lz.uid === state.user.uid) tun(lz.eigen); else lzEigenLaden().then(tun);
+}
+// Fragen eines Lernziels, pro Übung: [{rid, ids:[…]}]
+function lzFragen(set, nr){
+  var out = [], fr = set.fragen || {};
+  Object.keys(fr).forEach(function(rid){
+    var ids = Object.keys(fr[rid] || {}).filter(function(q){ return (fr[rid][q] || []).indexOf(nr) >= 0; });
+    if(ids.length) out.push({rid:rid, ids:ids});
+  });
+  return out;
+}
+// Stand pro Lernziel aus den Übungs-Statistiken {rid: stats}: {nr: {tot, ok, ver}}
+function lzStand(set, statsVon){
+  var st = {};
+  set.ziele.forEach(function(z){
+    var tot = 0, ok = 0, ver = 0;
+    lzFragen(set, z.nr).forEach(function(x){
+      var s = statsVon[x.rid] || {};
+      x.ids.forEach(function(q){ tot++; if(s[q] && s[q].status){ ver++; if(s[q].status === 'correct') ok++; } });
+    });
+    st[z.nr] = {tot:tot, ok:ok, ver:ver};
+  });
+  return st;
+}
+function lzStufe(s){ return !s.tot || !s.ver ? 'leer' : s.ok / s.tot >= 0.8 ? 'gruen' : s.ok / s.tot >= 0.5 ? 'gelb' : 'rot'; }
+function lzStatsLaden(uid, set){
+  var rids = Object.keys(set.fragen || {}), out = {};
+  return Promise.all(rids.map(function(rid){
+    return getDoc(doc(db, 'progress', uid, 'resources', rid)).then(function(s){ out[rid] = (s.exists() && s.data().stats) || {}; }, function(){ out[rid] = {}; });
+  })).then(function(){ return out; });
+}
+
+function lzKarteZeichnen(){
+  var el = document.getElementById('lzKarte');
+  if(!el || state.route.name !== 'subject') return;
+  var here = state.route.folderId || null, sets = here ? lzSets(here) : [];
+  if(!sets.length){ el.innerHTML = ''; return; }
+  var isTeacher = state.profile.role === 'teacher';
+  sets.forEach(function(set){ Object.keys(set.fragen || {}).forEach(function(rid){ lz.bekannt[rid] = set; }); });
+  el.innerHTML = sets.map(function(set, i){
+    return '<div class="lz-karte"><div class="lz-k-icon" aria-hidden="true">🎯</div>'+
+      '<div class="lz-k-text"><b>Lernziele: '+esc(set.titel || '')+'</b><small id="lzKarteInfo'+i+'">'+set.ziele.length+' Lernziele – wo stehst du?</small></div>'+
+      '<div class="lz-k-knoepfe">'+(isTeacher ? '<button class="btn btn-primary btn-sm" data-lzk="'+i+'" type="button">👥 Klasse ansehen</button>' : '')+
+      '<button class="btn '+(isTeacher ? 'btn-ghost' : 'btn-primary')+' btn-sm" data-lz="'+i+'" type="button">'+(isTeacher ? 'Schüleransicht' : 'Ansehen')+'</button></div></div>';
+  }).join('');
+  Array.prototype.forEach.call(el.querySelectorAll('[data-lz]'), function(b){ b.addEventListener('click', function(){ lzDialog(sets[+b.getAttribute('data-lz')]); }); });
+  Array.prototype.forEach.call(el.querySelectorAll('[data-lzk]'), function(b){ b.addEventListener('click', function(){ lzKlasseDialog(sets[+b.getAttribute('data-lzk')]); }); });
+  if(!isTeacher) lzEigenLaden().then(function(eigen){
+    sets.forEach(function(set, i){
+      var info = document.getElementById('lzKarteInfo'+i), m = eigen[set.id] || {};
+      var n = set.ziele.filter(function(z){ return m[z.nr] === 'g'; }).length;
+      if(info && n) info.textContent = n + ' von ' + set.ziele.length + ' Lernzielen als «erreicht» eingeschätzt';
+    });
+  });
+}
+
+// Schüler:in: alle Lernziele mit Übungsstand, Selbsteinschätzung und «Dazu üben».
+function lzDialog(set){
+  var isTeacher = state.profile.role === 'teacher';
+  openModal('<h2>🎯 '+esc(set.titel || 'Lernziele')+'</h2><p class="lz-lead">Wird geladen …</p>', 'lz-modal');
+  progressMeldungFlush();
+  Promise.all([lzEigenLaden(), lzStatsLaden(state.user.uid, set)]).then(function(r){
+    var eigen = r[0], stand = lzStand(set, r[1]);
+    function zeileHtml(z){
+      var s = stand[z.nr], stufe = lzStufe(s), m = (eigen[set.id] || {})[z.nr] || '';
+      var pct = s.tot ? Math.round(s.ok / s.tot * 100) : 0;
+      var fr = lzFragen(set, z.nr).filter(function(x){ return state.resources.some(function(res){ return res.id === x.rid; }); });
+      var tipp = '';
+      if(s.tot && m === 'g' && pct < 50) tipp = 'Übe hier noch weiter: erst ' + s.ok + ' von ' + s.tot + ' Fragen richtig.';
+      else if(s.tot && pct >= 80 && m !== 'g') tipp = 'Stark geübt! Passt «erreicht» schon?';
+      return '<div class="lz-zeile"><div class="lz-nr">'+esc(z.nr)+'</div><div class="lz-haupt">'+
+        '<div class="lz-text">'+esc(z.text)+'</div>'+
+        (s.tot ? '<div class="lz-balken lz-b-'+stufe+'"><span style="width:'+pct+'%"></span></div><small class="lz-klein">'+s.ok+' von '+s.tot+' Fragen richtig'+(s.ver ? '' : ' – noch nicht geübt')+'</small>'
+               : '<small class="lz-klein">Dazu gibt es keine Fragen in der Übung – schätz dich selbst ein.</small>')+
+        (tipp ? '<small class="lz-tipp">💡 '+esc(tipp)+'</small>' : '')+
+        '<div class="lz-knoepfe">'+LZ_WERTE.map(function(w){
+          return '<button type="button" class="lz-wahl lz-w-'+w[0]+(m === w[0] ? ' an' : '')+'" data-nr="'+esc(z.nr)+'" data-w="'+w[0]+'">'+w[1]+'</button>'; }).join('')+
+        (fr.length ? '<button type="button" class="btn btn-ghost btn-sm lz-ueben" data-ueben="'+esc(z.nr)+'">▶ Dazu üben</button>' : '')+
+        '</div></div></div>';
+    }
+    function malen(){
+      var h = '<h2>🎯 '+esc(set.titel || 'Lernziele')+'</h2>'+
+        '<p class="lz-lead">'+(isTeacher ? 'So sehen es die Schüler:innen (hier mit deinem eigenen Stand).' : 'Der Balken zeigt, wie viele Fragen du in der Übung schon richtig hast. Schätz dich bei jedem Lernziel selbst ein – wie auf dem Lernzielblatt.')+'</p>'+
+        '<div class="lz-liste">'+set.ziele.map(zeileHtml).join('')+'</div>'+
+        '<div class="modal-actions"><button class="btn btn-primary" id="lzZu" type="button">Schliessen</button></div>';
+      openModal(h, 'lz-modal');
+      document.getElementById('lzZu').addEventListener('click', function(){ closeModal(); lzKarteZeichnen(); });
+      Array.prototype.forEach.call(modalEl.querySelectorAll('.lz-wahl'), function(b){
+        b.addEventListener('click', function(){
+          var nr = lzNr(set, b.getAttribute('data-nr')), w = b.getAttribute('data-w');
+          var alt = (eigen[set.id] || {})[nr] || '';
+          lzSetzen(set, nr, alt === w ? '' : w);
+          var top = modalEl.querySelector('.modal').scrollTop;
+          malen();
+          modalEl.querySelector('.modal').scrollTop = top;
+        });
+      });
+      Array.prototype.forEach.call(modalEl.querySelectorAll('[data-ueben]'), function(b){
+        b.addEventListener('click', function(){
+          var nr = lzNr(set, b.getAttribute('data-ueben'));
+          var x = lzFragen(set, nr).filter(function(y){ return state.resources.some(function(res){ return res.id === y.rid; }); })[0];
+          var res = x && state.resources.find(function(y){ return y.id === x.rid; });
+          if(!res) return;
+          lz.start = {rid:res.id, ids:x.ids, titel:'Lernziel ' + nr, am:Date.now()};
+          closeModal();
+          goResource(res);
+        });
+      });
+    }
+    malen();
+  });
+}
+// data-Attribute sind Text; die Nummer im Set kann Zahl oder Text sein.
+function lzNr(set, text){
+  var z = set.ziele.find(function(y){ return String(y.nr) === String(text); });
+  return z ? z.nr : text;
+}
+
+// Lehrperson: Raster Schüler:in × Lernziel (Feld = Übungsstand, Punkt = Selbsteinschätzung).
+function lzKlasseDialog(set){
+  var subj = state.route.subject;
+  openModal('<h2>🎯 '+esc(set.titel || 'Lernziele')+' – Klasse</h2><p class="lz-lead">Wird geladen …</p>', 'lz-modal lz-modal-breit');
+  loadStudentRoster().then(function(list){
+    list = list.filter(function(s){ return gastImFach(s, subj); });
+    return Promise.all(list.map(function(s){
+      return Promise.all([
+        lzStatsLaden(s.uid, set),
+        getDoc(lzRef(s.uid)).then(function(d){ return d.exists() ? (d.data()[set.id] || {}) : {}; }, function(){ return {}; })
+      ]).then(function(r){ return {s:s, stand:lzStand(set, r[0]), selbst:r[1]}; });
+    }));
+  }).then(function(zeilen){
+    if(!modalEl.querySelector('.lz-modal')) return;
+    var punkt = {r:'🔴', a:'🟡', g:'🟢'};
+    var h = '<h2>🎯 '+esc(set.titel || 'Lernziele')+' – Klasse</h2>'+
+      '<p class="lz-lead">Feld = Übungsstand (richtig gelöste Fragen zum Lernziel): <span class="lz-z lz-z-gruen">ab 80 %</span> <span class="lz-z lz-z-gelb">ab 50 %</span> <span class="lz-z lz-z-rot">darunter</span> <span class="lz-z lz-z-leer">nicht geübt</span> · Punkt = Selbsteinschätzung (🔴 keine Ahnung, 🟡 teilweise, 🟢 erreicht).</p>'+
+      '<div class="lz-raster-wrap"><table class="lz-raster"><thead><tr><th>Name</th>'+
+      set.ziele.map(function(z){ return '<th title="'+esc(z.text).replace(/"/g,'&quot;')+'">'+esc(z.nr)+'</th>'; }).join('')+'</tr></thead><tbody>';
+    zeilen.forEach(function(x){
+      h += '<tr><td class="lz-name">'+esc(x.s.displayName || x.s.username || '')+'</td>'+set.ziele.map(function(z){
+        var s = x.stand[z.nr], m = x.selbst[z.nr];
+        return '<td class="lz-z lz-z-'+lzStufe(s)+'" title="'+esc(z.text).replace(/"/g,'&quot;')+'">'+(s.tot ? s.ok+'/'+s.tot : '–')+(punkt[m] ? '<span class="lz-p">'+punkt[m]+'</span>' : '')+'</td>';
+      }).join('')+'</tr>';
+    });
+    if(!zeilen.length) h += '<tr><td colspan="'+(set.ziele.length + 1)+'">Keine Schüler:innen gefunden.</td></tr>';
+    h += '</tbody></table></div><ol class="lz-legende">'+set.ziele.map(function(z){ return '<li value="'+(parseInt(z.nr, 10) || 0)+'">'+esc(z.text)+'</li>'; }).join('')+'</ol>'+
+      '<div class="modal-actions"><button class="btn btn-primary" id="lzZu" type="button">Schliessen</button></div>';
+    openModal(h, 'lz-modal lz-modal-breit');
+    document.getElementById('lzZu').addEventListener('click', closeModal);
+  }).catch(function(err){ console.error('Lernziele Klasse', err); toast('Die Lernziele der Klasse konnten nicht geladen werden.'); });
+}
+
+// Meldungen der Übung: Einschätzung abgleichen und nach «Dazu üben» die Fragen mitgeben.
+window.addEventListener('message', function(e){
+  var d = e.data;
+  if(!d || !state.user || !(d.__libBereit || d.__libLernziel)) return;
+  var fenster = libFensterVonQuelle(e.source);
+  var rid = fenster ? fenster.rid : currentViewerResourceId;
+  var set = rid && lz.bekannt[rid];
+  if(!set) return;
+  if(d.__libLernziel){
+    var z = set.ziele[d.idx];
+    if(z) lzSetzen(set, z.nr, LZ_VON_UEBUNG[d.val] || '');
+    return;
+  }
+  lzEigenLaden().then(function(eigen){
+    var m = eigen[set.id] || {}, aus = {}, alt = d.ziele || {};
+    set.ziele.forEach(function(z, i){
+      // Bisher nur in der Übung eingeschätzt → in die Library übernehmen.
+      if(!m[z.nr] && LZ_VON_UEBUNG[alt[i]]) lzSetzen(set, z.nr, LZ_VON_UEBUNG[alt[i]]);
+      else if(m[z.nr]) aus[i] = LZ_ZU_UEBUNG[m[z.nr]];
+    });
+    try{
+      if(Object.keys(aus).length) e.source.postMessage({__libLernziele:aus}, '*');
+      if(lz.start && lz.start.rid === rid && Date.now() - lz.start.am < 60000) e.source.postMessage({__libStart:{ids:lz.start.ids, titel:lz.start.titel}}, '*');
+    }catch(err){}
+    if(lz.start && lz.start.rid === rid) lz.start = null;
+  });
+});
+
 function renderFolderContents(){
   var listEl = document.getElementById('resourceList');
   if(!listEl) return;
@@ -16463,6 +16717,7 @@ function renderFolderContents(){
   var grFachEl = document.getElementById('gruppenFach');
   if(grFachEl) grFachEl.hidden = !!here;   // Gruppen-Übungen nur auf der Fach-Hauptebene
   bkListeZeichnen();
+  lzKarteZeichnen();
 
   var folders = foldersIn(here);
   // imHub: SIKORE und Tipptrainer stehen im ⚡ Übungstrainer, nicht noch einmal im Fach.
@@ -25878,6 +26133,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-11-11-lernziele', datum:'2026-11-11', fuer:'lehrer', text:'🎯 Lernziele (Pilot in Biologie G3b): Ein Ordner kann neu die Lernziele einer Prüfung tragen. Die Klasse sieht pro Lernziel einen Balken aus dem Übungsstand, schätzt sich mit drei Farben selbst ein und übt mit «Dazu üben» genau die passenden Fragen. Du siehst unter «👥 Klasse ansehen» das Raster Schüler:in × Lernziel.'},
   {id:'2026-11-11-pip-app', datum:'2026-11-11', fuer:'lehrer', text:'📌 Anpinnen (Lernphase, Prüfung): In der installierten Library-App öffnet sich jetzt zuverlässig ein schwebendes Fenster, das sich frei verschieben lässt – auch auf den zweiten Bildschirm.'},
   {id:'2026-11-11-lernphase-zwei-tabs', datum:'2026-11-11', fuer:'lehrer', text:'📚 Lernphase: Wer die Library in zwei Tabs oder Fenstern offen hat, wird nicht mehr fälschlich rot — der Tab im Hintergrund überschreibt den Tab, in dem gearbeitet wird, nicht mehr.'},
   {id:'2026-11-10-datum-sortiert', datum:'2026-11-10', fuer:'lehrer', text:'📅 Material mit Datum im Titel (z. B. «Di 03.11. · Rollenkarten») steht jetzt immer chronologisch, nicht mehr nach Wochentag sortiert.'},

@@ -19,6 +19,8 @@
  *                                      Quittung + Übersicht «1 von 2 eingeworfen»
  *                                      (nicht geprüft: «Leeren» in einen Ordner – braucht einen echten Ordner-Dialog)
  *   👀 Schulleitung                    sieht alles, kann nichts anlegen oder einwerfen
+ *   🎯 Lernziele                       Ordner mit Lernzielen: Selbsteinschätzung, «Dazu üben» gibt der Übung die
+ *                                      Fragen mit, Übungsstand pro Lernziel, Raster der Lehrperson
  */
 const B = require('./_basis.js');
 const { db, ok, bis, abschnitt } = B;
@@ -33,7 +35,23 @@ const UEBUNG = '<!doctype html><html><head><meta charset="utf-8"><title>Sync-Üb
   'document.getElementById("melden").addEventListener("click",function(){parent.postMessage({__libProgress:true,stats:{q1:{status:"correct"},q2:{status:"wrong"}},total:2},"*");});' +
   '<\/script></body></html>';
 
+// Übung, die das Lernziel-Protokoll spricht (wie die echten Übungsseiten ab 11.11.2026).
+const LZ_UEBUNG = '<!doctype html><html><head><meta charset="utf-8"><title>Lernziel-Übung</title></head><body>' +
+  '<div id="start"></div><div id="ziele"></div><button id="melden" type="button">melden</button><button id="schaetzen" type="button">schätzen</button><script>' +
+  'window.addEventListener("message",function(e){var d=e.data||{};' +
+  'if(d.__libStart)document.getElementById("start").textContent=d.__libStart.titel+":"+d.__libStart.ids.slice().sort().join(",");' +
+  'if(d.__libLernziele)document.getElementById("ziele").textContent=JSON.stringify(d.__libLernziele);});' +
+  'document.getElementById("melden").addEventListener("click",function(){parent.postMessage({__libProgress:true,stats:{q1:{status:"correct"},q2:{status:"wrong"}},total:3},"*");});' +
+  'document.getElementById("schaetzen").addEventListener("click",function(){parent.postMessage({__libLernziel:true,idx:1,val:"amber"},"*");});' +
+  'parent.postMessage({__libBereit:true,ziele:{2:"red"}},"*");' +
+  '<\/script></body></html>';
+const LZ_SET = { id: 'lz_test', titel: 'Test-Lernziele', ziele: [{ nr: 1, text: 'Erstes Lernziel' }, { nr: 2, text: 'Zweites Lernziel' }, { nr: 3, text: 'Drittes Lernziel' }],
+  fragen: { r_lz: { q1: [1], q2: [1], q3: [2] } } };
+const lzDoc = uid => db.doc('progress/' + uid + '/erledigt/lernziele').get().then(s => (s.data() || {}).lz_test || {});
+
 async function seed(){
+  await db.doc('klassen/' + K + '/folders/f_lz').set({ subject: 'mathe', parentId: null, name: 'Lernziel-Ordner', order: 1, lernziele: [LZ_SET] });
+  await B.uebung(K, 'r_lz', { subject: 'mathe', title: 'Lernziel-Übung', folderId: 'f_lz' }, LZ_UEBUNG);
   await B.konto('testlehrer', 'Test Lehrperson', 'teacher', K);
   await B.konto('anna', 'Anna', 'student', K);
   await B.konto('ben', 'Ben', 'student', K);
@@ -277,6 +295,52 @@ const feldWert = p => feld(p).inputValue().catch(() => null);
     await sl.waitForTimeout(500);
     ok((await db.collection('klassen/' + K + '/resources').get()).size === vorher, 'In der Klasse hat sich durch den Besuch nichts verändert');
     await sl.context().close();
+  });
+
+  await abschnitt('🎯 Lernziele', async () => {
+    const anna = await B.geraet('anna-lz'), lp = await B.geraet('lehrer-lz');
+    await B.anmelden(anna, 'anna'); await B.fach(anna, 'mathe');
+    ok(!(await anna.$('.lz-karte')), 'Auf der Fach-Hauptebene (ohne Lernziele) steht keine Lernziel-Karte');
+    await anna.click('#fopen-f_lz');
+    await anna.waitForSelector('.lz-karte [data-lz]');
+    ok(/Test-Lernziele/.test(await anna.$eval('.lz-karte', e => e.innerText)), 'Im Ordner erscheint die Karte «Lernziele: Test-Lernziele»');
+    await anna.click('.lz-karte [data-lz]');
+    await anna.waitForSelector('.lz-zeile');
+    const zeilen = await anna.$$eval('.lz-zeile', l => l.map(e => e.innerText.replace(/\s+/g, ' ')));
+    ok(zeilen.length === 3 && /0 von 2 Fragen richtig/.test(zeilen[0]) && /0 von 1 Fragen/.test(zeilen[1]) && /keine Fragen/.test(zeilen[2]), 'Drei Lernziele mit Übungsstand (0 von 2, 0 von 1, ohne Fragen)');
+    ok((await anna.$$('.lz-zeile:nth-child(3) [data-ueben]')).length === 0, 'Lernziel ohne Fragen hat kein «Dazu üben»');
+    await anna.click('.lz-wahl[data-nr="1"][data-w="g"]');
+    await bis(async () => (await lzDoc('u_anna'))['1'] === 'g', 'Selbsteinschätzung gespeichert');
+    ok(true, 'Selbsteinschätzung «erreicht» für Lernziel 1 ist gespeichert');
+    await anna.click('[data-ueben="1"]');
+    const f = anna.frameLocator('#resourceFrame');
+    await bis(async () => (await f.locator('#start').textContent().catch(() => '')) === 'Lernziel 1:q1,q2', '«Dazu üben» gibt die Fragen mit');
+    ok(true, '«Dazu üben» öffnet die Übung mit genau den Fragen des Lernziels (q1, q2)');
+    ok(/"0":"green"/.test(await f.locator('#ziele').textContent()), 'Die Übung bekommt die Einschätzung aus der Library');
+    await bis(async () => (await lzDoc('u_anna'))['3'] === 'r', 'Einschätzung aus der Übung übernommen');
+    ok(true, 'Eine Einschätzung, die es nur in der Übung gab, wird übernommen (Lernziel 3)');
+    await f.locator('#schaetzen').click();
+    await bis(async () => (await lzDoc('u_anna'))['2'] === 'a', 'Klick in der Übung gespeichert');
+    ok(true, 'Einschätzen in der Übung landet in der Library (Lernziel 2 «teilweise»)');
+    await f.locator('#melden').click();
+    await anna.click('#backBtn');
+    await bis(async () => ((await db.doc('progress/u_anna/resources/r_lz').get()).data() || {}).stats, 'Übungsstand gespeichert');
+    await anna.waitForSelector('.lz-karte [data-lz]');
+    await anna.click('.lz-karte [data-lz]');
+    await bis(async () => /1 von 2 Fragen richtig/.test(await anna.$eval('.modal', e => e.innerText).catch(() => '')), 'Balken zeigt 1 von 2');
+    ok(true, 'Nach dem Üben zeigt Lernziel 1 «1 von 2 Fragen richtig»');
+
+    await B.anmelden(lp, 'testlehrer'); await B.fach(lp, 'mathe');
+    await lp.click('#fopen-f_lz');
+    await lp.waitForSelector('.lz-karte [data-lzk]');
+    await lp.click('.lz-karte [data-lzk]');
+    await lp.waitForSelector('.lz-raster tbody tr');
+    const raster = await lp.$$eval('.lz-raster tbody tr', l => l.map(e => e.innerText.replace(/\s+/g, ' ')));
+    const za = raster.find(z => /^Anna/.test(z)) || '', zb = raster.find(z => /^Ben/.test(z)) || '';
+    ok(/1\/2 ?🟢/.test(za) && /0\/1 ?🟡/.test(za) && /– ?🔴/.test(za), 'Lehrperson: Annas Zeile zeigt 1/2 🟢, 0/1 🟡, – 🔴');
+    ok(/0\/2/.test(zb) && !/🟢|🟡|🔴/.test(zb), 'Ben: nichts geübt, keine Einschätzung');
+    if(process.env.DEBUG_DIR) await lp.screenshot({ path: process.env.DEBUG_DIR + '/lz-raster.png' });
+    for(const p of [anna, lp]) await p.context().close();
   });
 
   await B.ende('Ablauf-Test');
