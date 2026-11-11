@@ -2908,6 +2908,7 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
   .pr-q-kontext{color:var(--text-muted);font-size:14px;line-height:1.45;margin:0 0 10px;}
   .pr-q-bild{--accent:#3A3F73;--klick:#E8752C;--m:#7048e8;--normal:#2E9E5B;color:var(--text);max-width:420px;margin:0 auto 12px;}
   .pr-q-bild svg{max-width:100%;height:auto;}
+  .pr-q-bild:has(image){max-width:640px;}   /* Foto/Abbildung aus der Prüfungsdatei: braucht mehr Platz als eine Skizze */
   .pr-q-frage{font-size:18px;font-weight:700;line-height:1.4;margin:0 0 14px;}
   .pr-q-opts{display:flex;flex-direction:column;gap:8px;}
   /* ✍️ Rechtschreib-Prüfung (Lücken, Auswahl, Hördiktat) */
@@ -40972,6 +40973,10 @@ function pruefAusConfig(cfg){
         else f = {typ:'offen', frage:q, loesung:String(o.a || o.answer || ''), stichworte:o.stichworte};
         f.punkte = +o.punkte > 0 ? +o.punkte : null;
         if(Array.isArray(o.lz)) f.lz = o.lz;
+        // 🖼️ Bild zur Online-Frage: "bild" an der Frage oder an «online» – ein Schlüssel aus
+        // cfg.bilder ({name:'<svg…>'}) oder direkt ein SVG. Gleiche Bilder werden nur einmal gespeichert.
+        var bk = o.bild != null ? o.bild : on.bild, bs = bk && cfg.bilder && typeof cfg.bilder[bk] === 'string' ? cfg.bilder[bk] : (typeof bk === 'string' && bk.charAt(0) === '<' ? bk : '');
+        if(bs) f.bild = bs;
         fr.push(f);
       });
     } else if(Array.isArray(a.optionen) && a.optionen.length){
