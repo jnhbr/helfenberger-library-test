@@ -19412,15 +19412,19 @@ async function writeProgressWithHistory(uid, rid, newFields, basisRev){
     }
   }
   var before = null, bk = progressBekannt[uid + '/' + rid];
-  if(newFields.storeJson && newFields.storeJson.indexOf(LESEREISE_KEY) >= 0){
-    // Lesereise im Stand: nie ohne frischen Blick auf den Server schreiben (kein blindes Überschreiben aus Zwischenspeicher/Offline).
+  if(newFields.storeJson){
+    // Für ALLE Übungen (17.11.2026): ein Übungsstand wird nie ohne frischen Blick auf den Server geschrieben – kein blindes
+    // Überschreiben aus Zwischenspeicher/Offline-Warteschlange. Server nicht erreichbar → nichts schreiben, der Stand bleibt lokal.
     try{
       var sv = await getDocFromServer(ref_);
       before = sv.exists() ? sv.data() : null;
       if(before && before.storeJson){ newFields = Object.assign({}, newFields, {storeJson: lesereiseSchutz(newFields.storeJson, before.storeJson)}); }
+      if(before && before.storeJson && typeof before.storeRev === 'number' && newFields.storeJson !== before.storeJson && !newFields.vorher){
+        newFields = Object.assign({}, newFields, {vorher: {at: Date.now(), rev: before.storeRev, storeJson: before.storeJson}});
+      }
       bk = null;
     }catch(e){
-      console.warn('Lesereise: Server nicht erreichbar – nicht überschrieben, bleibt lokal bis zum nächsten Speichern', e);
+      console.warn('Übungsstand: Server nicht erreichbar – nicht überschrieben, bleibt lokal bis zum nächsten Speichern', e);
       return;
     }
   }
