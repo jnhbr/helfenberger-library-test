@@ -5556,6 +5556,20 @@ window.folienNamenLaden = function(){
   return mitRoster().then(function(l){ var n = l.filter(function(x){ return !x.mitAus; }).map(function(x){ return x.displayName; }); window.__libNamenFolien = n; return n; });
 };
 window.folienMitKurz = function(){ try{ return mitKurz(); }catch(e){ return ''; } };
+// Klassenwahl direkt im Popup (eigenes Folien-Fenster: der Dialog der Library läge im verdeckten Hauptfenster)
+window.folienKlassenOptionen = function(){
+  var w = mitWahlNorm(JSON.parse(JSON.stringify(mitWahl())));
+  var o = [{q:'', text:klasseLabel()}];
+  abstAlleKlassen().forEach(function(k){ if(k !== state.klasse) o.push({q:'k:'+k, text:k}); });
+  ((mit.gruppen)||[]).forEach(function(g){ o.push({q:'g:'+g.id, text:'👥 '+g.name}); });
+  o.forEach(function(x){ x.an = w.quellen.indexOf(x.q) >= 0; });
+  return o;
+};
+window.folienKlasseSetzen = function(q, fertig){
+  var w = mitWahlNorm({quellen:[q]});
+  mitWahlSetzen(w);
+  return window.folienNamenLaden().then(function(){ if(fertig) fertig(); });
+};
 window.folienWerMachtMit = function(fertig){
   try{ window.focus(); }catch(e){}
   mitDialog(function(){ window.folienNamenLaden().then(function(){ fertig(); }); }, function(){});
@@ -17938,6 +17952,19 @@ function folienZufallSkript(){
     el(d, 'zf-mn').onclick = function(){ if(!S.lauf){ S.mode = 'normal'; malen(); } };
     el(d, 'zf-wer').onclick = function(){
       var h = host(); if(!h || S.lauf) return;
+      if(h.folienKlassenOptionen && h === window.opener && window.parent === window){
+        var m = el(d, 'zf-wm');
+        if(m){ m.remove(); return; }
+        m = d.createElement('div'); m.id = 'zf-wm';
+        m.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:6px 0';
+        h.folienKlassenOptionen().forEach(function(x){
+          var b = d.createElement('button'); b.type = 'button'; b.textContent = x.text + (x.an ? ' ✓' : ''); knopfStil(b, x.an);
+          b.onclick = function(){ h.folienKlasseSetzen(x.q, function(){ S.gez = {}; S.res = ''; S.anz = ''; S.liste = null; malen(); }); };
+          m.appendChild(b);
+        });
+        el(d, 'zf-wer').insertAdjacentElement('afterend', m);
+        return;
+      }
       h.folienWerMachtMit(function(){ S.gez = {}; S.res = ''; S.anz = ''; S.liste = null; malen(); });
     };
     el(d, 'zf-go').onclick = ziehen;
