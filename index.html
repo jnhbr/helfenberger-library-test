@@ -17879,8 +17879,18 @@ function folienZufallSkript(){
   window.open = function(){ var w = ow.apply(window, arguments); if(arguments[1] === 'folienReferent' && w) ref = w; return w; };
   var FARBEN = ['#3A3F73','#E63950','#2E9E5B','#E8B72C','#4A7FD9','#8E5BC8','#F08A3C','#1FA3A3'];
   var TAU = Math.PI * 2;
+  // Obere Leiste im Schwarz des Library-Rahmens (#1D1D1B)
+  try{ var st = document.createElement('style'); st.textContent = ':root{--fl-bar:#1D1D1B !important}#fl-bar{background:#1D1D1B !important}'; document.head.appendChild(st); }catch(e){}
+  // Namen: im Viewer-Frame vom Elternfenster, im eigenen Fenster vom Opener (die Library setzt window.__libNamenFolien)
+  function namen(){
+    var q = [window.__libNamen];
+    try{ q.push(window.parent && window.parent.__libNamenFolien); }catch(e){}
+    try{ q.push(window.opener && window.opener.__libNamenFolien); }catch(e){}
+    for(var i = 0; i < q.length; i++) if(q[i] && q[i].length) return q[i];
+    return [];
+  }
   function alle(){
-    var n = (window.__libNamen || []).filter(Boolean);
+    var n = namen().filter(Boolean);
     if(!n.length){ n = []; for(var i = 1; i <= 24; i++) n.push(String(i)); }
     return n;
   }
@@ -17947,7 +17957,7 @@ function folienZufallSkript(){
       el(d, 'zf-r').textContent = S.res || '';
       el(d, 'zf-w').checked = S.weg;
       el(d, 'zf-go').disabled = S.lauf; el(d, 'zf-go').style.opacity = S.lauf ? .5 : 1;
-      el(d, 'zf-i').textContent = (window.__libNamen && window.__libNamen.length ? '' : 'Keine Klassenliste gefunden – es werden Nummern gezogen. ') + pool().length + ' von ' + alle().length + ' im Topf';
+      el(d, 'zf-i').textContent = (namen().length ? '' : 'Keine Klassenliste gefunden – es werden Nummern gezogen. ') + pool().length + ' von ' + alle().length + ' im Topf';
       if(S.mode === 'rad') rad(el(d, 'zf-c'), list);
       var b = el(d, o.k === 'main' ? 'fl-zufall' : 'r-zf'); if(b) b.classList.toggle('on', S.open);
     });
@@ -19991,7 +20001,7 @@ function renderResource(r){
       frame.addEventListener('load', function(){
         try{ frame.contentWindow.focus(); }catch(e){}
         // 🎲 Zufall: Namen der Klasse («Wer macht mit?») an die Folien reichen
-        if(istLP) mitRoster().then(function(l){ try{ frame.contentWindow.__libNamen = l.filter(function(x){ return !x.mitAus; }).map(function(x){ return x.displayName; }); }catch(e){} }).catch(function(){});
+        if(istLP) mitRoster().then(function(l){ var n = l.filter(function(x){ return !x.mitAus; }).map(function(x){ return x.displayName; }); window.__libNamenFolien = n; try{ frame.contentWindow.__libNamen = n; }catch(e){} }).catch(function(){});
       }, {once:true});
       var kopf = '<head><script>window.__libLehrer = '+(istLP ? 'true' : 'false')+';<\/script>' + (istLP ? '<script>('+folienZufallSkript.toString()+')();<\/script>' : '');
       frame.srcdoc = html.replace(/<head>/i, function(){ return kopf; });
