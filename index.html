@@ -19354,7 +19354,15 @@ function lesereiseSchutz(neuJson, altJson){
   try{
     var N = JSON.parse(neuJson), A = JSON.parse(altJson);
     if(!N || !A || typeof N[LESEREISE_KEY] !== 'string' || typeof A[LESEREISE_KEY] !== 'string') return neuJson;
-    var z = lesereiseZusammen(N[LESEREISE_KEY], A[LESEREISE_KEY]);
+    var nl = N[LESEREISE_KEY];
+    // Neuer Stand ganz ohne gelöste Station, Cloud hat welche: frisches/leeres Gerät, kein Zurücksetzen → Cloud-Stand gewinnt.
+    // (Ein gewolltes Zurücksetzen macht die Lehrperson in der Cloud, nicht ein Schüler-Gerät beim blossen Speichern.)
+    try{
+      var no = JSON.parse(nl), ao = JSON.parse(A[LESEREISE_KEY]);
+      var gel = function(o){ return o && o.st && Object.keys(o.st).some(function(i){ return o.st[i] && o.st[i].done; }); };
+      if(!gel(no) && gel(ao)){ no.savedAt = 0; nl = JSON.stringify(no); }
+    }catch(e){}
+    var z = lesereiseZusammen(nl, A[LESEREISE_KEY]);
     if(!z || z.json === N[LESEREISE_KEY]) return neuJson;
     N[LESEREISE_KEY] = z.json; return JSON.stringify(N);
   }catch(e){ return neuJson; }
@@ -19376,6 +19384,10 @@ async function standTransaktionLauf(ref_, newFields, basisRev){
         }
       }catch(e){ console.error('Stand zusammenführen', e); }
       if(before.storeJson !== f.storeJson) f.vorher = {at: Date.now(), rev: before.storeRev, storeJson: before.storeJson};
+    }
+    // Für ALLE Übungen: wird ein anderer Cloud-Stand ersetzt, bleibt die Fassung davor im Dokument («vorher») – unabhängig von basisRev.
+    if(!f.vorher && before && before.storeJson && typeof before.storeRev === 'number' && f.storeJson && before.storeJson !== f.storeJson){
+      f.vorher = {at: Date.now(), rev: before.storeRev, storeJson: before.storeJson};
     }
     var vor = f.vorher || (before && before.vorher);
     if(vor && vor.storeJson && f.storeJson.length + vor.storeJson.length > 850000) f.vorher = deleteField();
