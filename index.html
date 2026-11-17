@@ -19348,10 +19348,25 @@ function standTransaktion(ref_, newFields, basisRev){
     lauf.then(function(r){ clearTimeout(t); ok(r); }, function(e){ clearTimeout(t); fehl(e); });
   });
 }
+// Lesereise-Schutz (17.11.2026, Feyza: 32 Stationen auf 22 zurückgefallen): Stationen werden bei JEDEM Schreiben mit dem Cloud-Stand
+// zusammengeführt – unabhängig von basisRev, Zwischenspeicher oder Fallback. Nur der Schlüssel kbz_lesereise_v1 wird angefasst.
+function lesereiseSchutz(neuJson, altJson){
+  try{
+    var N = JSON.parse(neuJson), A = JSON.parse(altJson);
+    if(!N || !A || typeof N[LESEREISE_KEY] !== 'string' || typeof A[LESEREISE_KEY] !== 'string') return neuJson;
+    var z = lesereiseZusammen(N[LESEREISE_KEY], A[LESEREISE_KEY]);
+    if(!z || z.json === N[LESEREISE_KEY]) return neuJson;
+    N[LESEREISE_KEY] = z.json; return JSON.stringify(N);
+  }catch(e){ return neuJson; }
+}
 async function standTransaktionLauf(ref_, newFields, basisRev){
   return runTransaction(db, async function(tx){
     var snap = await tx.get(ref_), before = snap.exists() ? snap.data() : null;
     var f = Object.assign({}, newFields), zusammen = false;
+    if(before && before.storeJson && f.storeJson){
+      var s2 = lesereiseSchutz(f.storeJson, before.storeJson);
+      if(s2 !== f.storeJson){ f.storeJson = s2; zusammen = true; if(typeof before.storeRev === 'number') f.vorher = {at: Date.now(), rev: before.storeRev, storeJson: before.storeJson}; }
+    }
     if(before && before.storeJson && typeof before.storeRev === 'number' && before.storeRev > basisRev){
       try{
         var z = standZusammen(f.storeJson, before.storeJson);
@@ -19385,7 +19400,19 @@ async function writeProgressWithHistory(uid, rid, newFields, basisRev){
     }
   }
   var before = null, bk = progressBekannt[uid + '/' + rid];
-  if(bk && Date.now() - bk.at < PROGRESS_BEKANNT_MS) before = bk.data;
+  if(newFields.storeJson && newFields.storeJson.indexOf(LESEREISE_KEY) >= 0){
+    // Lesereise im Stand: nie ohne frischen Blick auf den Server schreiben (kein blindes Überschreiben aus Zwischenspeicher/Offline).
+    try{
+      var sv = await getDocFromServer(ref_);
+      before = sv.exists() ? sv.data() : null;
+      if(before && before.storeJson){ newFields = Object.assign({}, newFields, {storeJson: lesereiseSchutz(newFields.storeJson, before.storeJson)}); }
+      bk = null;
+    }catch(e){
+      console.warn('Lesereise: Server nicht erreichbar – nicht überschrieben, bleibt lokal bis zum nächsten Speichern', e);
+      return;
+    }
+  }
+  else if(bk && Date.now() - bk.at < PROGRESS_BEKANNT_MS) before = bk.data;
   else try{
     var snap = await getDoc(ref_);
     before = snap.exists() ? snap.data() : null;
