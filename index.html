@@ -7595,6 +7595,9 @@ var DIKTAT_RULE_META = {
   ableiten:    {name:'Ableiten/Stammprinzip', icon:'🔄', color:'#7a4a5a'},
   merkwoerter: {name:'Merkwörter', icon:'🎯', color:'#b8355c'},
   endungen:    {name:'Endungen', icon:'📝', color:'#556270'},
+  dasdass:     {name:'das oder dass', icon:'⚖️', color:'#3b5b5b'},
+  dehnung_ie:  {name:'Dehnung mit ie', icon:'🌾', color:'#c27c0e'},
+  satzzeichen: {name:'Satzzeichen', icon:'✒️', color:'#26201a'},
   sonstige:    {name:'Sonstige Fehler', icon:'❓', color:'#6b5f4e'}
 };
 
@@ -7602,6 +7605,21 @@ var DIKTAT_RULE_META = {
 // den jeweils letzten Diktatversuch (aus progress/{uid}/resources/{rid}) und
 // fasst die Fehlerkategorien pro Schüler:in zusammen. Einmaliger Ladevorgang
 // (kein Live-Listener) - die Ansicht hat einen "Neu laden"-Knopf.
+// Neuester Diktatversuch über alle "..._attempts"-Schlüssel einer Übung
+// (Niveau-Diktate speichern pro Niveau einen eigenen Schlüssel _n1/_n2/_n3_attempts).
+function diktatLetzterVersuch(store){
+  var best = null, anzahl = 0;
+  Object.keys(store || {}).forEach(function(k){
+    if(!/_attempts$/.test(k)) return;
+    var arr; try{ arr = JSON.parse(store[k]); }catch(e){ return; }
+    if(!Array.isArray(arr) || !arr.length) return;
+    anzahl += arr.length;
+    var l = arr[arr.length-1];
+    if(!best || String(l.date||'') > String(best.date||'')) best = l;
+  });
+  return best ? { last: best, anzahl: anzahl } : null;
+}
+
 async function loadDiktatAuswertung(){
   var result = { resources: [], students: [], perStudent: {} };
 
@@ -7643,14 +7661,11 @@ async function loadDiktatAuswertung(){
     if(!data.storeJson) return;
     var store;
     try{ store = JSON.parse(data.storeJson); }catch(e){ return; }
-    var attemptsKey = Object.keys(store).filter(function(k){ return /_attempts$/.test(k); })[0];
-    if(!attemptsKey) return;
-    var attempts;
-    try{ attempts = JSON.parse(store[attemptsKey]); }catch(e){ return; }
-    if(!Array.isArray(attempts) || !attempts.length) return;
-    var last = attempts[attempts.length-1];
+    var lv = diktatLetzterVersuch(store);
+    if(!lv) return;
+    var last = lv.last;
     var bucket = result.perStudent[r.uid];
-    bucket.byResource[r.resId] = { pct: last.pct, date: last.date, attemptCount: attempts.length };
+    bucket.byResource[r.resId] = { pct: last.pct, date: last.date, attemptCount: lv.anzahl, level: last.level, note: last.note };
     Object.keys(last.weakness||{}).forEach(function(catId){
       var meta = DIKTAT_RULE_META[catId] ? catId : 'sonstige';
       bucket.categoryTotals[meta] = (bucket.categoryTotals[meta]||0) + last.weakness[catId];
@@ -7686,7 +7701,7 @@ function renderDiktatAuswertung(){
       h += '<tr><td>'+esc(stu.displayName)+'</td>';
       result.resources.forEach(function(res){
         var by = bucket.byResource[res.id];
-        h += '<td>'+(by ? by.pct+'%' : '<span class="muted">–</span>')+'</td>';
+        h += '<td>'+(by ? by.pct+'%' + (typeof by.note === 'number' ? '<br><span class="muted small">N' + esc(String(by.level||'')) + ' · Note ' + by.note.toFixed(1) + '</span>' : '') : '<span class="muted">–</span>')+'</td>';
       });
       h += '</tr>';
     });
@@ -19558,13 +19573,10 @@ function learnedSummary(data){
   if(data.storeJson){
     try{
       var store = JSON.parse(data.storeJson);
-      var attemptsKey = Object.keys(store).filter(function(k){ return /_attempts$/.test(k); })[0];
-      if(attemptsKey){
-        var attempts = JSON.parse(store[attemptsKey]);
-        if(Array.isArray(attempts) && attempts.length){
-          var last = attempts[attempts.length-1];
-          return { kind:'diktat', attemptCount:attempts.length, pct:last.pct, correct:last.correct, total:last.total, lastDate:last.date };
-        }
+      var lv = diktatLetzterVersuch(store);
+      if(lv){
+        var last = lv.last;
+        return { kind:'diktat', attemptCount:lv.anzahl, pct:last.pct, correct:last.correct, total:last.total, lastDate:last.date };
       }
     }catch(e){}
   }
@@ -26756,6 +26768,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
+  {id:'2026-11-20-niveau-diktate', datum:'2026-11-20', fuer:'lehrer', text:'📊 Fehleranalyse Diktate kennt jetzt die neuen Niveau-Diktate (Deutsch › Diktate › Niveau-Diktate): gezählt wird der neueste Versuch über alle drei Niveaus, in der Tabelle stehen Niveau und Note. Neu als Fehlerarten: das/dass, Dehnung mit ie und Satzzeichen.'},
   {id:'2026-11-20-indiv-uebersicht', datum:'2026-11-20', fuer:'lehrer', text:'📌 Individuelle Übungen aufgeräumt: Die Übersicht zeigt pro Übung eine Karte mit «x/y gelöst» und den Namen als Chips (× entfernt eine Person, ⋯ entfernt für alle). Umschalter «Nach Person» zeigt alles pro Kind. Zuweisen und Sammelzuweisung sind hinter zwei Knöpfen oben, das Archiv ist unten nach Fächern eingeklappt.'},
   {id:'2026-11-20-rsw-abstreichen', datum:'2026-11-20', fuer:'alle', text:'✍️ Rechtschreib-Werkstatt: Bei Lückentexten mit «Wörter zum Einsetzen» kannst du ein Wort antippen, um es abzustreichen (nochmals antippen holt es zurück). Was du abgestrichen hast, bleibt gespeichert, dein bisheriger Stand auch.'},
   {id:'2026-11-20-pin-vollbild', datum:'2026-11-20', fuer:'lehrer', text:'📌 Das angepinnte Fenster (Lernphase/Prüfung) bleibt jetzt auch in der installierten App vor Apps im Vollbild sichtbar (als Bild-in-Bild). Es ist nur eine Anzeige, anklicken geht nicht.'},
