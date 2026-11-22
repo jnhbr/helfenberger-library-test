@@ -50,6 +50,8 @@
   .weiter.da{visibility:visible;}
   .meldung{font-size:1.2rem;font-weight:700;min-height:1.5em;text-align:center;}
   footer{font-size:.75rem;color:var(--muted);text-align:center;padding:6px 10px 10px;}
+  body.buehne{background:transparent;}
+  body.buehne header{background:transparent;border-bottom:0;}
   @media (max-width:640px){ .karten{flex-direction:column;align-items:center;} .vs{display:none;} .karte{width:100%;} .punkte{margin-left:0;} }
 </style>
 </head>
@@ -184,6 +186,8 @@
     var NAMEN = {flaeche:'Fläche', einwohner:'Einwohner', lebenserwartung:'Lebenserwartung', co2:'CO₂ pro Kopf', kinder:'Kinder pro Frau', internet:'Internetnutzung', wald:'Waldanteil', fleisch:'Fleischkonsum', bip:'Einkommen (BIP pro Kopf)', median:'Medianalter', stadt:'Stadtbevölkerung'};
     D.kennzahlen.forEach(function(k){ var o = document.createElement('option'); o.value = k.id; o.textContent = NAMEN[k.id] || k.id; sel.appendChild(o); });
     var q = new URLSearchParams(location.search);
+    // Im Klassenzimmer (Beamer-Bühne): immer zwei Teams, kein Allein-Modus, schlichter Kopf
+    if(q.get('buehne')){ st.modus = 'teams'; var mo = document.getElementById('modus'); mo.value = 'teams'; mo.parentNode.style.display = 'none'; document.querySelector('h1').style.display = 'none'; document.body.classList.add('buehne'); }
     if(q.get('thema') && kennzahl(q.get('thema'))){ st.kennzahl = q.get('thema'); sel.value = st.kennzahl; }
     punkteZeigen(); neueRunde();
   }).catch(function(){ document.getElementById('frage').textContent = 'Die Daten konnten nicht geladen werden.'; });
