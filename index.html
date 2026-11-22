@@ -512,9 +512,8 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
   .sim-filter{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;}
   .sim-filter input[type=search]{flex:1 1 220px;margin:0;}
   .sim-tabs{display:flex;gap:4px;flex-wrap:wrap;}
-  .sim-tabs .btn.active{background:var(--accent, #2f6fb5);color:#fff;}
   .sim-fachwahl{font-size:.9rem;display:flex;align-items:center;gap:6px;white-space:nowrap;}
-  .sim-liste{max-height:min(58vh,560px);overflow:auto;padding-right:4px;}
+  .sim-liste{max-height:max(180px, min(calc(100vh - 340px), 560px));overflow:auto;padding-right:4px;}
   .sim-thema{margin:14px 0 4px;font-size:.95rem;opacity:.75;}
   .sim-zeile{display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid rgba(127,127,127,.18);}
   .sim-ic{font-size:1.3rem;flex:none;}
@@ -17790,7 +17789,7 @@ function resourceCardHtml(r, index, total, isTeacher){
     html += '<button class="move-btn" id="down-'+r.id+'" type="button" title="Nach unten"'+(index===total-1?' disabled':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>';
     html += '</div>';
   }
-  if(!lp && !r.folien) html += '<div class="resource-ring" style="--p:0" title="Fortschritt"><span id="pbar-'+r.id+'">–</span></div>';
+  if(!lp && !r.folien && !r.externalUrl) html += '<div class="resource-ring" style="--p:0" title="Fortschritt"><span id="pbar-'+r.id+'">–</span></div>';
   html += '<div class="resource-info"><h4>'+esc(r.title || r.fileName)+(r.current?' <span class="chip-current">Aktuell</span>':'')+(lp?' <span class="chip-lehrer">🔒 Nur Lehrpersonen</span>':'')+(aus?' <span class="chip-lehrer">🙈 Ausgeblendet</span>':'')+niveauChipHtml(r, isTeacher)+'</h4>';
   var metaStart = r.methode ? '🧰 Methodenmaterial · ' + (r.methode.lektion ? esc(r.methode.lektion) + ' · ' : '') + (r.methode.menge ? esc(r.methode.menge) + ' · ' : '') + 'nur Lehrpersonen, zum Drucken' : lp && r.folien ? '🎞️ Folien · nur Lehrpersonen · Notizen + 🎤 Referentenansicht' : lp && r.pdf ? '📄 Lehrer-PDF · für Schüler:innen unsichtbar' : lp ? 'Lehrer-HTML · für Schüler:innen unsichtbar' : r.pdf ? '📄 PDF' : r.folien ? '🎞️ Folien · ▶ Präsentieren, Notizen nur für Lehrpersonen' : r.externalUrl ? (r.einbetten ? esc(r.linkLabel || '🔗 Link')+' · öffnet in der Library' : '🔗 Link · öffnet in neuem Tab') : 'Noch nicht geübt';
   if(aus) metaStart = 'Für Schüler:innen ausgeblendet · ' + metaStart;
@@ -19147,7 +19146,7 @@ function askSimKatalog(subjectId, folderId){
   );
   var liste = document.getElementById('simListe');
   function zeichnen(){
-    document.querySelectorAll('.sim-tabs [data-art]').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-art') === st.art); });
+    document.querySelectorAll('.sim-tabs [data-art]').forEach(function(b){ var an = b.getAttribute('data-art') === st.art; b.classList.toggle('btn-primary', an); b.classList.toggle('btn-ghost', !an); });
     var q = st.q.trim().toLowerCase();
     var treffer = SIM_KATALOG.filter(function(x){
       if(st.fach && x.f.indexOf(subjectId) < 0) return false;
