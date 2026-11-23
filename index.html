@@ -1968,7 +1968,9 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
   .uf-meta{color:var(--text-muted);font-size:15px;font-weight:600;}
   .uf-bars{display:flex;flex-direction:column;gap:10px;width:100%;}
   .uf-foto{max-width:760px;width:calc(100% - 32px);margin:0 auto 24px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;}
-  .uf-foto h4{margin:0 0 6px;font-size:16px;}
+  .uf-foto, .uf-foto h4, .uf-foto .lp-check, .uf-foto .lp-check span, .uf-foto .lp-check b{color:#1f2430;}   /* Beamer-Bühne (duck) färbt Text weiss */
+  .uf-foto{text-align:left;}
+  .uf-foto h4{margin:0 0 6px;font-size:18px;}
   .uf-foto img{display:block;width:100%;border-radius:8px;border:1px solid var(--border);margin:8px 0 4px;}
   .uf-bar{background:var(--surface-2);border-radius:12px;padding:16px 20px;position:relative;overflow:hidden;}
   .uf-bar-fill{position:absolute;inset:0 auto 0 0;background:var(--brand);opacity:.22;transition:width .35s ease;}
@@ -28817,7 +28819,11 @@ function umfrageFotoCanvas(erg, kopf){
     }
     y += 40;
   });
-  return c;
+  // Leerraum unten abschneiden (die Höhe oben ist grosszügig geschätzt)
+  var hoehe = Math.min(H, Math.ceil(y - 40 + P));
+  var aus = document.createElement('canvas'); aus.width = W; aus.height = hoehe;
+  aus.getContext('2d').drawImage(c, 0, 0);
+  return aus;
 }
 function umfrageFotoRund(ctx, x, y, w, h, r){
   ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
