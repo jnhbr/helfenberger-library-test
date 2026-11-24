@@ -17057,13 +17057,24 @@ function renderFolderContents(){
   // Pfeile/Nummern gelten nur unter den echten Einträgen.
   var realFolders = folders.filter(function(f){ return !f.virtual; });
   var realResources = resources.filter(function(r){ return !r.virtual; });
-  // 📋 Jahresplanung des Fachs auch in jedem anderen Ordner (gleiche Übung, nicht kopiert).
+  // 📋 Jahresplanung des Fachs nur in den Unterkapiteln = Ordnern ohne Unterordner (gleiche Übung, nicht kopiert).
+  // In Ordnern mit Unterordnern (z. B. «Themen», «6 Moderne») und auf der Hauptebene steht sie nicht –
+  // ausser das Fach hat gar keine solchen Ordner.
   var praepSpiegel = [];
-  if(isTeacher && here && !(fq && fq.ohneEigene)){
-    (state.resources || []).forEach(function(r){
-      if(r.subject === subjectId && (r.folderId || null) !== here && resources.indexOf(r) < 0 && jahresplanungIst(r) && fuerRolleSichtbar(r)) praepSpiegel.push(r);
-    });
-    resources = resources.concat(praepSpiegel);
+  if(isTeacher && !(fq && fq.ohneEigene)){
+    var fachOrdner = (state.folders || []).filter(function(f){ return !f.virtual && f.subject === subjectId; });
+    var istUnterkapitel = function(fid){
+      return !!fid && fachOrdner.some(function(f){ return f.id === fid; }) && !fachOrdner.some(function(f){ return f.parentId === fid; });
+    };
+    var hatUnterkapitel = fachOrdner.some(function(f){ return istUnterkapitel(f.id); });
+    if(istUnterkapitel(here)){
+      (state.resources || []).forEach(function(r){
+        if(r.subject === subjectId && (r.folderId || null) !== here && resources.indexOf(r) < 0 && jahresplanungIst(r) && fuerRolleSichtbar(r)) praepSpiegel.push(r);
+      });
+      resources = resources.concat(praepSpiegel);
+    } else if(hatUnterkapitel){
+      resources = resources.filter(function(r){ return !jahresplanungIst(r); });
+    }
   }
 
   if(!folders.length && !resources.length){
@@ -27136,7 +27147,7 @@ function aemtliMeineTermine_(cfg, uid){
    lesen kann. Was eine Person selbst schon gesehen hat, merkt sich der
    Browser (NEU_GESEHEN_KEY) — davon hängt nur das rote Leuchten ab. */
 const NEUIGKEITEN = [
-  {id:'2026-11-24-praep-zuoberst', datum:'2026-11-24', fuer:'lehrer', text:'📋 Präps stehen im Thema jetzt zuoberst im Zusatzmaterial. Eine Jahresplanung (z. B. Geschichte, Geografie) steht in jedem Ordner des Fachs zuoberst – es ist immer dieselbe Präp: einmal bearbeitet, überall aktuell.'},
+  {id:'2026-11-24-praep-zuoberst', datum:'2026-11-24', fuer:'lehrer', text:'📋 Präps stehen im Thema jetzt zuoberst im Zusatzmaterial. Eine Jahresplanung (z. B. Geschichte, Geografie) steht in jedem Unterkapitel des Fachs zuoberst (z. B. «Imperialismus und 1. Weltkrieg», «2. Weltkrieg») – es ist immer dieselbe Präp: einmal bearbeitet, überall aktuell.'},
   {id:'2026-11-24-neues-fenster-ueberall', datum:'2026-11-24', fuer:'lehrer', text:'⧉ Auch in eigenen Fenstern (Folien, Präp, Übungen) gibt es oben links den Knopf für ein neues Library-Fenster.'},
   {id:'2026-11-23-praep-lektion-verschieben', datum:'2026-11-23', fuer:'lehrer', text:'📅 Präp-Planungen (z. B. NT Biologie Körper): Ganze Lektionen lassen sich jetzt verschieben – am Griff ⠿ in der Titelzeile ziehen oder «📅 Tag» antippen und den Tag wählen. Was dort schon steht, und alles danach rutscht nach hinten, statt dass der Tag überfüllt wird. Wer etwas erst nachträglich abhakt, füllt damit nicht mehr den nächsten Unterrichtstag.'},
   {id:'2026-11-23-umfrage-foto', datum:'2026-11-23', fuer:'lehrer', text:'📸 Blitzumfrage: Resultat nicht mehr abfotografieren. Ist das Ergebnis aufgedeckt, legt «📸 Resultat speichern» es als Bild in einen Fach-Ordner, dort im Zusatzmaterial unter «📸 Umfrage-Resultate». Bei Umfragen mit mehreren Fragen speichert «📸 Resultate speichern» in der Übersicht alle auf einmal. Gestartet aus einem Ordner, ist dieser schon vorgewählt.'},
