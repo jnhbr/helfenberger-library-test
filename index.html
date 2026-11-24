@@ -46095,8 +46095,10 @@ function ladeQc(){
 }
 
 // Die Fehler des Pakets sind englisch — für die Lehrperson auf Deutsch.
-function qiFehlerText(err){
+function qiFehlerText(err, name){
   var c = err && err.code;
+  if((c === 'not-recognized' || c === 'no-questions') && /\.(pdf|docx?|pptx?|odt|pages|rtf)$/i.test(name || ''))
+    return 'PDFs, Word- und PowerPoint-Dateien (z. B. ein Dossier) liest der Import nicht. Er braucht einen Quiz-Export von Quizlet, Kahoot, Blooket, Moodle (GIFT/XML), Canvas/QTI, Blackboard, Brightspace, Respondus, Aiken oder Anki. Begriffe mit Antwort kannst du auch unten bei «Quizlet: Text einfügen» einfügen (Begriff, Tabulator, Antwort – eine Zeile pro Karte).';
   if(c === 'not-recognized') return 'Diese Datei kennt der Import nicht. Er liest Exporte bzw. Vorlagen von Quizlet, Kahoot, Blooket, Moodle (GIFT/XML), Canvas/QTI, Blackboard, Brightspace, Respondus, Aiken und Anki.';
   if(c === 'no-questions') return 'In dieser Datei wurden keine Fragen gefunden.';
   if(c === 'unsafe-archive') return 'Diese ZIP-Datei ist zu gross oder ungewöhnlich gebaut und wird darum nicht geöffnet.';
@@ -46296,10 +46298,13 @@ function openFragenImport(opt){
       umrechnen();
       schritt2();
     }).catch(function(err){
-      console.error('Fragen-Import', err);
+      // Falsche Datei gewählt ist kein Fehler der Library → nicht ins 🐞 Fehler-Log.
+      var c = err && err.code;
+      if(c === 'not-recognized' || c === 'no-questions' || c === 'unsafe-archive') console.warn('Fragen-Import', c, st.datei && st.datei.name);
+      else console.error('Fragen-Import', err);
       schritt1(err && err.qiLaden
         ? 'Der Import konnte nicht geladen werden – keine Verbindung oder ein älterer Browser. Bitte mit einem aktuellen Chrome, Edge oder Safari nochmals versuchen.'
-        : qiFehlerText(err));
+        : qiFehlerText(err, st.datei && st.datei.name));
     });
   }
 
