@@ -375,13 +375,15 @@ const feldWert = p => feld(p).inputValue().catch(() => null);
     // ✏️ Lernziele selbst anlegen (seit 25.11.2026): Ordner ohne Set → «🎯 Lernziele» → Editor.
     await lp.click('#backBtn');   // aus einem Ordner geht «Zurück» zur Startseite
     await B.fach(lp, 'mathe'); await lp.waitForSelector('#fopen-f_lz2');
+    ok(!(await lp.isVisible('#lzNeuBtn')), 'Auf der Fach-Hauptebene ist «🎯 Lernziele» ausgeblendet');
     await lp.click('#fopen-f_lz2');
-    await lp.waitForSelector('#lzNeuBtn');
+    await lp.waitForSelector('#lzNeuBtn', { state: 'visible' });
     ok(!(await lp.$('.lz-karte')), 'Editor-Ordner hat noch keine Lernziel-Karte');
     await lp.click('#lzNeuBtn');
     await lp.waitForSelector('#lzEZiele');
     await lp.fill('#lzETitel', 'Körper');
     await lp.fill('#lzEZiele', '1. Ich kenne das Herz.\n2) Ich kenne die Verdauung.\n\n- Ich kenne die Haut.');
+    if(process.env.DEBUG_DIR) await lp.screenshot({ path: process.env.DEBUG_DIR + '/lz-editor-1.png' });
     await lp.click('#lzEWeiter');
     await lp.waitForSelector('.lz-e-chip[data-q="a1"]', { timeout: 30000 });
     ok((await lp.$$('.lz-e-frage')).length === 3, 'Schritt 2 zeigt die drei Fragen der Übung (mit ID)');
@@ -391,6 +393,7 @@ const feldWert = p => feld(p).inputValue().catch(() => null);
     await lp.click('.lz-e-chip[data-q="a3"][data-nr="3"]');
     await lp.click('.lz-e-chip[data-q="a3"][data-nr="2"]');   // wieder weg
     ok(/1 Frage/.test(await lp.$eval('#lzELeg', e => e.innerText)), 'Die Legende zählt die zugeordneten Fragen pro Lernziel');
+    if(process.env.DEBUG_DIR) await lp.screenshot({ path: process.env.DEBUG_DIR + '/lz-editor-2.png' });
     await lp.click('#lzESpeichern');
     await bis(async () => (await lzOrdner('f_lz2')).length === 1, 'Set gespeichert');
     let sets = await lzOrdner('f_lz2');

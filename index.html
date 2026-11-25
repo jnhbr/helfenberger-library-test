@@ -44,7 +44,7 @@ function winterAn(){ var aus = false; try{ aus = localStorage.getItem('hl_winter
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js" crossorigin>
 <!-- Schriften und Bibliotheken liegen seit 08.10.2026 im eigenen Ordner assets/vendor/ (keine Abrufe mehr bei Google Fonts und jsdelivr). -->
 <link rel="stylesheet" href="assets/vendor/fonts/schriften.css">
-<link rel="stylesheet" href="app/stil.css?v=6d1bb1fdec">
+<link rel="stylesheet" href="app/stil.css?v=f2d40c4d23">
 <script>if(/-test\//.test(location.pathname))document.documentElement.classList.add('test-site');</script>
 </head>
 <body>
@@ -12337,7 +12337,8 @@ function renderSubject(subjectId, folderId){
       '<button class="btn btn-ghost btn-sm" id="kzmHolenBtn" type="button" title="Quiz, Karteikarten, Wortwolke oder Blitzumfrage hier ablegen">🏫 Aus dem Klassenzimmer</button>'+
       '<button class="btn btn-ghost btn-sm" id="dlHierBtn" type="button" title="Alle Dateien hier (mit allen Ordnern) als ZIP auf deinen Computer laden">⬇️ Alles herunterladen</button>'+
       (isLeitung() ? '' : '<button class="btn btn-ghost btn-sm" id="bkNeuBtn" type="button" title="Die Klasse gibt hier Dateien ab, du holst sie auf deinen Computer">📮 Briefkasten aufstellen</button>')+
-      (isLeitung() || !state.route.folderId ? '' : '<button class="btn btn-ghost btn-sm" id="lzNeuBtn" type="button" title="Lernziele für diesen Ordner festlegen und den Fragen der Übung zuordnen">🎯 Lernziele</button>')+
+      // 🎯 nur in einem Ordner sichtbar; die Leiste bleibt beim Ordnerwechsel stehen → renderFolderContents blendet ein/aus
+      (isLeitung() ? '' : '<button class="btn btn-ghost btn-sm" id="lzNeuBtn" type="button"'+(folderId ? '' : ' hidden')+' title="Lernziele für diesen Ordner festlegen und den Fragen der Übung zuordnen">🎯 Lernziele</button>')+
       '<div class="zieh-flaeche" id="ziehFlaeche">'+
         '<div class="dropzone" id="dropzone"><div class="dz-title">Für die Klasse</div><div>Datei hier loslassen (HTML, PDF, PowerPoint)</div></div>'+
         '<div class="dropzone dropzone-lp" id="dropzoneLp"><div class="dz-title">🔒 Nur Lehrpersonen</div><div>HTML, PDF oder PowerPoint hier loslassen</div></div>'+
@@ -12372,7 +12373,7 @@ function renderSubject(subjectId, folderId){
     var bkNeuBtn = document.getElementById('bkNeuBtn');
     if(bkNeuBtn) bkNeuBtn.addEventListener('click', function(){ bkEditor(null); });
     var lzNeuBtn = document.getElementById('lzNeuBtn');
-    if(lzNeuBtn) lzNeuBtn.addEventListener('click', function(){ lzOrdnerWahl(state.route.folderId); });
+    if(lzNeuBtn) lzNeuBtn.addEventListener('click', function(){ if(state.route.folderId) lzOrdnerWahl(state.route.folderId); });
     document.getElementById('newFolderBtn').addEventListener('click', function(){
       var here = state.route.folderId || null;
       if(folderDepth(here) >= MAX_FOLDER_DEPTH){
@@ -12833,7 +12834,7 @@ function lzEditor(folderId, set){
       var m = a.fragen[rid] || {};
       box.innerHTML = info.liste.map(function(q){
         var an = m[q.qid] || [];
-        return '<div class="lz-e-frage"><div class="lz-e-text">'+esc(q.text || q.qid)+(q.kat ? ' <small class="lz-klein">· '+esc(q.kat)+'</small>' : '')+'</div><div class="lz-e-chips">'+
+        return '<div class="lz-e-frage"><div class="lz-e-text">'+esc(q.text || q.qid)+(q.kat && q.kat !== 'alle' ? ' <small class="lz-klein">· '+esc(q.kat)+'</small>' : '')+'</div><div class="lz-e-chips">'+
           a.ziele.map(function(z){ return '<button type="button" class="lz-e-chip'+(an.indexOf(z.nr) >= 0 ? ' an' : '')+'" data-q="'+esc(q.qid)+'" data-nr="'+esc(z.nr)+'" title="'+esc(z.text).replace(/"/g, '&quot;')+'">'+esc(z.nr)+'</button>'; }).join('')+
           '</div></div>';
       }).join('') + (info.ohneId ? '<p class="lz-klein">'+info.ohneId+' weitere Fragen ohne ID lassen sich nicht zuordnen.</p>' : '');
@@ -13079,6 +13080,8 @@ function renderFolderContents(){
   var grFachEl = document.getElementById('gruppenFach');
   if(grFachEl) grFachEl.hidden = !!here;   // Gruppen-Übungen nur auf der Fach-Hauptebene
   bkListeZeichnen();
+  var lzNeuBtn = document.getElementById('lzNeuBtn');
+  if(lzNeuBtn) lzNeuBtn.hidden = !state.route.folderId;
   lzKarteZeichnen();
 
   var folders = foldersIn(here);
