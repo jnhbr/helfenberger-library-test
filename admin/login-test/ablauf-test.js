@@ -373,7 +373,8 @@ const feldWert = p => feld(p).inputValue().catch(() => null);
     await lp.click('#lzZu');
 
     // ✏️ Lernziele selbst anlegen (seit 25.11.2026): Ordner ohne Set → «🎯 Lernziele» → Editor.
-    await lp.click('#backBtn'); await lp.waitForSelector('#fopen-f_lz2');
+    await lp.click('#backBtn');   // aus einem Ordner geht «Zurück» zur Startseite
+    await B.fach(lp, 'mathe'); await lp.waitForSelector('#fopen-f_lz2');
     await lp.click('#fopen-f_lz2');
     await lp.waitForSelector('#lzNeuBtn');
     ok(!(await lp.$('.lz-karte')), 'Editor-Ordner hat noch keine Lernziel-Karte');
