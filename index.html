@@ -67,7 +67,7 @@ import {
   updatePassword, EmailAuthProvider, reauthenticateWithCredential, connectAuthEmulator
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache,
   getFirestore, doc, getDoc, getDocFromServer, getDocFromCache, getDocs, getDocsFromServer, collection, query, where, limit as fsLimit, onSnapshot, serverTimestamp, increment,
   setDoc as fsSetDoc, updateDoc as fsUpdateDoc, deleteDoc as fsDeleteDoc, writeBatch as fsWriteBatch, Bytes, deleteField, arrayUnion, arrayRemove,
   connectFirestoreEmulator, waitForPendingWrites, disableNetwork, enableNetwork, runTransaction
@@ -268,10 +268,17 @@ if(EMULATOR) connectAuthEmulator(auth, 'http://127.0.0.1:9099', {disableWarnings
 // automatisch im IndexedDB-Cache und bleiben so ohne Netz lesbar. Fällt das
 // Anlegen aus irgendeinem Grund aus (z.B. privates Surfen ohne IndexedDB),
 // fangen wir das ab und laufen einfach ohne Offline-Cache weiter.
+// 26.11.2026 (Ella E1c): Mit dem Mehr-Tab-Cache spricht nur EIN Tab des Browsers mit
+// Firestore (auch Live- und Testseite teilen ihn, gleiche Herkunft). Hat dieser Tab
+// keine gültige Anmeldung, lehnt Firestore in ALLEN Tabs alles ab – frisches Token
+// und Neu-Anmelden im eigenen Tab helfen dann nicht. Erkennt tokenNachlauf() das,
+// läuft dieser Tab bis zum Schliessen mit eigener Verbindung (ohne Offline-Cache).
+var FS_EIGEN_KEY = 'lib_fsEigeneVerbindung', fsEigen = false;
+try{ fsEigen = sessionStorage.getItem(FS_EIGEN_KEY) === '1'; }catch(e){}
 var db;
 try{
   if(EMULATOR) throw new Error('Emulator: ohne Offline-Cache');
-  db = initializeFirestore(fbApp, {
+  db = initializeFirestore(fbApp, fsEigen ? { localCache: memoryLocalCache() } : {
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
   });
 }catch(e){
@@ -315,7 +322,7 @@ function fehlerMelden(quelle, err, zusatz){
     // info: womit die Anfrage lief (Rechte im Anmelde-Token, angezeigte Klasse,
     // Schüleransicht, Sekunden seit Seitenaufruf) — bei «permission-denied»
     // sieht man so, ob das Konto die Rechte (noch) nicht hatte.
-    var info = 'Ansicht ' + (ansicht || '-') + (als ? ' (Schüleransicht)' : '') +
+    var info = 'Ansicht ' + (ansicht || '-') + (als ? ' (Schüleransicht)' : '') + (fsEigen ? ' · eigene Verbindung' : '') +
       ' · ' + Math.round(performance.now() / 1000) + ' s nach Laden' + (document.hidden ? ' · Tab im Hintergrund' : '');
     function senden(){
       fsSetDoc(doc(collection(db, 'fehlerLog')), {
@@ -378,9 +385,22 @@ function tokenNachlauf(){
   if(tokenNachlaufGetan || performance.now() > 120000 || !auth.currentUser) return;
   tokenNachlaufGetan = true;
   setTimeout(function(){
-    auth.currentUser && auth.currentUser.getIdToken(true).then(function(){
+    var u = auth.currentUser;
+    if(!u) return;
+    u.getIdToken(true).then(function(){
+      // Probe: das eigene Einstellungs-Dokument darf jede angemeldete Person lesen.
+      // Wird auch das abgelehnt, nimmt Firestore die Anmeldung dieses Tabs gar nicht
+      // (anderer Tab führt die gemeinsame Verbindung) → mit eigener Verbindung neu laden.
+      return getDocFromServer(doc(db, 'progress', u.uid, 'einstellungen', 'layout')).then(function(){ return true; }, function(err){
+        if(!(err && err.code === 'permission-denied') || fsEigen || EMULATOR) return true;
+        try{ sessionStorage.setItem(FS_EIGEN_KEY, '1'); }catch(e){ return true; }
+        return false;
+      });
+    }).then(function(ok){
       try{
-        if(state.route && (state.route.name === 'home' || state.route.name === 'subject') && !modalEl.classList.contains('show')) render();
+        var ruhig = state.route && (state.route.name === 'home' || state.route.name === 'subject') && !modalEl.classList.contains('show');
+        if(ok === false){ if(ruhig) location.reload(); return; }
+        if(ruhig) render();
       }catch(e){}
     }, function(){});
   }, 1500);
