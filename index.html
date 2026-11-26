@@ -48185,14 +48185,17 @@ function renderStpJetzt(){
       (l.info.img ? '<img class="'+(l.info.full?'':'ct')+'" src="'+l.info.img+'" alt="" onerror="stpBildFehlt(this)">' : '<span class="stp-dot"></span>')+
       '<div><small>'+label+'</small><b>'+esc(l.info.name)+'</b>'+(sub ? '<span>'+esc(sub)+'</span>' : '')+'</div></div>';
   }
+  // Termin mit genauer Uhrzeit (v/b, z. B. aus dem Kalender): die statt der Lektionszeit
+  function von(l){ return l.c && l.c.v && l.c.b ? l.c.v : l.z.von; }
+  function bisZ(l){ return l.c && l.c.v && l.c.b ? l.c.b : l.z.bis; }
   var h = '<button type="button" class="stp-jetzt" id="stpJetztBtn">';
   if(n.aktuell){
-    var rest = stpMin(n.aktuell.z.bis) - stpJetztMin();
+    var rest = stpMin(bisZ(n.aktuell)) - stpJetztMin();
     h += chip(n.aktuell, 'Jetzt', 'noch '+rest+' Min.');
   }
   if(n.danach){
-    var lbl = n.danach.spaeter ? n.danach.spaeter+' · '+n.danach.z.von : (n.aktuell ? 'Danach · ' : 'Als Nächstes · ')+n.danach.z.von;
-    var bis = n.danach.spaeter ? '' : (function(){ var m = stpMin(n.danach.z.von) - stpJetztMin(); return !n.aktuell && m <= 90 ? 'in '+m+' Min.' : ''; })();
+    var lbl = n.danach.spaeter ? n.danach.spaeter+' · '+von(n.danach) : (n.aktuell ? 'Danach · ' : 'Als Nächstes · ')+von(n.danach);
+    var bis = n.danach.spaeter ? '' : (function(){ var m = stpMin(von(n.danach)) - stpJetztMin(); return !n.aktuell && m <= 90 ? 'in '+m+' Min.' : ''; })();
     h += chip(n.danach, lbl, bis);
   }
   h += '<span class="stp-jetzt-go">🗓️ ›</span></button>';
