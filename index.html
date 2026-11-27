@@ -313,6 +313,10 @@ function fehlerMelden(quelle, err, zusatz){
     var msg = ((zusatz ? zusatz + ' ' : '') + fehlerText(err)).trim().slice(0, 1000);
     var stack = String((err && err.stack) || '').slice(0, 4000);
     if(!msg || FEHLER_IGNORIEREN.test(msg) || /extension:\/\//.test(stack)) return;
+    // Direkt nach einer Anmeldung: abgelehnte Zugriffe erst zurückhalten, bis tokenNachlauf()
+    // fertig ist (27.11.2026: Bommeli G1b und Helfenberger G3b, je 5 Lesezugriffe 1–2 s nach
+    // dem Anmelden abgelehnt, auch das eigene Einstellungs-Dokument).
+    if(err && err.code === 'permission-denied' && nachlaufHalten(quelle, err, zusatz)) return;
     var sig = msg.slice(0, 200);
     if(fehlerGesehen[sig]) return;
     fehlerGesehen[sig] = 1;
@@ -380,13 +384,47 @@ console.error = function(){
    einmal frisches Token holen und die Startseite neu aufbauen – sonst bleiben Links,
    Ämtliplan, Stundenplan usw. leer, bis jemand neu lädt. Nur auf der Startseite und
    nur, wenn gerade kein Dialog offen ist. */
-var tokenNachlaufGetan = false;
+/* Seit 27.11.2026 gilt das Fenster ab der letzten Anmeldung (loginAb, gesetzt in
+   authGeaendert), nicht nur ab dem Laden der Seite: Wer sich im offenen Tab ab- und wieder
+   anmeldet (Helfenberger, 5059 s nach dem Laden), bekam sonst keinen Nachlauf.
+   Abgelehnte Zugriffe in diesem Fenster werden zurückgehalten (nachlaufHalten). Lehnt
+   Firestore gleich mehrere verschiedene ab und klappt es danach mit frischem Token, war
+   die Anmeldung nur kurz nicht bereit: dann nichts melden, sondern neu laden. Eine einzelne
+   Ablehnung (eher eine Regel-Lücke) wird nach dem Nachlauf normal gemeldet. */
+var tokenNachlaufGetan = false, loginAb = 0, nachlaufFertig = false, nachlaufGehalten = [];
+function nachlaufFenster(){ return !nachlaufFertig && performance.now() - loginAb < 120000 && !!auth.currentUser; }
+function nachlaufHalten(quelle, err, zusatz){
+  if(!nachlaufFenster()) return false;
+  if(nachlaufGehalten.length < 30) nachlaufGehalten.push([quelle, err, zusatz]);
+  tokenNachlauf();
+  return true;
+}
+function nachlaufAbschliessen(ok){
+  nachlaufFertig = true;
+  var liste = nachlaufGehalten;
+  nachlaufGehalten = [];
+  var arten = {};
+  liste.forEach(function(x){ arten[(x[2] || '') + fehlerText(x[1])] = 1; });
+  if(ok && Object.keys(arten).length >= 2){ console.warn('Anmeldung kurz nicht bereit:', liste.length, 'Zugriffe abgelehnt, nach Token-Erneuerung neu geladen'); return; }
+  liste.forEach(function(x){ fehlerMelden(x[0], x[1], x[2]); });
+}
+function nachlaufNeuLaden(){
+  // Was beim Anmelden einmal geladen und danach zwischengespeichert wird, nochmals holen.
+  try{
+    if(!state.user || !state.profile) return;
+    linksLoad(true);
+    i18nKontoLaden();
+    stpVorladen();
+    if(state.profile.role === 'teacher') refreshSettingsBadge(true);
+  }catch(e){}
+}
 function tokenNachlauf(){
-  if(tokenNachlaufGetan || performance.now() > 120000 || !auth.currentUser) return;
+  if(tokenNachlaufGetan || performance.now() - loginAb > 120000 || !auth.currentUser) return;
   tokenNachlaufGetan = true;
+  var fuerLogin = loginAb;
   setTimeout(function(){
     var u = auth.currentUser;
-    if(!u) return;
+    if(!u || fuerLogin !== loginAb) return;
     u.getIdToken(true).then(function(){
       // Probe: das eigene Einstellungs-Dokument darf jede angemeldete Person lesen.
       // Wird auch das abgelehnt, nimmt Firestore die Anmeldung dieses Tabs gar nicht
@@ -397,12 +435,15 @@ function tokenNachlauf(){
         return false;
       });
     }).then(function(ok){
+      if(fuerLogin !== loginAb) return;
+      nachlaufAbschliessen(ok !== false);
       try{
         var ruhig = state.route && (state.route.name === 'home' || state.route.name === 'subject') && !modalEl.classList.contains('show');
         if(ok === false){ if(ruhig) location.reload(); return; }
+        nachlaufNeuLaden();
         if(ruhig) render();
       }catch(e){}
-    }, function(){});
+    }, function(){ if(fuerLogin === loginAb) nachlaufAbschliessen(false); });
   }, 1500);
 }
 /* Firestore-Tageslimit (Gratis-Tarif «Spark») erreicht: Schreiben/Lesen schlägt
@@ -6111,6 +6152,7 @@ async function authGeaendert(user){
   // "Start" zurückgesetzt und so unbemerkt den bereits getippten Text riskiert.
   if(user && lastAuthedUid && user.uid === lastAuthedUid){ if(!alsSchueler()) state.user = user; return; }
   state.user = user;
+  if(user){ loginAb = performance.now(); tokenNachlaufGetan = false; nachlaufFertig = false; nachlaufGehalten = []; }
   if(!user){
     lastAuthedUid = null;
     state.profile = null;
